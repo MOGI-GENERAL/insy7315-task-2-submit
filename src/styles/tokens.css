@@ -1,0 +1,102 @@
+/* DESIGN TOKENS: BRAND COLOURS FAIL AA AS TEXT, USE -text VARIANTS FOR COPY */
+
+:root {
+  /* BRAND PALETTE */
+  --c-amber: #c9762b;
+  --c-amber-text: #96521b;
+  --c-amber-dark: #7d4415;
+  --c-amber-tint: #f6e6d3;
+
+  --c-ink: #2e2a26;
+  --c-ink-soft: #4a443d;
+
+  --c-green: #3f8f52;
+  --c-green-text: #2c6b3c;
+  --c-green-tint: #e0efe4;
+
+  --c-red: #c1462f;
+  --c-red-text: #a63a25;
+  --c-red-tint: #f8e2dd;
+
+  --c-bg: #faf6f0;
+  --c-surface: #ffffff;
+  --c-surface-sunk: #f3ede4;
+
+  --c-muted: #6b635a;
+  --c-stone: #8a8177;
+  --c-line: #e2d9cc;
+  --c-line-strong: #cabfae;
+
+  /* OFFER LIFECYCLE: 5 STATES + DERIVED "EXPIRING" WARNING, AA-SAFE TINTS */
+  --c-status-open: var(--c-amber-text);
+  --c-status-open-bg: var(--c-amber-tint);
+  --c-status-claimed: var(--c-green-text);
+  --c-status-claimed-bg: var(--c-green-tint);
+  --c-status-collected: var(--c-green-text);
+  --c-status-collected-bg: var(--c-green-tint);
+  --c-status-expired: var(--c-muted);
+  --c-status-expired-bg: var(--c-surface-sunk);
+  --c-status-cancelled: var(--c-muted);
+  --c-status-cancelled-bg: var(--c-surface-sunk);
+  --c-status-expiring: var(--c-red-text);
+  --c-status-expiring-bg: var(--c-red-tint);
+
+  /* TYPOGRAPHY: REM-SIZED, MIN 13PX FOR ARM'S-LENGTH READABILITY */
+  --font-body: 'Inter Variable', 'Inter', system-ui, -apple-system, sans-serif;
+  --font-head: 'Figtree Variable', 'Figtree', var(--font-body);
+
+  --t-xs: 0.8125rem;
+  --t-sm: 0.9375rem;
+  --t-base: 1rem;
+  --t-lg: 1.125rem;
+  --t-xl: 1.375rem;
+  --t-2xl: 1.75rem;
+  --t-3xl: 2.25rem;
+
+  --lh-tight: 1.2;
+  --lh-normal: 1.5;
+
+  --w-normal: 400;
+  --w-medium: 500;
+  --w-semi: 600;
+  --w-bold: 700;
+
+  /* SPACING */
+  --s-1: 0.25rem;
+  --s-2: 0.5rem;
+  --s-3: 0.75rem;
+  --s-4: 1rem;
+  --s-5: 1.5rem;
+  --s-6: 2rem;
+  --s-7: 3rem;
+  --s-8: 4rem;
+
+  /* SHAPE AND DEPTH */
+  --r-sm: 4px;
+  --r-md: 8px;
+  --r-lg: 12px;
+  --r-pill: 999px;
+
+  --shadow-sm: 0 1px 2px rgb(46 42 38 / 8%);
+  --shadow-md: 0 2px 8px rgb(46 42 38 / 10%);
+  --shadow-lg: 0 8px 24px rgb(46 42 38 / 14%);
+
+  /* CONTROLS: 48PX MIN TAP TARGET (A11Y REQUIREMENT) */
+  --tap-min: 48px;
+  --focus-ring: 3px solid var(--c-amber-dark);
+  --focus-offset: 2px;
+
+  /* CHART PALETTE: BRAND GREEN/RED FAILS CVD CHECK, THESE TONES PASS */
+  --chart-good: #4e9a60;
+  --chart-bad: #8c2f1e;
+  --chart-neutral: var(--c-stone);
+  --chart-grid: var(--c-line);
+  --chart-axis: var(--c-muted);
+
+  /* LAYOUT */
+  --shell-max: 1200px;
+  --content-max: 44rem;
+  --sidebar-w: 15rem;
+  --bottombar-h: 4.25rem;
+  --header-h: 3.5rem;
+}

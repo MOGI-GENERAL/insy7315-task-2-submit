@@ -1,0 +1,82 @@
+.posted {
+  max-width: 32rem;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.posted__tick {
+  display: grid;
+  place-items: center;
+  width: 4.5rem;
+  height: 4.5rem;
+  margin: var(--s-4) auto var(--s-4);
+  border-radius: var(--r-pill);
+  background: var(--c-green-tint);
+  color: var(--c-green-text);
+}
+
+.posted h1 {
+  margin-bottom: var(--s-1);
+}
+
+.posted__ref {
+  color: var(--c-muted);
+  font-size: var(--t-sm);
+  letter-spacing: 0.05em;
+  font-weight: var(--w-semi);
+  margin-bottom: var(--s-4);
+}
+
+.posted__reach {
+  display: inline-block;
+  padding: var(--s-2) var(--s-4);
+  background: var(--c-amber-tint);
+  color: var(--c-amber-text);
+  border-radius: var(--r-pill);
+  font-size: var(--t-sm);
+  margin-bottom: var(--s-5);
+}
+
+.posted__reach strong {
+  font-size: var(--t-lg);
+}
+
+.posted__card {
+  overflow: hidden;
+  text-align: left;
+  margin-bottom: var(--s-5);
+}
+
+.posted__photo {
+  aspect-ratio: 16 / 7;
+}
+
+.posted__card h2 {
+  margin-bottom: var(--s-1);
+}
+
+.posted__tags {
+  margin: var(--s-3) 0;
+}
+
+.posted__next {
+  color: var(--c-muted);
+  font-size: var(--t-sm);
+  margin-bottom: var(--s-5);
+}
+
+.posted__actions {
+  display: grid;
+  gap: var(--s-3);
+  margin-bottom: var(--s-3);
+}
+
+@media (min-width: 30rem) {
+  .posted__actions {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.posted__home {
+  margin: 0 auto;
+}

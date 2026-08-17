@@ -1,0 +1,85 @@
+.chart {
+  width: 100%;
+}
+
+.chart__svg {
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.chart__grid {
+  stroke: var(--chart-grid);
+  stroke-width: 1;
+}
+
+.chart__bar[data-tone='good'] {
+  fill: var(--chart-good);
+}
+
+.chart__bar[data-tone='bad'] {
+  fill: var(--chart-bad);
+}
+
+.chart__group {
+  cursor: pointer;
+  outline: none;
+}
+
+.chart__group:focus-visible .chart__bar {
+  stroke: var(--c-ink);
+  stroke-width: 2;
+}
+
+.chart__x-label {
+  font-size: 11px;
+  fill: var(--chart-axis);
+  font-family: var(--font-body);
+}
+
+.chart__tooltip rect {
+  fill: var(--c-ink);
+}
+
+.chart__tooltip-text {
+  fill: #fff;
+  font-size: 11px;
+  font-family: var(--font-body);
+  font-weight: 600;
+}
+
+.chart__legend {
+  display: flex;
+  gap: var(--s-4);
+  margin-bottom: var(--s-3);
+  flex-wrap: wrap;
+}
+
+.chart__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  font-size: var(--t-sm);
+  color: var(--c-ink-soft);
+}
+
+.chart__swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.chart__swatch[data-tone='good'] {
+  background: var(--chart-good);
+}
+
+.chart__swatch[data-tone='bad'] {
+  background: var(--chart-bad);
+}
+
+.split-bar__svg {
+  width: 100%;
+  height: 2rem;
+  display: block;
+}
