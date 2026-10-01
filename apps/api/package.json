@@ -1,0 +1,23 @@
+{
+  "name": "@fedsa/api",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc -b",
+    "start": "node dist/src/server.js",
+    "test:unit": "vitest run --passWithNoTests --dir src",
+    "test:integration": "vitest run --passWithNoTests --dir test/integration",
+    "test:contract": "vitest run --passWithNoTests --dir test/contract"
+  },
+  "dependencies": {
+    "@fedsa/contract": "0.0.0",
+    "express": "^5.2.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^22.20.4",
+    "tsx": "^4.23.15"
+  }
+}
