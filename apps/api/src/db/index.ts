@@ -11,8 +11,10 @@ export * from './models/tax-certificate.js';
 export * from './models/user.js';
 export * from './models/valuation-rate.js';
 
+export * from './repositories/audit-log-repository.js';
 export * from './repositories/claim-repository.js';
 export * from './repositories/handover-repository.js';
+export * from './repositories/health-repository.js';
 export * from './repositories/notification-repository.js';
 export * from './repositories/offer-repository.js';
 export * from './repositories/organisation-repository.js';
