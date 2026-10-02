@@ -1,18 +1,27 @@
 import express, { type Router } from 'express';
 import type { Logger } from 'pino';
 import { pinoHttp } from 'pino-http';
+import { csrfProtection } from './middleware/csrf.js';
+import { loadCurrentUser } from './middleware/current-user.js';
 import { errorHandler, notFound } from './middleware/error-handler.js';
+import { globalLimit } from './middleware/rate-limits.js';
 import { securityHeaders } from './middleware/security-headers.js';
+import { sessions, type SessionSettings } from './middleware/session.js';
+import { authRouter } from './routes/auth-router.js';
 import { healthRouter } from './routes/health-router.js';
+import { meRouter } from './routes/me-router.js';
 import type { HealthService } from './services/health-service.js';
+import type { UserService } from './services/user-service.js';
 
 export interface AppServices {
   health: HealthService;
+  users: UserService;
 }
 
 export interface AppDeps {
   logger: Logger;
   services: AppServices;
+  session: SessionSettings;
   /** lets tests mount throwaway routes in front of the 404 */
   extraRouters?: Router[];
 }
@@ -28,9 +37,14 @@ export function createApp(deps: AppDeps) {
   app.use(securityHeaders());
   app.use(express.json({ limit: '100kb' }));
 
-  // the session and then the CSRF check go here, so every router below sees both
+  app.use(sessions(deps.session));
+  app.use(globalLimit());
+  app.use(csrfProtection);
+  app.use(loadCurrentUser(deps.services.users));
 
   app.use('/api', healthRouter(deps.services.health));
+  app.use('/api', authRouter(deps.services.users));
+  app.use('/api', meRouter(deps.services.users));
   for (const router of deps.extraRouters ?? []) app.use(router);
 
   app.use(notFound);

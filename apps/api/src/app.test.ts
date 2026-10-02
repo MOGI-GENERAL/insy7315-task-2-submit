@@ -7,12 +7,15 @@ import {
   LoginRequest,
 } from '@fedsa/contract';
 import { Router } from 'express';
-import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
+import { TestClient } from '../test/test-client.js';
 import { createApp } from './app.js';
+import { OrganisationRepository, SessionRepository, UserRepository } from './db/index.js';
 import { OfferUnavailableError } from './errors.js';
 import { createLogger } from './logger.js';
 import { validate } from './middleware/validate.js';
 import { HealthService } from './services/health-service.js';
+import { UserService } from './services/user-service.js';
 
 const logLines: string[] = [];
 const logger = createLogger({ write: (line: string) => void logLines.push(line) });
@@ -39,16 +42,31 @@ throwaway.get('/test/crash', () => {
 throwaway.get('/test/claimed', () => {
   throw new OfferUnavailableError();
 });
+throwaway.post('/api/webhooks/twilio/test', (_req, res) => {
+  res.status(204).end();
+});
 
+// no request in this file signs in, so the user service never reaches a database
 const server = createApp({
   logger,
-  services: { health: new HealthService(fakeHealthRepository, 'test-sha') },
+  services: {
+    health: new HealthService(fakeHealthRepository, 'test-sha'),
+    users: new UserService(
+      new UserRepository(),
+      new OrganisationRepository(),
+      new SessionRepository(),
+    ),
+  },
+  session: { secret: 'unit-test-session-secret', secureCookie: false },
   extraRouters: [throwaway],
 }).listen(0);
 let baseUrl = '';
+let client: TestClient;
 
-beforeAll(() => {
+beforeAll(async () => {
   baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  client = new TestClient(baseUrl);
+  await client.fetchCsrfToken();
 });
 
 beforeEach(() => {
@@ -63,11 +81,7 @@ afterAll(() => {
 const VALID_ID = '64b7f0c2a1b2c3d4e5f60718';
 
 function post(path: string, body: unknown) {
-  return fetch(`${baseUrl}${path}`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+  return client.post(path, body);
 }
 
 describe('health', () => {
@@ -185,5 +199,59 @@ describe('logging', () => {
 
     expect(logs()).not.toContain('top-level-secret');
     expect(logs()).not.toContain('nested-secret');
+  });
+
+  test('the CSRF token header is redacted', async () => {
+    await post(`/test/users/${VALID_ID}`, { email: 'a@example.org', password: 'correct horse' });
+
+    // the request is logged when the response finishes, which can trail the client a little
+    await vi.waitFor(() => expect(logs()).toContain('x-csrf-token'));
+    expect(logs()).not.toContain(client.csrfToken);
+  });
+
+  test('password hashes are redacted', () => {
+    logger.info({ user: { passwordHash: '$2b$12$hash-value-789' } });
+
+    expect(logs()).not.toContain('hash-value-789');
+  });
+});
+
+describe('CSRF', () => {
+  const body = { email: 'a@example.org', password: 'correct horse' };
+
+  test('a state-changing request without a token is refused', async () => {
+    const token = client.csrfToken;
+    client.csrfToken = '';
+    const res = await client.post(`/test/users/${VALID_ID}`, body);
+    client.csrfToken = token;
+
+    expect(res.status).toBe(403);
+    expect(ErrorEnvelope.parse(await res.json()).error.code).toBe('CSRF_INVALID');
+  });
+
+  test('a state-changing request with the wrong token is refused', async () => {
+    const res = await client.request('POST', `/test/users/${VALID_ID}`, body, {
+      'X-CSRF-Token': 'x'.repeat(client.csrfToken.length),
+    });
+
+    expect(res.status).toBe(403);
+    expect(ErrorEnvelope.parse(await res.json()).error.code).toBe('CSRF_INVALID');
+  });
+
+  test('a token from another session is refused', async () => {
+    const other = new TestClient(baseUrl);
+    await other.fetchCsrfToken();
+
+    const res = await client.request('POST', `/test/users/${VALID_ID}`, body, {
+      'X-CSRF-Token': other.csrfToken,
+    });
+
+    expect(res.status).toBe(403);
+  });
+
+  test('Twilio webhooks need no token', async () => {
+    const res = await fetch(`${baseUrl}/api/webhooks/twilio/test`, { method: 'POST' });
+
+    expect(res.status).toBe(204);
   });
 });

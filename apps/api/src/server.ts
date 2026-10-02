@@ -1,16 +1,25 @@
 import mongoose from 'mongoose';
 import { createApp } from './app.js';
-import { bootstrapDb, HealthRepository } from './db/index.js';
+import {
+  bootstrapDb,
+  HealthRepository,
+  OrganisationRepository,
+  SessionRepository,
+  UserRepository,
+} from './db/index.js';
 import { createLogger } from './logger.js';
+import { createSessionStore } from './middleware/session.js';
 import { HealthService } from './services/health-service.js';
+import { UserService } from './services/user-service.js';
 
 const logger = createLogger();
 
 async function start() {
   const mongodbUri = process.env.MONGODB_URI;
-  if (!mongodbUri) {
+  const sessionSecret = process.env.SESSION_SECRET;
+  if (!mongodbUri || !sessionSecret) {
     logger.fatal(
-      'MONGODB_URI is not set. Copy apps/api/.env.example to apps/api/.env and fill it in',
+      'MONGODB_URI and SESSION_SECRET must be set. Copy apps/api/.env.example to apps/api/.env and fill it in',
     );
     process.exit(1);
   }
@@ -27,10 +36,21 @@ async function start() {
   const services = {
     // Render sets RENDER_GIT_COMMIT on every deploy
     health: new HealthService(new HealthRepository(), process.env.RENDER_GIT_COMMIT || 'dev'),
+    users: new UserService(
+      new UserRepository(),
+      new OrganisationRepository(),
+      new SessionRepository(),
+    ),
+  };
+  const session = {
+    secret: sessionSecret,
+    store: createSessionStore(),
+    // secure unless explicitly running locally, so a missing variable in a deployment fails safe
+    secureCookie: process.env.NODE_ENV !== 'development',
   };
   const port = Number(process.env.PORT || 3000);
 
-  createApp({ logger, services }).listen(port, () => {
+  createApp({ logger, services, session }).listen(port, () => {
     logger.info(`api listening on ${port}`);
   });
 }
