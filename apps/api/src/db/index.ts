@@ -1,4 +1,5 @@
 export * from './bootstrap.js';
+export * from './transaction.js';
 
 export * from './models/audit-log.js';
 export * from './models/claim.js';
@@ -18,4 +19,5 @@ export * from './repositories/health-repository.js';
 export * from './repositories/notification-repository.js';
 export * from './repositories/offer-repository.js';
 export * from './repositories/organisation-repository.js';
+export * from './repositories/session-repository.js';
 export * from './repositories/user-repository.js';
