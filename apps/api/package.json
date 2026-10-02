@@ -3,21 +3,29 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "exports": {
+    "./db": {
+      "types": "./dist/src/db/index.d.ts",
+      "default": "./dist/src/db/index.js"
+    }
+  },
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc -b",
     "start": "node dist/src/server.js",
     "test:unit": "vitest run --passWithNoTests --dir src",
-    "test:integration": "vitest run --passWithNoTests --dir test/integration",
+    "test:integration": "vitest run --passWithNoTests --no-file-parallelism --dir test/integration",
     "test:contract": "vitest run --passWithNoTests --dir test/contract"
   },
   "dependencies": {
     "@fedsa/contract": "0.0.0",
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "mongoose": "^9.10.3"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
     "@types/node": "^22.20.4",
+    "mongodb-memory-server-core": "^11.3.0",
     "tsx": "^4.23.15"
   }
 }
