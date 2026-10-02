@@ -42,7 +42,15 @@ export class TestClient {
       const pair = setCookie.split(';')[0]!;
       this.cookie = pair.endsWith('=') ? '' : pair;
     }
-    return res;
+
+    // express-session holds back the last byte until the session is stored, so a
+    // request sent before the body is read can find the session missing
+    const content = await res.arrayBuffer();
+    return new Response(content.byteLength > 0 ? content : null, {
+      status: res.status,
+      statusText: res.statusText,
+      headers: res.headers,
+    });
   }
 
   get(path: string) {
