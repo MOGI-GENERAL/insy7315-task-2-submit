@@ -9,4 +9,12 @@ export class OfferRepository {
   create(data: Partial<OfferDoc>, session?: ClientSession) {
     return new OfferModel(data).save({ session });
   }
+
+  countByDonor(donorOrganisationId: Types.ObjectId | string) {
+    return OfferModel.countDocuments({ donorOrganisationId }).exec();
+  }
+
+  idsForDonor(donorOrganisationId: Types.ObjectId | string) {
+    return OfferModel.distinct('_id', { donorOrganisationId }).exec() as Promise<Types.ObjectId[]>;
+  }
 }
