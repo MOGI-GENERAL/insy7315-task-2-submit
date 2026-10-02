@@ -24,9 +24,11 @@ async function start() {
     process.exit(1);
   }
 
+  let sessionStore;
   try {
     await mongoose.connect(mongodbUri);
     const result = await bootstrapDb();
+    sessionStore = await createSessionStore();
     logger.info(result, 'database ready');
   } catch (err) {
     logger.fatal({ err }, 'could not connect to MongoDB or prepare the database');
@@ -44,7 +46,7 @@ async function start() {
   };
   const session = {
     secret: sessionSecret,
-    store: createSessionStore(),
+    store: sessionStore,
     // secure unless explicitly running locally, so a missing variable in a deployment fails safe
     secureCookie: process.env.NODE_ENV !== 'development',
   };

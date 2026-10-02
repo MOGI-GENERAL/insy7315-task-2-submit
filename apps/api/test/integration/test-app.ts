@@ -35,7 +35,11 @@ export async function startTestApp(extraRouters: Router[] = []) {
         new SessionRepository(),
       ),
     },
-    session: { secret: TEST_SESSION_SECRET, secureCookie: false, store: createSessionStore() },
+    session: {
+      secret: TEST_SESSION_SECRET,
+      secureCookie: false,
+      store: await createSessionStore(),
+    },
     extraRouters,
   }).listen(0);
   await once(server, 'listening');

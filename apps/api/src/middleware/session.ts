@@ -48,14 +48,18 @@ type StoreClient = NonNullable<Parameters<typeof MongoStore.create>[0]['client']
  * keeps sessions in MongoDB over the open mongoose connection. sessions are
  * stored as objects rather than JSON strings so `session.userId` can be queried
  */
-export function createSessionStore() {
-  return MongoStore.create({
+export async function createSessionStore() {
+  const store = MongoStore.create({
     // mongoose ships its own copy of the driver, so its client type differs from the store's
     client: mongoose.connection.getClient() as unknown as StoreClient,
     collectionName: SESSIONS_COLLECTION,
     stringify: false,
     ttl: SESSION_TTL_SECONDS,
   });
+  // the store builds its expiry index in the background. a failure there would
+  // otherwise surface later as an unhandled rejection, even after a disconnect
+  await store.collectionP;
+  return store;
 }
 
 /** a new session ID on every sign-in stops a session fixed before it from being reused */
