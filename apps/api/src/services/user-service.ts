@@ -7,6 +7,8 @@ import {
   type RegisterRequest,
   type Role,
   type SessionResponse,
+  type UpdateMeRequest,
+  type UserResponse,
 } from '@fedsa/contract';
 import bcrypt from 'bcryptjs';
 import { mongo } from 'mongoose';
@@ -119,6 +121,12 @@ export class UserService {
       role: user.role,
       organisationId: user.organisationId ? user.organisationId.toString() : null,
     };
+  }
+
+  async updateMe(userId: string, input: UpdateMeRequest): Promise<UserResponse> {
+    const user = await this.users.updateProfile(userId, input);
+    if (!user) throw new UnauthenticatedError();
+    return { user: userView(user) };
   }
 
   /** signs the user out everywhere except the session that made the change */

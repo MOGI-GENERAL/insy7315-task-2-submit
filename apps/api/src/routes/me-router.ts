@@ -1,4 +1,4 @@
-import { ChangePasswordRequest } from '@fedsa/contract';
+import { ChangePasswordRequest, UpdateMeRequest } from '@fedsa/contract';
 import { Router } from 'express';
 import { meController } from '../controllers/me-controller.js';
 import { requireAuth } from '../middleware/guards.js';
@@ -9,6 +9,7 @@ export function meRouter(users: UserService) {
   const controller = meController(users);
   const router = Router();
   router.get('/me', requireAuth, controller.get);
+  router.patch('/me', requireAuth, validate({ body: UpdateMeRequest }), controller.update);
   router.post(
     '/me/password',
     requireAuth,
