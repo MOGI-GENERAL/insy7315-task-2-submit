@@ -3,12 +3,16 @@ import { pino, type DestinationStream } from 'pino';
 const REDACT = [
   'req.headers.cookie',
   'req.headers.authorization',
+  'req.headers["x-csrf-token"]',
   'res.headers["set-cookie"]',
   'password',
   '*.password',
   '*.*.password',
   '*.currentPassword',
   '*.newPassword',
+  'passwordHash',
+  '*.passwordHash',
+  '*.*.passwordHash',
 ];
 
 /** `destination` lets tests read what was logged */

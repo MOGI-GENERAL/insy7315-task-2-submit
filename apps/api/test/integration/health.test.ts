@@ -1,28 +1,21 @@
-import type { Server } from 'node:http';
-import type { AddressInfo } from 'node:net';
 import { HealthResponse } from '@fedsa/contract';
 import { afterAll, beforeAll, expect, test } from 'vitest';
-import { createApp } from '../../src/app.js';
-import { HealthRepository } from '../../src/db/index.js';
-import { createLogger } from '../../src/logger.js';
-import { HealthService } from '../../src/services/health-service.js';
+import { startTestApp } from './test-app.js';
 import { START_TIMEOUT_MS, startTestDb } from './test-db.js';
 
 let stopTestDb: (() => Promise<void>) | undefined;
-let server: Server | undefined;
+let closeApp: (() => Promise<void>) | undefined;
 let baseUrl = '';
 
 beforeAll(async () => {
   stopTestDb = await startTestDb();
-  server = createApp({
-    logger: createLogger({ write: () => {} }),
-    services: { health: new HealthService(new HealthRepository(), 'test-sha') },
-  }).listen(0);
-  baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  const app = await startTestApp();
+  closeApp = app.close;
+  baseUrl = app.baseUrl;
 }, START_TIMEOUT_MS);
 
 afterAll(async () => {
-  server?.close();
+  await closeApp?.();
   await stopTestDb?.();
 });
 
