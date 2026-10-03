@@ -6,7 +6,11 @@ import type { Router } from 'express';
 import type { Types } from 'mongoose';
 import { createApp } from '../../src/app.js';
 import {
+  AuditLogRepository,
+  ClaimRepository,
+  HandoverRepository,
   HealthRepository,
+  OfferRepository,
   OrganisationRepository,
   SessionRepository,
   UserModel,
@@ -14,7 +18,9 @@ import {
 } from '../../src/db/index.js';
 import { createLogger } from '../../src/logger.js';
 import { createSessionStore } from '../../src/middleware/session.js';
+import { AuditService } from '../../src/services/audit-service.js';
 import { HealthService } from '../../src/services/health-service.js';
+import { OrganisationService } from '../../src/services/organisation-service.js';
 import { UserService } from '../../src/services/user-service.js';
 import { TestClient } from '../test-client.js';
 
@@ -22,6 +28,17 @@ import { TestClient } from '../test-client.js';
 export const TEST_SESSION_SECRET = 'integration-test-session-secret';
 
 export const TEST_PASSWORD = 'correct horse battery';
+
+/** the organisation service as the app builds it, for tests that call it directly */
+export function newOrganisationService() {
+  return new OrganisationService(
+    new OrganisationRepository(),
+    new OfferRepository(),
+    new ClaimRepository(),
+    new HandoverRepository(),
+    new AuditService(new AuditLogRepository()),
+  );
+}
 
 /** starts the real app on the test database. needs `startTestDb` to have run */
 export async function startTestApp(extraRouters: Router[] = []) {
@@ -34,6 +51,7 @@ export async function startTestApp(extraRouters: Router[] = []) {
         new OrganisationRepository(),
         new SessionRepository(),
       ),
+      organisations: newOrganisationService(),
     },
     session: {
       secret: TEST_SESSION_SECRET,

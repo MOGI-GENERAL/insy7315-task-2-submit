@@ -10,11 +10,21 @@ import { Router } from 'express';
 import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 import { TestClient } from '../test/test-client.js';
 import { createApp } from './app.js';
-import { OrganisationRepository, SessionRepository, UserRepository } from './db/index.js';
+import {
+  AuditLogRepository,
+  ClaimRepository,
+  HandoverRepository,
+  OfferRepository,
+  OrganisationRepository,
+  SessionRepository,
+  UserRepository,
+} from './db/index.js';
 import { OfferUnavailableError } from './errors.js';
 import { createLogger } from './logger.js';
 import { validate } from './middleware/validate.js';
+import { AuditService } from './services/audit-service.js';
 import { HealthService } from './services/health-service.js';
+import { OrganisationService } from './services/organisation-service.js';
 import { UserService } from './services/user-service.js';
 
 const logLines: string[] = [];
@@ -55,6 +65,13 @@ const server = createApp({
       new UserRepository(),
       new OrganisationRepository(),
       new SessionRepository(),
+    ),
+    organisations: new OrganisationService(
+      new OrganisationRepository(),
+      new OfferRepository(),
+      new ClaimRepository(),
+      new HandoverRepository(),
+      new AuditService(new AuditLogRepository()),
     ),
   },
   session: { secret: 'unit-test-session-secret', secureCookie: false },

@@ -1,4 +1,4 @@
-import { ErrorEnvelope, SessionResponse, suburbLocation } from '@fedsa/contract';
+import { ErrorEnvelope, SessionResponse, UserResponse, suburbLocation } from '@fedsa/contract';
 import mongoose from 'mongoose';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { OrganisationModel, SESSIONS_COLLECTION, UserModel } from '../../src/db/index.js';
@@ -330,6 +330,69 @@ describe('change password', () => {
     expect((await other.get('/api/me')).status).toBe(401);
     await expect(signedInClient(baseUrl, user.email)).rejects.toThrow();
     await expect(signedInClient(baseUrl, user.email, 'a brand new password')).resolves.toBeTruthy();
+  });
+});
+
+describe('update me', () => {
+  test('a user changes their language and phone', async () => {
+    const user = await createUser({ role: 'donor', organisationId: new mongoose.Types.ObjectId() });
+    const client = await signedInClient(baseUrl, user.email);
+
+    const res = await client.request('PATCH', '/api/me', {
+      languagePreference: 'af',
+      phone: '+27837654321',
+    });
+
+    expect(res.status).toBe(200);
+    expect(UserResponse.parse(await res.json()).user).toMatchObject({
+      id: user.id,
+      languagePreference: 'af',
+      phone: '+27837654321',
+    });
+    const me = SessionResponse.parse(await (await client.get('/api/me')).json());
+    expect(me.user.languagePreference).toBe('af');
+  });
+
+  test('fields outside the request are ignored and an empty body changes nothing', async () => {
+    const user = await createUser({ role: 'donor', organisationId: new mongoose.Types.ObjectId() });
+    const client = await signedInClient(baseUrl, user.email);
+
+    const res = await client.request('PATCH', '/api/me', {
+      role: 'administrator',
+      email: 'someone.else@example.org',
+    });
+    const empty = await client.request('PATCH', '/api/me', {});
+
+    expect(res.status).toBe(200);
+    expect(empty.status).toBe(200);
+    const stored = await UserModel.findById(user._id).lean();
+    expect(stored!.role).toBe('donor');
+    expect(stored!.email).toBe(user.email);
+    expect(stored!.languagePreference).toBe('en');
+  });
+
+  test('an unknown language or a malformed phone is refused', async () => {
+    const user = await createUser({ role: 'coordinator' });
+    const client = await signedInClient(baseUrl, user.email);
+
+    const res = await client.request('PATCH', '/api/me', {
+      languagePreference: 'fr',
+      phone: '0821234567',
+    });
+
+    expect(res.status).toBe(400);
+    expect(Object.keys(ErrorEnvelope.parse(await res.json()).error.fields ?? {}).sort()).toEqual([
+      'languagePreference',
+      'phone',
+    ]);
+  });
+
+  test('an anonymous caller is refused', async () => {
+    const client = await anonymousClient(baseUrl);
+
+    const res = await client.request('PATCH', '/api/me', { languagePreference: 'xh' });
+
+    expect(res.status).toBe(401);
   });
 });
 

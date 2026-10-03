@@ -63,3 +63,8 @@ export function organisationView(organisation: Stored<OrganisationDoc>): Organis
     mealsPerDay: organisation.mealsPerDay ?? null,
   };
 }
+
+/** adds `capacityNotes`, so only coordinators and administrators may receive it */
+export function organisationStaffView(organisation: Stored<OrganisationDoc>): Organisation {
+  return { ...organisationView(organisation), capacityNotes: organisation.capacityNotes ?? '' };
+}
