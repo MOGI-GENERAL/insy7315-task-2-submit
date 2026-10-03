@@ -14,6 +14,7 @@ export * from './models/valuation-rate.js';
 
 export * from './repositories/audit-log-repository.js';
 export * from './repositories/claim-repository.js';
+export * from './repositories/collection-repository.js';
 export * from './repositories/handover-repository.js';
 export * from './repositories/health-repository.js';
 export * from './repositories/notification-repository.js';
