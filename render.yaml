@@ -1,0 +1,60 @@
+# secrets are marked sync: false and set in the Render dashboard, never here
+services:
+  - type: web
+    name: fedsa-api
+    runtime: node
+    plan: starter
+    region: frankfurt
+    branch: main
+    # deploys come from the deploy workflow's hook once CI passes
+    autoDeployTrigger: "off"
+    buildCommand: npm ci --include=dev && npm run build -w packages/contract -w apps/api
+    startCommand: npm run start -w apps/api
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "22"
+      - key: MONGODB_URI
+        sync: false
+      - key: SESSION_SECRET
+        sync: false
+
+  - type: web
+    name: fedsa-api-staging
+    runtime: node
+    plan: free
+    region: frankfurt
+    branch: develop
+    autoDeployTrigger: commit
+    buildCommand: npm ci --include=dev && npm run build -w packages/contract -w apps/api
+    startCommand: npm run start -w apps/api
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "22"
+      - key: MONGODB_URI
+        sync: false
+      - key: SESSION_SECRET
+        sync: false
+
+  - type: cron
+    name: fedsa-jobs
+    runtime: node
+    plan: starter
+    region: frankfurt
+    branch: main
+    schedule: "*/5 * * * *"
+    autoDeployTrigger: "off"
+    buildCommand: npm ci --include=dev && npm run build -w packages/contract -w apps/api -w apps/jobs
+    startCommand: npm run start -w apps/jobs
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "22"
+      - key: MONGODB_URI
+        sync: false
