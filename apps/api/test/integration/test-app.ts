@@ -29,6 +29,8 @@ import { createSessionStore } from '../../src/middleware/session.js';
 import { LocalPhotoStore } from '../../src/photos/local-photo-store.js';
 import type { PhotoStore } from '../../src/photos/photo-store.js';
 import { AuditService } from '../../src/services/audit-service.js';
+import { LoggingClaimNotifier, type ClaimNotifier } from '../../src/services/claim-notifier.js';
+import { ClaimService } from '../../src/services/claim-service.js';
 import { DEFAULT_RADIUS_KM } from '../../src/services/eligibility.js';
 import { HealthService } from '../../src/services/health-service.js';
 import { LoggingNotifier, type OfferNotifier } from '../../src/services/offer-notifier.js';
@@ -75,8 +77,32 @@ export function newOfferService(options: OfferTestOptions = {}) {
   );
 }
 
+export interface ClaimTestOptions {
+  offerNotifier?: OfferNotifier;
+  claimNotifier?: ClaimNotifier;
+}
+
+/** built on the same offer service the app uses, as in production */
+export function newClaimService(offers: OfferService, options: ClaimTestOptions = {}) {
+  const logger = createLogger({ write: () => {} });
+  return new ClaimService(
+    new ClaimRepository(),
+    new OfferRepository(),
+    new OrganisationRepository(),
+    new HandoverRepository(),
+    offers,
+    options.offerNotifier ?? new LoggingNotifier(logger),
+    options.claimNotifier ?? new LoggingClaimNotifier(logger),
+    logger,
+  );
+}
+
 /** starts the real app on the test database. needs `startTestDb` to have run */
-export async function startTestApp(extraRouters: Router[] = [], offers = newOfferService()) {
+export async function startTestApp(
+  extraRouters: Router[] = [],
+  offers = newOfferService(),
+  claims = newClaimService(offers),
+) {
   const server = createApp({
     logger: createLogger({ write: () => {} }),
     services: {
@@ -88,6 +114,7 @@ export async function startTestApp(extraRouters: Router[] = [], offers = newOffe
       ),
       organisations: newOrganisationService(),
       offers,
+      claims,
     },
     session: {
       secret: TEST_SESSION_SECRET,
