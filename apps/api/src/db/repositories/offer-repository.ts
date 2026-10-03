@@ -29,6 +29,28 @@ export class OfferRepository {
     ).exec();
   }
 
+  /** the claim lock. the status filter is the lock, and a second claimant matches nothing */
+  lockIfClaimable(id: Types.ObjectId | string, now: Date, session: ClientSession) {
+    return OfferModel.findOneAndUpdate(
+      { _id: id, status: 'open', availableFrom: { $lte: now }, collectionDeadline: { $gt: now } },
+      { $set: { status: 'claimed' } },
+      { returnDocument: 'after', runValidators: true, session },
+    ).exec();
+  }
+
+  /** null if the offer is no longer claimed, as after expiry */
+  reopenIfClaimed(id: Types.ObjectId | string, session: ClientSession) {
+    return OfferModel.findOneAndUpdate(
+      { _id: id, status: 'claimed' },
+      { $set: { status: 'open' } },
+      { returnDocument: 'after', runValidators: true, session },
+    ).exec();
+  }
+
+  findByIds(ids: Types.ObjectId[]) {
+    return OfferModel.find({ _id: { $in: ids } }).exec();
+  }
+
   countByDonor(donorOrganisationId: Types.ObjectId | string) {
     return OfferModel.countDocuments({ donorOrganisationId }).exec();
   }
