@@ -4,6 +4,10 @@ import type { DataLayer } from './repositories';
 
 export { ApiError, isApiError } from './ApiError';
 export { photoKeyFromUrl } from './fake/mappers';
+export { demoAccounts } from './fake/demoAccounts';
+export type { DemoAccount } from './fake/demoAccounts';
+export { useLoad } from './useLoad';
+export type { Loaded } from './useLoad';
 export type * from './repositories';
 
 export type DataMode = 'fake' | 'http';

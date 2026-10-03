@@ -1,13 +1,14 @@
-/* LOGIN — PERSONA PICKER (DEMO STAND-IN FOR AUTH); LANGUAGE SELECT KEPT OFF SETTINGS ON PURPOSE */
-
-import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { LoginRequest } from '@fedsa/contract';
+import type { Language, Role } from '@fedsa/contract';
+import { useAuth } from '../auth/context';
 import { LogoMark } from '../components/Logo';
 import { Icon } from '../components/Icon';
-import { useApp } from '../store/context';
-import { loginPersonaIds } from '../store/seed';
+import { PendingButton } from '../components/feedback';
+import { Field, FormError, useForm } from '../components/forms';
+import { dataMode, demoAccounts, isApiError } from '../data';
 import { languageNames } from '../i18n/strings';
-import { useT } from '../i18n/useT';
-import type { Language, Role } from '../store/types';
+import { useLanguage, useT } from '../i18n/useT';
 import './Login.css';
 
 const roleLabel: Record<Role, string> = {
@@ -17,25 +18,30 @@ const roleLabel: Record<Role, string> = {
   administrator: 'Administrator',
 };
 
-const roleHome: Record<Role, string> = {
-  donor: '/donor',
-  recipient: '/recipient',
-  coordinator: '/coordinator',
-  administrator: '/admin',
-};
-
 export function Login() {
-  const { state, dispatch } = useApp();
-  const navigate = useNavigate();
+  const auth = useAuth();
+  const language = useLanguage();
   const t = useT();
+  const [wrongPassword, setWrongPassword] = useState(false);
 
-  const personas = loginPersonaIds
-    .map((id) => state.users.find((u) => u.id === id))
-    .filter((u): u is NonNullable<typeof u> => Boolean(u));
+  const form = useForm({
+    initial: { email: '', password: '' },
+    schema: LoginRequest,
+    async onSubmit(body) {
+      setWrongPassword(false);
+      try {
+        await auth.login(body);
+      } catch (error) {
+        // one answer for an unknown email and a wrong password. it belongs to no single field
+        if (isApiError(error, 'UNAUTHENTICATED')) setWrongPassword(true);
+        else throw error;
+      }
+    },
+  });
 
-  function signIn(userId: string, role: Role) {
-    dispatch({ type: 'LOGIN', userId });
-    navigate(roleHome[role]);
+  function fillDemo(email: string) {
+    form.set('email', email);
+    form.set('password', 'demo-password');
   }
 
   return (
@@ -56,10 +62,8 @@ export function Login() {
           <select
             id="login-language"
             className="select"
-            value={state.language}
-            onChange={(e) =>
-              dispatch({ type: 'SET_LANGUAGE', language: e.target.value as Language })
-            }
+            value={language}
+            onChange={(e) => auth.setLanguage(e.target.value as Language)}
           >
             {(Object.keys(languageNames) as Language[]).map((code) => (
               <option key={code} value={code}>
@@ -69,49 +73,72 @@ export function Login() {
           </select>
         </div>
 
-        <h2 className="login__subtitle">{t('login.subtitle')}</h2>
+        <form className="login__form" {...form.formProps}>
+          <h1 className="login__subtitle">{t('login.subtitle')}</h1>
+          <FormError form={form} />
+          {wrongPassword && (
+            <div className="banner" data-tone="bad" role="alert">
+              <Icon name="alert" size={20} />
+              <div className="banner__body">{t('login.failed')}</div>
+            </div>
+          )}
+          <Field form={form} name="email" label={t('login.email')}>
+            {(props) => (
+              <input {...props} className="input" type="email" autoComplete="username" />
+            )}
+          </Field>
+          <Field form={form} name="password" label={t('login.password')}>
+            {(props) => (
+              <input
+                {...props}
+                className="input"
+                type="password"
+                autoComplete="current-password"
+              />
+            )}
+          </Field>
+          <PendingButton
+            type="submit"
+            className="btn btn--primary btn--block btn--lg"
+            pending={form.pending}
+            pendingLabel={t('login.signingIn')}
+          >
+            {t('login.signIn')}
+          </PendingButton>
+          <p className="login__help">{t('login.forgot')}</p>
+        </form>
 
-        <ul className="login__list">
-          {personas.map((user) => {
-            const org = state.organisations.find((o) => o.id === user.organisationId);
-            return (
-              <li key={user.id}>
-                <button
-                  type="button"
-                  className="login__card"
-                  onClick={() => signIn(user.id, user.role)}
-                >
-                  <span className="login__card-top">
-                    <span className="login__avatar" aria-hidden="true">
-                      {user.name
-                        .split(' ')
-                        .map((part) => part[0])
-                        .join('')
-                        .slice(0, 2)}
+        {dataMode() === 'fake' && (
+          <section aria-labelledby="demo-accounts">
+            <h2 className="login__subtitle" id="demo-accounts">
+              {t('login.demoAccounts')}
+            </h2>
+            <p className="login__demo">
+              <Icon name="shield" size={16} />
+              {t('login.demoNote')}
+            </p>
+            <ul className="login__list">
+              {demoAccounts.map((account) => (
+                <li key={account.email}>
+                  <button
+                    type="button"
+                    className="login__card"
+                    onClick={() => fillDemo(account.email)}
+                  >
+                    <span className="login__card-top">
+                      <span className="login__who">
+                        <strong>{account.name}</strong>
+                        <span className="login__job">{account.email}</span>
+                      </span>
+                      <span className="badge login__role">{roleLabel[account.role]}</span>
                     </span>
-                    <span className="login__who">
-                      <strong>{user.name}</strong>
-                      <span className="login__job">{user.jobTitle}</span>
-                    </span>
-                    <span className="badge login__role">{roleLabel[user.role]}</span>
-                  </span>
-                  {user.personaNote && <span className="login__note">{user.personaNote}</span>}
-                  {org && (
-                    <span className="login__org">
-                      <Icon name="pin" size={14} />
-                      {org.suburb}
-                    </span>
-                  )}
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-
-        <p className="login__demo">
-          <Icon name="shield" size={16} />
-          {t('login.demoNote')}
-        </p>
+                    <span className="login__note">{account.note}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
       </div>
     </div>
   );
