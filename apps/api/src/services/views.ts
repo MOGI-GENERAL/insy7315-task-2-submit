@@ -3,6 +3,7 @@ import type {
   Collection,
   GeoPoint,
   Handover,
+  Notification,
   Offer,
   Organisation,
   OrganisationSummary,
@@ -14,6 +15,7 @@ import type {
   ClaimDoc,
   CollectionDoc,
   HandoverRecordDoc,
+  NotificationDoc,
   OfferDoc,
   OrganisationDoc,
   UserDoc,
@@ -169,5 +171,20 @@ export function handoverView(
     resolvedAt: iso(handover.resolvedAt),
     resolvedByUserId: handover.resolvedByUserId ? handover.resolvedByUserId.toString() : null,
     resolutionNote: handover.resolutionNote ?? null,
+  };
+}
+
+export function notificationView(notification: Stored<NotificationDoc>): Notification {
+  return {
+    id: notification._id.toString(),
+    kind: notification.kind,
+    channel: notification.channel,
+    offerId: notification.offerId ? notification.offerId.toString() : null,
+    title: notification.title,
+    body: notification.body,
+    href: notification.href ?? null,
+    deliveryStatus: notification.deliveryStatus,
+    readAt: iso(notification.readAt),
+    createdAt: notification.createdAt.toISOString(),
   };
 }
