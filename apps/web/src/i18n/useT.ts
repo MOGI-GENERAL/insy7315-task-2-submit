@@ -1,13 +1,11 @@
-/* TRANSLATION HOOK; LANGUAGE LIVES IN APP STATE, NOT ITS OWN CONTEXT */
-
 import { useCallback } from 'react';
-import { useAppState } from '../store/context';
+import { useLanguageContext } from './context';
 import { dictionaries } from './strings';
 import type { StringKey } from './strings';
 import type { ColdChain, FoodCategory, OfferStatus } from '../store/types';
 
 export function useT() {
-  const language = useAppState().language;
+  const { language } = useLanguageContext();
   return useCallback(
     (key: StringKey) => dictionaries[language][key] ?? dictionaries.en[key],
     [language],
@@ -15,7 +13,7 @@ export function useT() {
 }
 
 export function useLanguage() {
-  return useAppState().language;
+  return useLanguageContext().language;
 }
 
 /* DOMAIN ENUM KEYS, TRANSLATED THROUGH THE SAME DICTIONARY */

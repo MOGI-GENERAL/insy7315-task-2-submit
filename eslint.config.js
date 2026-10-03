@@ -18,7 +18,8 @@ export default defineConfig([
       globals: globals.browser,
     },
     rules: {
-      // eslint-plugin-react does not support ESLint 10, so this stands in for react/no-danger
+      'react-hooks/exhaustive-deps': ['warn', { additionalHooks: '^useLoad$' }],
+      // stand in for react/no-danger
       'no-restricted-syntax': [
         'error',
         {

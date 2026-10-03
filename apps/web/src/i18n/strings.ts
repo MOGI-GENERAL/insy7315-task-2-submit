@@ -1,5 +1,92 @@
 /* CORE ACTION SCREENS I18N — AF/XH ARE MACHINE-TRANSLATED, UNREVIEWED */
 
+/** TODO translate. af and xh show this English until each key moves into their own lists */
+const untranslated = {
+  /* LOGIN */
+  'login.subtitle': 'Sign in to your account',
+  'login.email': 'Email address',
+  'login.password': 'Password',
+  'login.failed': 'The email or password is not right.',
+  'login.signingIn': 'Signing in',
+  'login.forgot': 'Forgot your password? Ask a FEDSA coordinator to reset it.',
+  'login.register': 'New organisation? Register here',
+  'login.demoAccounts': 'Demo accounts',
+  'login.demoNote': 'Demo data. Any password works for these accounts.',
+
+  /* REGISTER */
+  'register.title': 'Register your organisation',
+  'register.lead': 'A FEDSA coordinator checks every organisation before it can take part.',
+  'register.role': 'We are a',
+  'register.roleDonor': 'Donor: we have surplus food',
+  'register.roleRecipient': 'Recipient: we feed people',
+  'register.organisation': 'Your organisation',
+  'register.orgName': 'Organisation name',
+  'register.address': 'Street address',
+  'register.suburb': 'Suburb',
+  'register.contactName': 'Contact person',
+  'register.contactPhone': 'Contact phone',
+  'register.contactEmail': 'Contact email',
+  'register.taxRef': 'Tax reference number',
+  'register.taxRefHint': 'Needed for tax certificates.',
+  'register.you': 'Your account',
+  'register.fullName': 'Your full name',
+  'register.phone': 'Your mobile number',
+  'register.phoneHint': 'Offers and collection details are sent here by SMS.',
+  'register.passwordHint': 'At least 10 characters.',
+  'register.consent':
+    'I agree that FEDSA may store these details to match food offers, as the privacy notice sets out.',
+  'register.submit': 'Register',
+  'register.submitting': 'Registering',
+  'register.haveAccount': 'Already registered? Sign in',
+  'register.done': 'Registered. A coordinator will verify your organisation.',
+
+  /* ACCOUNT */
+  'account.title': 'Your account',
+  'account.changePassword': 'Change password',
+  'account.mustChange': 'Choose a new password before you continue.',
+  'account.currentPassword': 'Current password',
+  'account.newPassword': 'New password',
+  'account.passwordChanged': 'Password changed',
+  'account.phone': 'Mobile number',
+  'account.saved': 'Saved',
+
+  /* FEEDBACK */
+  'feedback.loading': 'Loading',
+  'feedback.saving': 'Saving',
+  'feedback.retry': 'Try again',
+  'feedback.errorTitle': 'That did not work',
+  'feedback.signInAgain': 'Sign in again',
+  'feedback.dismiss': 'Dismiss',
+
+  /* ERRORS, ONE PER API ERROR CODE */
+  'error.validation': 'Some fields need attention.',
+  'error.unauthenticated': 'Your session has ended. Sign in again.',
+  'error.csrf': 'This page was open for a long time. Try again.',
+  'error.forbidden': 'You do not have access to this.',
+  'error.notFound': 'We could not find that. It may have been removed.',
+  'error.offerUnavailable': 'Someone else just claimed this.',
+  'error.invalidState': 'This changed since you opened it. Refresh and try again.',
+  'error.uploadRejected': 'That photo could not be used. Use a JPEG or PNG under 5 MB.',
+  'error.rateLimited': 'Too many attempts. Wait a minute and try again.',
+  'error.internal': 'Something went wrong on our side. Try again.',
+  'error.network': 'No connection. Check your signal and try again.',
+
+  /* CORE ACTIONS: CONFIRMATIONS AND RESULTS */
+  'claim.done': 'Claimed. It is yours to collect.',
+  'claim.released': 'Claim released. The offer is open again.',
+  'offer.cancel': 'Cancel this offer',
+  'offer.cancelTitle': 'Cancel this offer?',
+  'offer.cancelWhy': 'Organisations that were notified will see that it is no longer available.',
+  'offer.cancelConfirm': 'Cancel offer',
+  'offer.cancelled': 'Offer cancelled',
+  'dispatch.sent': 'Collection details sent to the driver',
+
+  /* NOTIFICATIONS: PUSH */
+  'notif.pushOptIn': 'Get alerts on this phone',
+  'notif.pushOn': 'Alerts are on for this phone',
+  'notif.pushBlocked': 'Alerts are blocked in this browser’s settings.',
+} as const;
+
 const en = {
   /* NAV */
   'nav.home': 'Home',
@@ -14,10 +101,8 @@ const en = {
 
   /* LOGIN */
   'login.title': 'Food Excess Distribution South Africa',
-  'login.subtitle': 'Choose an account to sign in',
   'login.language': 'Language',
   'login.signIn': 'Sign in',
-  'login.demoNote': 'Prototype. Passwords not yet required to log in.',
 
   /* OFFERS SHARED */
   'offer.collectBy': 'Collect by',
@@ -158,6 +243,8 @@ const en = {
   'common.kg': 'kg',
   'common.required': 'Required',
   'common.optional': 'optional',
+
+  ...untranslated,
 } as const;
 
 export type StringKey = keyof typeof en;
@@ -174,10 +261,8 @@ const af: Record<StringKey, string> = {
   'nav.menu': 'Kieslys',
 
   'login.title': 'Goeie kos, vinnig versprei',
-  'login.subtitle': 'Kies ’n rekening om aan te meld',
   'login.language': 'Taal',
   'login.signIn': 'Meld aan',
-  'login.demoNote': 'Prototipe. Elke rekening hier onder meld aan sonder ’n wagwoord.',
 
   'offer.collectBy': 'Haal af voor',
   'offer.availableFrom': 'Beskikbaar vanaf',
@@ -307,6 +392,8 @@ const af: Record<StringKey, string> = {
   'common.kg': 'kg',
   'common.required': 'Verpligtend',
   'common.optional': 'opsioneel',
+
+  ...untranslated,
 };
 
 const xh: Record<StringKey, string> = {
@@ -321,10 +408,8 @@ const xh: Record<StringKey, string> = {
   'nav.menu': 'Imenyu',
 
   'login.title': 'Ukutya okulungileyo, kuhanjiswa ngokukhawuleza',
-  'login.subtitle': 'Khetha iakhawunti ukuze ungene',
   'login.language': 'Ulwimi',
   'login.signIn': 'Ngena',
-  'login.demoNote': 'Yiprothotayipu. Zonke iiakhawunti ezingezantsi zingena ngaphandle kwephasiwedi.',
 
   'offer.collectBy': 'Landa ngaphambi ko',
   'offer.availableFrom': 'Iyafumaneka ukusuka',
@@ -454,6 +539,8 @@ const xh: Record<StringKey, string> = {
   'common.kg': 'kg',
   'common.required': 'Iyafuneka',
   'common.optional': 'akunyanzelekanga',
+
+  ...untranslated,
 };
 
 export const dictionaries = { en, af, xh } as const;

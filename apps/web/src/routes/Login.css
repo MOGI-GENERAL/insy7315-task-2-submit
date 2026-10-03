@@ -57,6 +57,25 @@
   flex: 1;
 }
 
+.login__form {
+  padding: var(--s-5) var(--s-4);
+  background: var(--c-surface);
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-md);
+  margin-bottom: var(--s-6);
+}
+
+.login__form .banner {
+  margin-bottom: var(--s-4);
+}
+
+.login__help {
+  margin: var(--s-4) 0 0;
+  font-size: var(--t-sm);
+  color: var(--c-muted);
+  text-align: center;
+}
+
 .login__subtitle {
   font-size: var(--t-base);
   color: var(--c-muted);
