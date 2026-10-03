@@ -5,11 +5,12 @@ import type { ReactNode } from 'react';
 import { Icon } from './Icon';
 import type { IconName } from './Icon';
 import { LogoMark } from './Logo';
-import { useApp, useCurrentUser } from '../store/context';
+import type { Language, Role } from '@fedsa/contract';
+import { useAuth, useSession } from '../auth/context';
+import { useAppState } from '../store/context';
 import { unreadCount } from '../store/selectors';
-import { useT } from '../i18n/useT';
+import { useLanguage, useT } from '../i18n/useT';
 import { languageNames } from '../i18n/strings';
-import type { Language, Role } from '../store/types';
 import './AppShell.css';
 
 interface NavItem {
@@ -53,16 +54,16 @@ const roleLabel: Record<Role, string> = {
 };
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const { state, dispatch } = useApp();
-  const user = useCurrentUser();
+  const state = useAppState();
+  const { user, organisation: org } = useSession();
+  const { logout, setLanguage } = useAuth();
+  const language = useLanguage();
   const t = useT();
   const location = useLocation();
 
-  if (!user) return null;
-
   const items = navByRole[user.role];
+  // TODO: read from the notifications repository once the inbox is wired
   const unread = unreadCount(state, user.id);
-  const org = state.organisations.find((o) => o.id === user.organisationId);
 
   return (
     <div className="shell" data-role={user.role}>
@@ -84,10 +85,8 @@ export function AppShell({ children }: { children: ReactNode }) {
             <span className="sr-only">{t('login.language')}</span>
             <select
               className="shell__lang-select"
-              value={state.language}
-              onChange={(e) =>
-                dispatch({ type: 'SET_LANGUAGE', language: e.target.value as Language })
-              }
+              value={language}
+              onChange={(e) => setLanguage(e.target.value as Language)}
             >
               {(Object.keys(languageNames) as Language[]).map((code) => (
                 <option key={code} value={code}>
@@ -109,7 +108,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <button
             type="button"
             className="shell__signout"
-            onClick={() => dispatch({ type: 'LOGOUT' })}
+            onClick={() => void logout()}
           >
             <Icon name="signout" size={18} />
             <span className="shell__signout-text">{t('nav.signOut')}</span>
@@ -121,7 +120,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <nav className="shell__nav" aria-label={`${roleLabel[user.role]} sections`}>
           <p className="shell__nav-who">
             <span className="shell__nav-role">{roleLabel[user.role]}</span>
-            <span className="shell__nav-name">{user.name}</span>
+            <span className="shell__nav-name">{user.fullName}</span>
           </p>
           <ul>
             {items.map((item) => (

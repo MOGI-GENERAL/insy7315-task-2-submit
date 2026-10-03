@@ -1,14 +1,16 @@
 /* ROUTE TABLE — CLIENT-SIDE ROLE GUARDS (NOT A SUBSTITUTE FOR SERVER AUTH) */
 
-import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { Route, Routes } from 'react-router-dom';
 import type { ReactElement } from 'react';
+import type { Role } from '@fedsa/contract';
 
+import { CHANGE_PASSWORD_PATH } from './auth/context';
+import { Landing, RequireRole, SignedOutOnly } from './auth/guards';
 import { AppShell } from './components/AppShell';
-import { useCurrentUser } from './store/context';
-import type { Role } from './store/types';
 
 import { Login } from './routes/Login';
 import { Notifications } from './routes/Notifications';
+import { ChangePassword } from './routes/account/ChangePassword';
 
 import { DonorHome } from './routes/donor/DonorHome';
 import { PostOffer } from './routes/donor/PostOffer';
@@ -39,40 +41,42 @@ import { ExportReport } from './routes/admin/ExportReport';
 import { AdminCertificates } from './routes/admin/AdminCertificates';
 import { ManageAccounts } from './routes/admin/ManageAccounts';
 
-const roleHome: Record<Role, string> = {
-  donor: '/donor',
-  recipient: '/recipient',
-  coordinator: '/coordinator',
-  administrator: '/admin',
-};
-
-/* ROLE GUARD */
 function Guard({ allow, children }: { allow: Role; children: ReactElement }) {
-  const user = useCurrentUser();
-  const location = useLocation();
-
-  if (!user) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
-  if (user.role !== allow) return <Navigate to={roleHome[user.role]} replace />;
-
-  return <AppShell>{children}</AppShell>;
+  return (
+    <RequireRole allow={allow}>
+      <AppShell>{children}</AppShell>
+    </RequireRole>
+  );
 }
 
 function AnyRole({ children }: { children: ReactElement }) {
-  const user = useCurrentUser();
-  if (!user) return <Navigate to="/login" replace />;
-  return <AppShell>{children}</AppShell>;
-}
-
-function Landing() {
-  const user = useCurrentUser();
-  return <Navigate to={user ? roleHome[user.role] : '/login'} replace />;
+  return (
+    <RequireRole>
+      <AppShell>{children}</AppShell>
+    </RequireRole>
+  );
 }
 
 export function App() {
   return (
     <Routes>
       <Route path="/" element={<Landing />} />
-      <Route path="/login" element={<LoginRoute />} />
+      <Route
+        path="/login"
+        element={
+          <SignedOutOnly>
+            <Login />
+          </SignedOutOnly>
+        }
+      />
+      <Route
+        path={CHANGE_PASSWORD_PATH}
+        element={
+          <AnyRole>
+            <ChangePassword />
+          </AnyRole>
+        }
+      />
 
       <Route
         path="/notifications"
@@ -119,10 +123,4 @@ export function App() {
       <Route path="*" element={<Landing />} />
     </Routes>
   );
-}
-
-function LoginRoute() {
-  const user = useCurrentUser();
-  if (user) return <Navigate to={roleHome[user.role]} replace />;
-  return <Login />;
 }
