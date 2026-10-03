@@ -25,16 +25,18 @@ export class TestClient {
     body?: unknown,
     headers: Record<string, string> = {},
   ) {
+    // fetch sends a FormData body as multipart and writes the boundary into the content type itself
+    const isForm = body instanceof FormData;
     const res = await fetch(`${this.baseUrl}${path}`, {
       method,
       headers: {
         'x-forwarded-for': this.ip,
-        ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+        ...(body === undefined || isForm ? {} : { 'content-type': 'application/json' }),
         ...(this.cookie ? { cookie: this.cookie } : {}),
         ...(this.csrfToken ? { [CSRF_HEADER]: this.csrfToken } : {}),
         ...headers,
       },
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
     });
 
     const setCookie = res.headers.getSetCookie().find((c) => c.startsWith(`${SESSION_COOKIE}=`));
