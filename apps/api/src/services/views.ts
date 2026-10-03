@@ -1,6 +1,23 @@
-import type { GeoPoint, Organisation, User } from '@fedsa/contract';
+import type {
+  Claim,
+  Collection,
+  GeoPoint,
+  Handover,
+  Offer,
+  Organisation,
+  OrganisationSummary,
+  Photo,
+  User,
+} from '@fedsa/contract';
 import type { Types } from 'mongoose';
-import type { OrganisationDoc, UserDoc } from '../db/index.js';
+import type {
+  ClaimDoc,
+  CollectionDoc,
+  HandoverRecordDoc,
+  OfferDoc,
+  OrganisationDoc,
+  UserDoc,
+} from '../db/index.js';
 
 type Stored<T> = T & { _id: Types.ObjectId; createdAt: Date };
 
@@ -67,4 +84,90 @@ export function organisationView(organisation: Stored<OrganisationDoc>): Organis
 /** adds `capacityNotes`, so only coordinators and administrators may receive it */
 export function organisationStaffView(organisation: Stored<OrganisationDoc>): Organisation {
   return { ...organisationView(organisation), capacityNotes: organisation.capacityNotes ?? '' };
+}
+
+export function organisationSummary(organisation: Stored<OrganisationDoc>): OrganisationSummary {
+  const { id, name, suburb, location } = organisationView(organisation);
+  return { id, name, suburb, location };
+}
+
+/** the caller builds `photos`, because lists carry thumbnails only (NFR03) */
+export function offerView(
+  offer: Stored<OfferDoc>,
+  donor: Stored<OrganisationDoc>,
+  photos: Photo[],
+): Offer {
+  return {
+    id: offer._id.toString(),
+    reference: offer.reference,
+    donorOrganisationId: offer.donorOrganisationId.toString(),
+    donor: organisationSummary(donor),
+    postedByUserId: offer.postedByUserId.toString(),
+    title: offer.title,
+    description: offer.description ?? null,
+    category: offer.category,
+    offeredQuantityKg: offer.offeredQuantityKg,
+    coldChain: offer.coldChain,
+    photos,
+    availableFrom: offer.availableFrom.toISOString(),
+    collectionDeadline: offer.collectionDeadline.toISOString(),
+    status: offer.status,
+    expiredAt: iso(offer.expiredAt),
+    parentOfferId: offer.parentOfferId ? offer.parentOfferId.toString() : null,
+    createdAt: offer.createdAt.toISOString(),
+  };
+}
+
+export function claimView(claim: Stored<ClaimDoc>, recipient: Stored<OrganisationDoc>): Claim {
+  return {
+    id: claim._id.toString(),
+    offerId: claim.offerId.toString(),
+    recipientOrganisationId: claim.recipientOrganisationId.toString(),
+    recipient: organisationSummary(recipient),
+    claimedByUserId: claim.claimedByUserId.toString(),
+    claimedAt: claim.claimedAt.toISOString(),
+    transportNeeded: claim.transportNeeded,
+    status: claim.status,
+    releasedAt: iso(claim.releasedAt),
+    releaseReason: claim.releaseReason ?? null,
+  };
+}
+
+export function collectionView(collection: Stored<CollectionDoc>): Collection {
+  return {
+    id: collection._id.toString(),
+    claimId: collection.claimId.toString(),
+    dispatchedByUserId: collection.dispatchedByUserId.toString(),
+    driverName: collection.driverName,
+    driverPhone: collection.driverPhone,
+    dispatchedAt: collection.dispatchedAt.toISOString(),
+    scheduledFor: iso(collection.scheduledFor),
+    status: collection.status,
+  };
+}
+
+/** the full photo is never included. it is only reachable through its own route (NFR03) */
+export function handoverView(
+  handover: Stored<HandoverRecordDoc>,
+  donorPhotoThumbUrl: string | null,
+): Handover {
+  return {
+    id: handover._id.toString(),
+    claimId: handover.claimId.toString(),
+    offerId: handover.offerId.toString(),
+    donorConfirmedByUserId: handover.donorConfirmedByUserId.toString(),
+    donorConfirmedAt: handover.donorConfirmedAt.toISOString(),
+    collectedQuantityKg: handover.collectedQuantityKg,
+    donorPhotoThumbUrl,
+    recipientConfirmedByUserId: handover.recipientConfirmedByUserId
+      ? handover.recipientConfirmedByUserId.toString()
+      : null,
+    recipientConfirmedAt: iso(handover.recipientConfirmedAt),
+    conditionOnReceipt: handover.conditionOnReceipt ?? null,
+    conditionNotes: handover.conditionNotes ?? null,
+    retainUntil: handover.retainUntil.toISOString(),
+    resolvedAt: iso(handover.resolvedAt),
+    resolvedByUserId: handover.resolvedByUserId ? handover.resolvedByUserId.toString() : null,
+    resolutionNote: handover.resolutionNote ?? null,
+  };
 }

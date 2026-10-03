@@ -19,6 +19,19 @@ export class OrganisationRepository {
     return OrganisationModel.findById(id, null, { session }).exec();
   }
 
+  findByIds(ids: Types.ObjectId[]) {
+    return OrganisationModel.find({ _id: { $in: ids } }).exec();
+  }
+
+  /** by name only. ranking organisations by size or distance is ruled out (NFR10) */
+  findMatching(filter: Record<string, unknown>) {
+    return OrganisationModel.find(filter).sort({ name: 1, _id: 1 }).exec();
+  }
+
+  idsMatching(filter: Record<string, unknown>) {
+    return OrganisationModel.distinct('_id', filter).exec() as Promise<Types.ObjectId[]>;
+  }
+
   create(data: Partial<OrganisationDoc>, session?: ClientSession) {
     return new OrganisationModel(data).save({ session });
   }

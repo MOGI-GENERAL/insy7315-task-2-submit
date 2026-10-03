@@ -11,6 +11,12 @@ export class ClaimRepository {
     return new ClaimModel(data).save({ session });
   }
 
+  /** a released offer can be claimed again, so the newest claim is the active one if any is */
+  latestForOffer(offerId: Types.ObjectId | string, recipientOrganisationId?: Types.ObjectId) {
+    const filter = recipientOrganisationId ? { offerId, recipientOrganisationId } : { offerId };
+    return ClaimModel.findOne(filter).sort({ claimedAt: -1, _id: -1 }).exec();
+  }
+
   countByRecipient(recipientOrganisationId: Types.ObjectId | string, status?: ClaimStatus) {
     return ClaimModel.countDocuments(
       status ? { recipientOrganisationId, status } : { recipientOrganisationId },

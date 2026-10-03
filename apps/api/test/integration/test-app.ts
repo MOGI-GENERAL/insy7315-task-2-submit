@@ -1,6 +1,12 @@
 import { once } from 'node:events';
 import type { AddressInfo } from 'node:net';
-import type { RegisterRequest } from '@fedsa/contract';
+import {
+  suburbLocation,
+  type OrganisationStatus,
+  type OrganisationType,
+  type RegisterRequest,
+  type Suburb,
+} from '@fedsa/contract';
 import bcrypt from 'bcryptjs';
 import type { Router } from 'express';
 import type { Types } from 'mongoose';
@@ -8,9 +14,11 @@ import { createApp } from '../../src/app.js';
 import {
   AuditLogRepository,
   ClaimRepository,
+  CollectionRepository,
   HandoverRepository,
   HealthRepository,
   OfferRepository,
+  OrganisationModel,
   OrganisationRepository,
   SessionRepository,
   UserModel,
@@ -18,8 +26,13 @@ import {
 } from '../../src/db/index.js';
 import { createLogger } from '../../src/logger.js';
 import { createSessionStore } from '../../src/middleware/session.js';
+import { LocalPhotoStore } from '../../src/photos/local-photo-store.js';
+import type { PhotoStore } from '../../src/photos/photo-store.js';
 import { AuditService } from '../../src/services/audit-service.js';
+import { DEFAULT_RADIUS_KM } from '../../src/services/eligibility.js';
 import { HealthService } from '../../src/services/health-service.js';
+import { LoggingNotifier, type OfferNotifier } from '../../src/services/offer-notifier.js';
+import { OfferService } from '../../src/services/offer-service.js';
 import { OrganisationService } from '../../src/services/organisation-service.js';
 import { UserService } from '../../src/services/user-service.js';
 import { TestClient } from '../test-client.js';
@@ -40,8 +53,30 @@ export function newOrganisationService() {
   );
 }
 
+export interface OfferTestOptions {
+  photos?: PhotoStore;
+  notifier?: OfferNotifier;
+  newReference?: () => string;
+}
+
+/** a test that posts photos passes a store in a temporary folder it removes afterwards */
+export function newOfferService(options: OfferTestOptions = {}) {
+  const logger = createLogger({ write: () => {} });
+  return new OfferService(
+    new OfferRepository(),
+    new OrganisationRepository(),
+    new ClaimRepository(),
+    new CollectionRepository(),
+    new HandoverRepository(),
+    new AuditService(new AuditLogRepository()),
+    options.photos ?? new LocalPhotoStore(),
+    options.notifier ?? new LoggingNotifier(logger),
+    { radiusKm: DEFAULT_RADIUS_KM, logger, newReference: options.newReference },
+  );
+}
+
 /** starts the real app on the test database. needs `startTestDb` to have run */
-export async function startTestApp(extraRouters: Router[] = []) {
+export async function startTestApp(extraRouters: Router[] = [], offers = newOfferService()) {
   const server = createApp({
     logger: createLogger({ write: () => {} }),
     services: {
@@ -52,6 +87,7 @@ export async function startTestApp(extraRouters: Router[] = []) {
         new SessionRepository(),
       ),
       organisations: newOrganisationService(),
+      offers,
     },
     session: {
       secret: TEST_SESSION_SECRET,
@@ -137,6 +173,45 @@ export async function signedInClient(baseUrl: string, email: string, password = 
   if (res.status !== 200) throw new Error(`sign-in failed with ${res.status}`);
   await client.fetchCsrfToken();
   return client;
+}
+
+/**
+ * stored directly, so a test can set any status and skip the full-cost hash of
+ * registration. recipients default to verified, with dry storage only
+ */
+export function createOrganisation(fields: {
+  type: OrganisationType;
+  status?: OrganisationStatus;
+  name?: string;
+  suburb?: Suburb;
+  storageAmbient?: boolean;
+  storageRefrigerated?: boolean;
+  storageFrozen?: boolean;
+  maxCapacityKg?: number | null;
+  hasTransport?: boolean;
+}) {
+  const suburb = fields.suburb ?? 'Woodstock';
+  const base = {
+    name: fields.name ?? (fields.type === 'donor' ? "Ouma's Bakery" : 'Siyakhula Shelter'),
+    type: fields.type,
+    status: fields.status ?? (fields.type === 'donor' ? 'active' : 'verified'),
+    addressLine: '12 Long Street',
+    suburb,
+    city: 'Cape Town',
+    location: suburbLocation(suburb),
+    contactName: 'Test Contact',
+    contactPhone: '+27820000000',
+    contactEmail: 'organisation@example.org',
+  };
+  if (fields.type === 'donor') return OrganisationModel.create(base);
+  return OrganisationModel.create({
+    ...base,
+    storageAmbient: fields.storageAmbient ?? true,
+    storageRefrigerated: fields.storageRefrigerated ?? false,
+    storageFrozen: fields.storageFrozen ?? false,
+    maxCapacityKg: fields.maxCapacityKg ?? null,
+    hasTransport: fields.hasTransport ?? false,
+  });
 }
 
 let testPasswordHash: Promise<string> | undefined;

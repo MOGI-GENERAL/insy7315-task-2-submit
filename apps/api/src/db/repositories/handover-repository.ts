@@ -6,6 +6,10 @@ export class HandoverRepository {
     return HandoverRecordModel.findById(id, null, { session }).exec();
   }
 
+  findByClaim(claimId: Types.ObjectId | string) {
+    return HandoverRecordModel.findOne({ claimId }).exec();
+  }
+
   /** only handovers both sides have confirmed count as collected */
   async totalCollectedKg(by: 'claimId' | 'offerId', ids: Types.ObjectId[]) {
     const [row] = await HandoverRecordModel.aggregate<{ kg: number }>([

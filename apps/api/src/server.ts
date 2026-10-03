@@ -4,6 +4,7 @@ import {
   AuditLogRepository,
   bootstrapDb,
   ClaimRepository,
+  CollectionRepository,
   HandoverRepository,
   HealthRepository,
   OfferRepository,
@@ -13,8 +14,12 @@ import {
 } from './db/index.js';
 import { createLogger } from './logger.js';
 import { createSessionStore } from './middleware/session.js';
+import { LocalPhotoStore } from './photos/local-photo-store.js';
 import { AuditService } from './services/audit-service.js';
+import { DEFAULT_RADIUS_KM } from './services/eligibility.js';
 import { HealthService } from './services/health-service.js';
+import { LoggingNotifier } from './services/offer-notifier.js';
+import { OfferService } from './services/offer-service.js';
 import { OrganisationService } from './services/organisation-service.js';
 import { UserService } from './services/user-service.js';
 
@@ -27,6 +32,12 @@ async function start() {
     logger.fatal(
       'MONGODB_URI and SESSION_SECRET must be set. Copy apps/api/.env.example to apps/api/.env and fill it in',
     );
+    process.exit(1);
+  }
+
+  const radiusKm = Number(process.env.MATCH_RADIUS_KM || DEFAULT_RADIUS_KM);
+  if (!(radiusKm > 0)) {
+    logger.fatal('MATCH_RADIUS_KM must be a number of kilometres above zero');
     process.exit(1);
   }
 
@@ -55,6 +66,17 @@ async function start() {
       new ClaimRepository(),
       new HandoverRepository(),
       new AuditService(new AuditLogRepository()),
+    ),
+    offers: new OfferService(
+      new OfferRepository(),
+      new OrganisationRepository(),
+      new ClaimRepository(),
+      new CollectionRepository(),
+      new HandoverRepository(),
+      new AuditService(new AuditLogRepository()),
+      new LocalPhotoStore(),
+      new LoggingNotifier(logger),
+      { radiusKm, logger },
     ),
   };
   const session = {
