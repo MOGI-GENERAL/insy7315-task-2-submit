@@ -13,6 +13,7 @@ import { createApp } from './app.js';
 import {
   AuditLogRepository,
   ClaimRepository,
+  CollectionRepository,
   HandoverRepository,
   OfferRepository,
   OrganisationRepository,
@@ -22,8 +23,12 @@ import {
 import { OfferUnavailableError } from './errors.js';
 import { createLogger } from './logger.js';
 import { validate } from './middleware/validate.js';
+import { LocalPhotoStore } from './photos/local-photo-store.js';
 import { AuditService } from './services/audit-service.js';
+import { DEFAULT_RADIUS_KM } from './services/eligibility.js';
 import { HealthService } from './services/health-service.js';
+import { LoggingNotifier } from './services/offer-notifier.js';
+import { OfferService } from './services/offer-service.js';
 import { OrganisationService } from './services/organisation-service.js';
 import { UserService } from './services/user-service.js';
 
@@ -72,6 +77,17 @@ const server = createApp({
       new ClaimRepository(),
       new HandoverRepository(),
       new AuditService(new AuditLogRepository()),
+    ),
+    offers: new OfferService(
+      new OfferRepository(),
+      new OrganisationRepository(),
+      new ClaimRepository(),
+      new CollectionRepository(),
+      new HandoverRepository(),
+      new AuditService(new AuditLogRepository()),
+      new LocalPhotoStore(),
+      new LoggingNotifier(logger),
+      { radiusKm: DEFAULT_RADIUS_KM, logger },
     ),
   },
   session: { secret: 'unit-test-session-secret', secureCookie: false },
