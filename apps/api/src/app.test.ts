@@ -25,6 +25,8 @@ import { createLogger } from './logger.js';
 import { validate } from './middleware/validate.js';
 import { LocalPhotoStore } from './photos/local-photo-store.js';
 import { AuditService } from './services/audit-service.js';
+import { LoggingClaimNotifier } from './services/claim-notifier.js';
+import { ClaimService } from './services/claim-service.js';
 import { DEFAULT_RADIUS_KM } from './services/eligibility.js';
 import { HealthService } from './services/health-service.js';
 import { LoggingNotifier } from './services/offer-notifier.js';
@@ -61,6 +63,18 @@ throwaway.post('/api/webhooks/twilio/test', (_req, res) => {
   res.status(204).end();
 });
 
+const offers = new OfferService(
+  new OfferRepository(),
+  new OrganisationRepository(),
+  new ClaimRepository(),
+  new CollectionRepository(),
+  new HandoverRepository(),
+  new AuditService(new AuditLogRepository()),
+  new LocalPhotoStore(),
+  new LoggingNotifier(logger),
+  { radiusKm: DEFAULT_RADIUS_KM, logger },
+);
+
 // no request in this file signs in, so the user service never reaches a database
 const server = createApp({
   logger,
@@ -78,16 +92,16 @@ const server = createApp({
       new HandoverRepository(),
       new AuditService(new AuditLogRepository()),
     ),
-    offers: new OfferService(
+    offers,
+    claims: new ClaimService(
+      new ClaimRepository(),
       new OfferRepository(),
       new OrganisationRepository(),
-      new ClaimRepository(),
-      new CollectionRepository(),
       new HandoverRepository(),
-      new AuditService(new AuditLogRepository()),
-      new LocalPhotoStore(),
+      offers,
       new LoggingNotifier(logger),
-      { radiusKm: DEFAULT_RADIUS_KM, logger },
+      new LoggingClaimNotifier(logger),
+      logger,
     ),
   },
   session: { secret: 'unit-test-session-secret', secureCookie: false },
