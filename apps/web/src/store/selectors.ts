@@ -1,15 +1,8 @@
 /* READ-ONLY DERIVED VIEWS: REPORTS COMPUTED FROM THE SAME OPERATIONAL RECORDS */
 
-import type {
-  AppState,
-  Claim,
-  Dispute,
-  HandoverRecord,
-  Offer,
-  Organisation,
-  User,
-} from './types';
+import type { AppState, Claim, HandoverRecord, Offer, Organisation, User } from './types';
 import { KG_PER_MEAL } from '../lib/format';
+import { canStore } from '../lib/org';
 
 /* LOOKUPS */
 
@@ -31,15 +24,17 @@ export const handoverForClaim = (state: AppState, claimId: string) =>
 export const collectionForClaim = (state: AppState, claimId: string) =>
   state.collections.find((c) => c.claimId === claimId);
 
-/** ACTIVE (NON-RELEASED) CLAIM FOR OFFER */
+/** the offer's current claim, active or already fulfilled */
 export const activeClaimForOffer = (state: AppState, offerId: string) =>
-  state.claims.find((c) => c.offerId === offerId && !c.releasedAt);
+  state.claims.find(
+    (c) => c.offerId === offerId && (c.status === 'active' || c.status === 'fulfilled'),
+  );
 
 export const currentUser = (state: AppState) => userById(state, state.currentUserId) ?? null;
 
 export const currentOrg = (state: AppState) => {
   const user = currentUser(state);
-  return user ? orgById(state, user.organisationId) ?? null : null;
+  return user ? (orgById(state, user.organisationId) ?? null) : null;
 };
 
 /* ELIGIBILITY */
@@ -49,7 +44,7 @@ export interface Eligibility {
   /** WITHHELD REASONS, USER-FACING */
   reasons: string[];
   /** NEEDS A DRIVER */
-  needsTransport: boolean;
+  transportNeeded: boolean;
 }
 
 /* STORAGE/CAPACITY ARE HARD FILTERS; TRANSPORT IS NOT (FAIRNESS REQUIREMENT) */
@@ -59,10 +54,9 @@ export function checkEligibility(
   offer: Pick<Offer, 'coldChain' | 'offeredQuantityKg'>,
 ): Eligibility {
   const reasons: string[] = [];
-  const storage = org.storage ?? [];
-  const capacity = org.capacityKg ?? 0;
+  const capacity = org.maxCapacityKg ?? 0;
 
-  if (!storage.includes(offer.coldChain)) {
+  if (!canStore(org, offer.coldChain)) {
     reasons.push(
       offer.coldChain === 'refrigerated'
         ? 'Needs refrigeration, and your profile has no fridge'
@@ -79,7 +73,7 @@ export function checkEligibility(
   return {
     eligible: reasons.length === 0,
     reasons,
-    needsTransport: !org.hasTransport,
+    transportNeeded: !org.hasTransport,
   };
 }
 
@@ -93,8 +87,7 @@ export function eligibleOffers(state: AppState, org: Organisation): Offer[] {
     .filter((o) => new Date(o.availableFrom).getTime() <= Date.now())
     .filter((o) => checkEligibility(org, o).eligible)
     .sort(
-      (a, b) =>
-        new Date(a.collectionDeadline).getTime() - new Date(b.collectionDeadline).getTime(),
+      (a, b) => new Date(a.collectionDeadline).getTime() - new Date(b.collectionDeadline).getTime(),
     );
 }
 
@@ -134,11 +127,18 @@ export interface ClaimView {
   donorOrg: Organisation | undefined;
   recipientOrg: Organisation | undefined;
   /** CLAIM STAGE, USER-FACING WORDING */
-  stage: 'awaiting-collection' | 'awaiting-your-confirmation' | 'awaiting-other-party' | 'complete' | 'released';
+  stage:
+    | 'awaiting-collection'
+    | 'awaiting-your-confirmation'
+    | 'awaiting-other-party'
+    | 'complete'
+    | 'released'
+    | 'expired';
 }
 
 function stageOf(claim: Claim, handover: HandoverRecord | undefined, side: 'donor' | 'recipient') {
-  if (claim.releasedAt) return 'released' as const;
+  if (claim.status === 'released') return 'released' as const;
+  if (claim.status === 'expired') return 'expired' as const;
   if (!handover) return 'awaiting-collection' as const;
   const mine = side === 'donor' ? handover.donorConfirmedAt : handover.recipientConfirmedAt;
   const theirs = side === 'donor' ? handover.recipientConfirmedAt : handover.donorConfirmedAt;
@@ -190,7 +190,7 @@ export function claimsForDonor(state: AppState, organisationId: string): ClaimVi
 /** NEEDS DRIVER, NOT DISPATCHED */
 export function awaitingDispatch(state: AppState): ClaimView[] {
   return state.claims
-    .filter((c) => c.needsTransport && !c.releasedAt)
+    .filter((c) => c.transportNeeded && c.status === 'active')
     .filter((c) => {
       const offer = offerById(state, c.offerId);
       return offer?.status === 'claimed';
@@ -220,7 +220,7 @@ export function notificationsFor(state: AppState, userId: string) {
 }
 
 export function unreadCount(state: AppState, userId: string) {
-  return state.notifications.filter((n) => n.userId === userId && !n.read).length;
+  return state.notifications.filter((n) => n.userId === userId && !n.readAt).length;
 }
 
 /* DASHBOARD */
@@ -232,7 +232,7 @@ export interface DashboardView {
   collectedToday: Offer[];
   expiredToday: Offer[];
   needsDriver: ClaimView[];
-  openDisputes: Dispute[];
+  openDisputes: HandoverRecord[];
   pendingVerification: Organisation[];
 }
 
@@ -263,9 +263,9 @@ export function dashboard(state: AppState): DashboardView {
       (o) => o.status === 'expired' && o.expiredAt && new Date(o.expiredAt).getTime() >= dayStart,
     ),
     needsDriver: awaitingDispatch(state).filter((v) => !collectionForClaim(state, v.claim.id)),
-    openDisputes: state.disputes.filter((d) => d.status === 'open'),
+    openDisputes: state.handovers.filter(isOpenDispute),
     pendingVerification: state.organisations.filter(
-      (o) => o.verification === 'pending' || o.verification === 'visit-booked',
+      (o) => o.type === 'recipient' && o.status === 'pending',
     ),
   };
 }
@@ -324,7 +324,7 @@ export function byMonth(state: AppState, months = 6): MonthRow[] {
     const claim = claimById(state, handover.claimId);
     if (!claim) continue;
     const row = ensure(monthKey(handover.recipientConfirmedAt!));
-    const kg = handover.recipientQuantityKg ?? 0;
+    const kg = handover.collectedQuantityKg;
     row.kg += kg;
   }
 
@@ -358,7 +358,7 @@ export function byDonor(state: AppState): PartyRow[] {
       meals: 0,
       count: 0,
     };
-    row.kg += handover.recipientQuantityKg ?? 0;
+    row.kg += handover.collectedQuantityKg;
     row.count += 1;
     rows.set(org.id, row);
   }
@@ -381,7 +381,7 @@ export function byRecipient(state: AppState): PartyRow[] {
       meals: 0,
       count: 0,
     };
-    row.kg += handover.recipientQuantityKg ?? 0;
+    row.kg += handover.collectedQuantityKg;
     row.count += 1;
     rows.set(org.id, row);
   }
@@ -404,16 +404,14 @@ export interface Headline {
 
 export function headline(state: AppState): Headline {
   const handovers = completedHandovers(state);
-  const totalKg = handovers.reduce((sum, h) => sum + (h.recipientQuantityKg ?? 0), 0);
+  const totalKg = handovers.reduce((sum, h) => sum + h.collectedQuantityKg, 0);
 
   const thisMonth = monthKey(new Date().toISOString());
   const thisMonthKg = handovers
     .filter((h) => monthKey(h.recipientConfirmedAt!) === thisMonth)
-    .reduce((sum, h) => sum + (h.recipientQuantityKg ?? 0), 0);
+    .reduce((sum, h) => sum + h.collectedQuantityKg, 0);
 
-  const settled = state.offers.filter(
-    (o) => o.status === 'collected' || o.status === 'expired',
-  );
+  const settled = state.offers.filter((o) => o.status === 'collected' || o.status === 'expired');
   const collected = settled.filter((o) => o.status === 'collected').length;
   const expired = settled.filter((o) => o.status === 'expired').length;
 
@@ -458,13 +456,15 @@ export function headline(state: AppState): Headline {
   };
 }
 
-/* DISPUTES */
+/* DISPUTES: A HANDOVER THE RECIPIENT MARKED AS A PROBLEM */
+
+export const isDispute = (h: HandoverRecord) => h.conditionOnReceipt === 'problem';
+export const isOpenDispute = (h: HandoverRecord) => isDispute(h) && !h.resolvedAt;
 
 export interface DisputeView {
-  dispute: Dispute;
+  handover: HandoverRecord;
   claim: Claim | undefined;
   offer: Offer | undefined;
-  handover: HandoverRecord | undefined;
   donorOrg: Organisation | undefined;
   recipientOrg: Organisation | undefined;
   donorUser: User | undefined;
@@ -472,28 +472,29 @@ export interface DisputeView {
 }
 
 export function disputeViews(state: AppState): DisputeView[] {
-  return state.disputes
-    .map((dispute) => {
-      const claim = claimById(state, dispute.claimId);
+  return state.handovers
+    .filter(isDispute)
+    .map((handover) => {
+      const claim = claimById(state, handover.claimId);
       const offer = claim && offerById(state, claim.offerId);
-      const handover = state.handovers.find((h) => h.claimId === dispute.claimId);
       return {
-        dispute,
+        handover,
         claim,
         offer,
-        handover,
         donorOrg: orgById(state, offer?.donorOrganisationId),
         recipientOrg: orgById(state, claim?.recipientOrganisationId),
-        donorUser: userById(state, handover?.donorConfirmedByUserId ?? offer?.postedByUserId),
-        recipientUser: userById(
-          state,
-          handover?.recipientConfirmedByUserId ?? claim?.claimedByUserId,
-        ),
+        donorUser: userById(state, handover.donorConfirmedByUserId),
+        recipientUser: userById(state, handover.recipientConfirmedByUserId),
       };
     })
     .sort((a, b) => {
-      if (a.dispute.status !== b.dispute.status) return a.dispute.status === 'open' ? -1 : 1;
-      return new Date(a.dispute.openedAt).getTime() - new Date(b.dispute.openedAt).getTime();
+      const aOpen = !a.handover.resolvedAt;
+      const bOpen = !b.handover.resolvedAt;
+      if (aOpen !== bOpen) return aOpen ? -1 : 1;
+      return (
+        new Date(a.handover.recipientConfirmedAt!).getTime() -
+        new Date(b.handover.recipientConfirmedAt!).getTime()
+      );
     });
 }
 

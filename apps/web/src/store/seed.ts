@@ -6,7 +6,6 @@ import type {
   AuditEntry,
   Claim,
   Collection,
-  Dispute,
   FoodCategory,
   HandoverRecord,
   Offer,
@@ -14,7 +13,9 @@ import type {
   TaxCertificate,
   User,
 } from './types';
+import { suburbLocation } from '@fedsa/contract';
 import { KG_PER_MEAL } from '../lib/format';
+import { canStore } from '../lib/org';
 
 /* TIME */
 
@@ -51,7 +52,7 @@ function mulberry32(seed: number) {
 
 const rand = mulberry32(20260817);
 
-const pick = <T,>(items: T[]): T => items[Math.floor(rand() * items.length)];
+const pick = <T>(items: T[]): T => items[Math.floor(rand() * items.length)];
 const between = (lo: number, hi: number) => lo + rand() * (hi - lo);
 const intBetween = (lo: number, hi: number) => Math.floor(between(lo, hi + 1));
 
@@ -62,12 +63,12 @@ export const organisations: Organisation[] = [
   {
     id: 'org-ouma',
     name: "Ouma's Bakery",
-    kind: 'donor',
+    type: 'donor',
     suburb: 'Woodstock',
-    distanceKm: 2.4,
+    location: suburbLocation('Woodstock'),
     contactName: 'Riaan de Villiers',
     contactPhone: '+27821114402',
-    verification: 'verified',
+    status: 'verified',
     capacityNotes:
       'Knows his surplus at 16:00 cash-up and locks up at 17:30. Will not fill in forms. Keep posting to three taps.',
     joinedAt: iso(NOW.getTime() - days(680)),
@@ -75,12 +76,12 @@ export const organisations: Organisation[] = [
   {
     id: 'org-kaap',
     name: 'Kaap Foods',
-    kind: 'donor',
+    type: 'donor',
     suburb: 'Kenilworth',
-    distanceKm: 9.1,
+    location: suburbLocation('Kenilworth'),
     contactName: 'Nomsa Sithole',
     contactPhone: '+27822227713',
-    verification: 'verified',
+    status: 'verified',
     capacityNotes:
       'Near-expiry stock flagged at the morning stock check, so a 24-hour window rather than 90 minutes. Head office requires a paper trail and tax certificates for anything leaving the store.',
     joinedAt: iso(NOW.getTime() - days(540)),
@@ -88,48 +89,48 @@ export const organisations: Organisation[] = [
   {
     id: 'org-deli',
     name: 'Woodstock Deli & Bistro',
-    kind: 'donor',
+    type: 'donor',
     suburb: 'Woodstock',
-    distanceKm: 2.9,
+    location: suburbLocation('Woodstock'),
     contactName: 'Shireen Adams',
     contactPhone: '+27823338821',
-    verification: 'verified',
+    status: 'verified',
     capacityNotes: 'Prepared food only. Two-hour window from posting, never longer.',
     joinedAt: iso(NOW.getTime() - days(300)),
   },
   {
     id: 'org-fruit',
     name: 'Salt River Fruit Market',
-    kind: 'donor',
+    type: 'donor',
     suburb: 'Salt River',
-    distanceKm: 0.8,
+    location: suburbLocation('Salt River'),
     contactName: 'Yusuf Parker',
     contactPhone: '+27824449930',
-    verification: 'verified',
+    status: 'verified',
     capacityNotes: 'Posts most mornings. High volume, short shelf life, always ambient.',
     joinedAt: iso(NOW.getTime() - days(420)),
   },
   {
     id: 'org-bokaap',
     name: 'Bo-Kaap Bakery',
-    kind: 'donor',
+    type: 'donor',
     suburb: 'Bo-Kaap',
-    distanceKm: 4.2,
+    location: suburbLocation('Bo-Kaap'),
     contactName: 'Faiza Ismail',
     contactPhone: '+27825551147',
-    verification: 'verified',
+    status: 'verified',
     capacityNotes: 'Small but reliable. Bread and pastries, six days a week.',
     joinedAt: iso(NOW.getTime() - days(210)),
   },
   {
     id: 'org-harbour',
     name: 'Harbour View Hotel',
-    kind: 'donor',
+    type: 'donor',
     suburb: 'Green Point',
-    distanceKm: 6.7,
+    location: suburbLocation('Green Point'),
     contactName: 'Dean Cloete',
     contactPhone: '+27826662258',
-    verification: 'verified',
+    status: 'verified',
     capacityNotes:
       'Banqueting surplus, irregular but large. Insists on a photographed handover record before releasing anything.',
     joinedAt: iso(NOW.getTime() - days(150)),
@@ -139,16 +140,18 @@ export const organisations: Organisation[] = [
   {
     id: 'org-siyakhula',
     name: 'Siyakhula Shelter',
-    kind: 'recipient',
+    type: 'recipient',
     suburb: 'Khayelitsha',
-    distanceKm: 26.4,
+    location: suburbLocation('Khayelitsha'),
     contactName: 'Nosipho Dlamini',
     contactPhone: '+27737778812',
-    capacityKg: 60,
-    storage: ['ambient', 'frozen'],
+    maxCapacityKg: 60,
+    storageAmbient: true,
+    storageRefrigerated: false,
+    storageFrozen: true,
     hasTransport: false,
     mealsPerDay: 120,
-    verification: 'verified',
+    status: 'active',
     capacityNotes:
       'One small chest freezer, no fridge, so nothing chilled. No vehicle at all - every collection needs a driver. Cooking starts at 15:30, which is exactly when the offers land. Phone is shared between three staff and she reads isiXhosa most comfortably.',
     joinedAt: iso(NOW.getTime() - days(610)),
@@ -156,16 +159,18 @@ export const organisations: Organisation[] = [
   {
     id: 'org-stmichaels',
     name: "St Michael's Night Shelter",
-    kind: 'recipient',
+    type: 'recipient',
     suburb: 'Observatory',
-    distanceKm: 4.1,
+    location: suburbLocation('Observatory'),
     contactName: 'Peter Molefe',
     contactPhone: '+27731112204',
-    capacityKg: 80,
-    storage: ['ambient', 'refrigerated'],
+    maxCapacityKg: 80,
+    storageAmbient: true,
+    storageRefrigerated: true,
+    storageFrozen: false,
     hasTransport: true,
     mealsPerDay: 90,
-    verification: 'verified',
+    status: 'active',
     capacityNotes:
       'Fridge, small van, desktop computer. Plans menus a week ahead and wants to know on Monday what he is cooking on Thursday. Best organisation in the network for anything scheduled.',
     joinedAt: iso(NOW.getTime() - days(590)),
@@ -173,16 +178,18 @@ export const organisations: Organisation[] = [
   {
     id: 'org-ubuntu',
     name: 'Ubuntu Soup Kitchen',
-    kind: 'recipient',
+    type: 'recipient',
     suburb: 'Langa',
-    distanceKm: 12.8,
+    location: suburbLocation('Langa'),
     contactName: 'Thandi Nkosi',
     contactPhone: '+27734446617',
-    capacityKg: 200,
-    storage: ['ambient', 'refrigerated', 'frozen'],
+    maxCapacityKg: 200,
+    storageAmbient: true,
+    storageRefrigerated: true,
+    storageFrozen: true,
     hasTransport: true,
     mealsPerDay: 260,
-    verification: 'verified',
+    status: 'active',
     capacityNotes:
       'Largest recipient in the network. Cold room, chest freezers and a bakkie. The only organisation that can absorb a full supermarket produce run.',
     joinedAt: iso(NOW.getTime() - days(500)),
@@ -190,16 +197,18 @@ export const organisations: Organisation[] = [
   {
     id: 'org-masi',
     name: 'Masiphumelele Care Centre',
-    kind: 'recipient',
+    type: 'recipient',
     suburb: 'Masiphumelele',
-    distanceKm: 32.1,
+    location: suburbLocation('Masiphumelele'),
     contactName: 'Lindiwe Mabaso',
     contactPhone: '+27735558829',
-    capacityKg: 45,
-    storage: ['ambient'],
+    maxCapacityKg: 45,
+    storageAmbient: true,
+    storageRefrigerated: false,
+    storageFrozen: false,
     hasTransport: false,
     mealsPerDay: 70,
-    verification: 'verified',
+    status: 'active',
     capacityNotes:
       'Dry storage only. Far out, so a driver is essential and the collection window has to allow an hour of travel.',
     joinedAt: iso(NOW.getTime() - days(340)),
@@ -207,48 +216,54 @@ export const organisations: Organisation[] = [
   {
     id: 'org-athlone',
     name: 'Athlone Haven',
-    kind: 'recipient',
+    type: 'recipient',
     suburb: 'Athlone',
-    distanceKm: 11.3,
+    location: suburbLocation('Athlone'),
     contactName: 'Gadija Samaai',
     contactPhone: '+27736669940',
-    capacityKg: 70,
-    storage: ['ambient', 'refrigerated'],
+    maxCapacityKg: 70,
+    storageAmbient: true,
+    storageRefrigerated: true,
+    storageFrozen: false,
     hasTransport: false,
     mealsPerDay: 85,
-    verification: 'verified',
+    status: 'active',
     capacityNotes: 'Fridge but no vehicle. Reliable on confirmations.',
     joinedAt: iso(NOW.getTime() - days(260)),
   },
   {
     id: 'org-mitchells',
     name: 'Mitchells Plain Feeding Scheme',
-    kind: 'recipient',
+    type: 'recipient',
     suburb: 'Mitchells Plain',
-    distanceKm: 24.7,
+    location: suburbLocation('Mitchells Plain'),
     contactName: 'Riedwaan Jacobs',
     contactPhone: '+27737773351',
-    capacityKg: 110,
-    storage: ['ambient', 'frozen'],
+    maxCapacityKg: 110,
+    storageAmbient: true,
+    storageRefrigerated: false,
+    storageFrozen: true,
     hasTransport: true,
     mealsPerDay: 150,
-    verification: 'verified',
+    status: 'active',
     capacityNotes: 'Own transport, two freezers. Takes bulk bakery well.',
     joinedAt: iso(NOW.getTime() - days(180)),
   },
   {
     id: 'org-hope',
     name: 'Hope Kitchen',
-    kind: 'recipient',
+    type: 'recipient',
     suburb: 'Delft',
-    distanceKm: 21.9,
+    location: suburbLocation('Delft'),
     contactName: 'Beauty Mokoena',
     contactPhone: '+27738884462',
-    capacityKg: 50,
-    storage: ['ambient'],
+    maxCapacityKg: 50,
+    storageAmbient: true,
+    storageRefrigerated: false,
+    storageFrozen: false,
     hasTransport: false,
     mealsPerDay: 60,
-    verification: 'pending',
+    status: 'pending',
     capacityNotes: '',
     joinedAt: iso(NOW.getTime() - days(6)),
   },
@@ -463,7 +478,7 @@ export const liveOffers: Offer[] = [
     postedByUserId: 'usr-riaan',
     title: '62 loaves and 40 rolls',
     description:
-      "End of day bake. All of it went out the oven this morning, still good tonight and tomorrow. Side door on Victoria Road, ask for Riaan.",
+      'End of day bake. All of it went out the oven this morning, still good tonight and tomorrow. Side door on Victoria Road, ask for Riaan.',
     category: 'bakery',
     offeredQuantityKg: 46,
     coldChain: 'ambient',
@@ -563,7 +578,8 @@ const disputeOffers: Offer[] = [
     donorOrganisationId: 'org-harbour',
     postedByUserId: 'usr-dean',
     title: 'Banqueting surplus, conference',
-    description: 'Chicken, rice and roast vegetables from a conference lunch. Portioned into trays.',
+    description:
+      'Chicken, rice and roast vegetables from a conference lunch. Portioned into trays.',
     category: 'prepared',
     offeredQuantityKg: 62,
     coldChain: 'refrigerated',
@@ -619,7 +635,8 @@ const disputeClaims: Claim[] = [
     offerId: 'off-0901',
     recipientOrganisationId: 'org-ubuntu',
     claimedByUserId: 'usr-thandi',
-    needsTransport: false,
+    transportNeeded: false,
+    status: 'fulfilled',
     claimedAt: iso(NOW.getTime() - days(2) - hours(5) - minutes(40)),
     releasedAt: null,
     releaseReason: null,
@@ -629,7 +646,8 @@ const disputeClaims: Claim[] = [
     offerId: 'off-0902',
     recipientOrganisationId: 'org-masi',
     claimedByUserId: 'usr-lindiwe',
-    needsTransport: true,
+    transportNeeded: true,
+    status: 'expired',
     claimedAt: iso(NOW.getTime() - days(3) - hours(4) - minutes(30)),
     releasedAt: null,
     releaseReason: null,
@@ -639,41 +657,31 @@ const disputeClaims: Claim[] = [
     offerId: 'off-0903',
     recipientOrganisationId: 'org-athlone',
     claimedByUserId: 'usr-gadija',
-    needsTransport: true,
+    transportNeeded: true,
+    status: 'fulfilled',
     claimedAt: iso(NOW.getTime() - days(1) - hours(6)),
     releasedAt: null,
     releaseReason: null,
   },
 ];
 
+/* A DISPUTE IS A HANDOVER THE RECIPIENT MARKED AS A PROBLEM. OF-0902 EXPIRED WHILE CLAIMED */
 const disputeHandovers: HandoverRecord[] = [
-  /* QUANTITY MISMATCH: DONOR 62KG VS RECIPIENT 40KG */
+  /* QUANTITY DISAGREEMENT: DONOR RECORDED 62KG, RECIPIENT SAYS LESS ARRIVED */
   {
     id: 'hnd-0901',
     claimId: 'clm-0901',
     donorConfirmedAt: iso(NOW.getTime() - days(2) - hours(4) - minutes(20)),
     donorConfirmedByUserId: 'usr-dean',
-    donorQuantityKg: 62,
+    collectedQuantityKg: 62,
     donorPhoto: 'prepared',
     recipientConfirmedAt: iso(NOW.getTime() - days(2) - hours(3)),
     recipientConfirmedByUserId: 'usr-thandi',
-    recipientQuantityKg: 40,
-    recipientCondition: 'good',
-    recipientNote: 'Only four trays arrived. We were told there would be six.',
-  },
-  /* NON-COLLECTION: NEVER CONFIRMED */
-  {
-    id: 'hnd-0902',
-    claimId: 'clm-0902',
-    donorConfirmedAt: null,
-    donorConfirmedByUserId: null,
-    donorQuantityKg: null,
-    donorPhoto: null,
-    recipientConfirmedAt: null,
-    recipientConfirmedByUserId: null,
-    recipientQuantityKg: null,
-    recipientCondition: null,
-    recipientNote: null,
+    conditionOnReceipt: 'problem',
+    conditionNotes: 'Only four trays arrived, about 40 kg. We were told there would be six.',
+    resolvedAt: null,
+    resolvedByUserId: null,
+    resolutionNote: null,
   },
   /* CONDITION: RECIPIENT FLAGGED POOR */
   {
@@ -681,14 +689,16 @@ const disputeHandovers: HandoverRecord[] = [
     claimId: 'clm-0903',
     donorConfirmedAt: iso(NOW.getTime() - days(1) - hours(5)),
     donorConfirmedByUserId: 'usr-yusuf',
-    donorQuantityKg: 38,
+    collectedQuantityKg: 38,
     donorPhoto: 'produce',
     recipientConfirmedAt: iso(NOW.getTime() - days(1) - hours(3)),
     recipientConfirmedByUserId: 'usr-gadija',
-    recipientQuantityKg: 38,
-    recipientCondition: 'poor',
-    recipientNote:
+    conditionOnReceipt: 'problem',
+    conditionNotes:
       'The tomatoes at the bottom of both crates were already going. We could use maybe half.',
+    resolvedAt: null,
+    resolvedByUserId: null,
+    resolutionNote: null,
   },
 ];
 
@@ -710,45 +720,6 @@ const disputeCollections: Collection[] = [
     driverPhone: '+27829994417',
     dispatchedAt: iso(NOW.getTime() - days(1) - hours(5) - minutes(30)),
     status: 'completed',
-  },
-];
-
-export const disputes: Dispute[] = [
-  {
-    id: 'dsp-001',
-    reference: 'DP-014',
-    claimId: 'clm-0901',
-    type: 'handover-mismatch',
-    openedAt: iso(NOW.getTime() - days(2) - hours(3)),
-    status: 'open',
-    resolution: null,
-    resolutionNote: null,
-    resolvedAt: null,
-    resolvedByUserId: null,
-  },
-  {
-    id: 'dsp-002',
-    reference: 'DP-015',
-    claimId: 'clm-0902',
-    type: 'non-collection',
-    openedAt: iso(NOW.getTime() - days(3) - hours(3)),
-    status: 'open',
-    resolution: null,
-    resolutionNote: null,
-    resolvedAt: null,
-    resolvedByUserId: null,
-  },
-  {
-    id: 'dsp-003',
-    reference: 'DP-016',
-    claimId: 'clm-0903',
-    type: 'food-condition',
-    openedAt: iso(NOW.getTime() - days(1) - hours(3)),
-    status: 'open',
-    resolution: null,
-    resolutionNote: null,
-    resolvedAt: null,
-    resolvedByUserId: null,
   },
 ];
 
@@ -800,7 +771,8 @@ const inFlightClaims: Claim[] = [
     offerId: 'off-1006',
     recipientOrganisationId: 'org-siyakhula',
     claimedByUserId: 'usr-nosipho',
-    needsTransport: true,
+    transportNeeded: true,
+    status: 'active',
     claimedAt: fromNow(-hours(1) - minutes(35)),
     releasedAt: null,
     releaseReason: null,
@@ -810,40 +782,30 @@ const inFlightClaims: Claim[] = [
     offerId: 'off-1007',
     recipientOrganisationId: 'org-stmichaels',
     claimedByUserId: 'usr-peter',
-    needsTransport: false,
+    transportNeeded: false,
+    status: 'active',
     claimedAt: fromNow(-hours(3) - minutes(10)),
     releasedAt: null,
     releaseReason: null,
   },
 ];
 
+/* CLM-1006 HAS NO HANDOVER YET. CLM-1007 IS DONOR CONFIRMED, RECIPIENT NOT - DELIBERATE PARTIAL STATE */
 const inFlightHandovers: HandoverRecord[] = [
-  {
-    id: 'hnd-1006',
-    claimId: 'clm-1006',
-    donorConfirmedAt: null,
-    donorConfirmedByUserId: null,
-    donorQuantityKg: null,
-    donorPhoto: null,
-    recipientConfirmedAt: null,
-    recipientConfirmedByUserId: null,
-    recipientQuantityKg: null,
-    recipientCondition: null,
-    recipientNote: null,
-  },
-  /* DONOR CONFIRMED, RECIPIENT NOT - DELIBERATE PARTIAL STATE */
   {
     id: 'hnd-1007',
     claimId: 'clm-1007',
     donorConfirmedAt: fromNow(-minutes(50)),
     donorConfirmedByUserId: 'usr-dean',
-    donorQuantityKg: 27,
+    collectedQuantityKg: 27,
     donorPhoto: 'prepared',
     recipientConfirmedAt: null,
     recipientConfirmedByUserId: null,
-    recipientQuantityKg: null,
-    recipientCondition: null,
-    recipientNote: null,
+    conditionOnReceipt: null,
+    conditionNotes: null,
+    resolvedAt: null,
+    resolvedByUserId: null,
+    resolutionNote: null,
   },
 ];
 
@@ -916,7 +878,8 @@ function generateHistory(): History {
     const date = new Date(NOW.getTime() - days(day));
     const weekday = date.getDay();
     /* SUN QUIET, SAT HALF DAY */
-    const count = weekday === 0 ? intBetween(0, 1) : weekday === 6 ? intBetween(1, 3) : intBetween(3, 6);
+    const count =
+      weekday === 0 ? intBetween(0, 1) : weekday === 6 ? intBetween(1, 3) : intBetween(3, 6);
 
     for (let i = 0; i < count; i++) {
       n += 1;
@@ -929,7 +892,8 @@ function generateHistory(): History {
       const postMinute = intBetween(0, 59);
       const posted = new Date(date);
       posted.setHours(postHour, postMinute, 0, 0);
-      const windowHours = category === 'prepared' ? 2 : category === 'bakery' ? 2 : intBetween(3, 24);
+      const windowHours =
+        category === 'prepared' ? 2 : category === 'bakery' ? 2 : intBetween(3, 24);
       const deadline = new Date(posted.getTime() + hours(windowHours));
 
       const offerId = `off-h${n}`;
@@ -959,9 +923,7 @@ function generateHistory(): History {
       /* FEASIBLE = CAPACITY + STORAGE MATCH */
       const feasible = recipientIds.filter((rid) => {
         const org = organisations.find((o) => o.id === rid)!;
-        return (
-          (org.capacityKg ?? 0) >= kg && (org.storage ?? []).includes(coldChainFor[category])
-        );
+        return (org.maxCapacityKg ?? 0) >= kg && canStore(org, coldChainFor[category]);
       });
       const recipientId = feasible.length > 0 ? pick(feasible) : 'org-ubuntu';
       const recipientOrg = organisations.find((o) => o.id === recipientId)!;
@@ -970,20 +932,21 @@ function generateHistory(): History {
       const claimDelay = minutes(intBetween(4, 90));
       const claimedAt = new Date(posted.getTime() + claimDelay);
       const claimId = `clm-h${n}`;
-      const needsTransport = !recipientOrg.hasTransport;
+      const transportNeeded = !recipientOrg.hasTransport;
 
       claims.push({
         id: claimId,
         offerId,
         recipientOrganisationId: recipientId,
         claimedByUserId: claimant?.id ?? 'usr-thandi',
-        needsTransport,
+        transportNeeded,
+        status: 'fulfilled',
         claimedAt: claimedAt.toISOString(),
         releasedAt: null,
         releaseReason: null,
       });
 
-      if (needsTransport) {
+      if (transportNeeded) {
         const driver = pick(driverContacts);
         collections.push({
           id: `col-h${n}`,
@@ -1007,13 +970,15 @@ function generateHistory(): History {
         claimId,
         donorConfirmedAt: donorConfirm.toISOString(),
         donorConfirmedByUserId: donorUserOf[donorId],
-        donorQuantityKg: collectedKg,
+        collectedQuantityKg: collectedKg,
         donorPhoto: photoFor[category],
         recipientConfirmedAt: recipientConfirm.toISOString(),
         recipientConfirmedByUserId: claimant?.id ?? 'usr-thandi',
-        recipientQuantityKg: collectedKg,
-        recipientCondition: rand() > 0.06 ? 'good' : 'acceptable',
-        recipientNote: null,
+        conditionOnReceipt: rand() > 0.06 ? 'good' : 'acceptable',
+        conditionNotes: null,
+        resolvedAt: null,
+        resolvedByUserId: null,
+        resolutionNote: null,
       });
     }
   }
@@ -1049,7 +1014,7 @@ function buildCertificate(
   for (const h of relevant) {
     const claim = history.claims.find((c) => c.id === h.claimId)!;
     const offer = history.offers.find((o) => o.id === claim.offerId)!;
-    const kg = h.recipientQuantityKg ?? 0;
+    const kg = h.collectedQuantityKg;
     totalKg += kg;
     byCategory.set(offer.category, (byCategory.get(offer.category) ?? 0) + kg);
   }
@@ -1100,34 +1065,34 @@ export const notifications: AppNotification[] = [
   {
     id: 'ntf-001',
     userId: 'usr-riaan',
-    kind: 'offer-posted',
+    kind: 'offer_posted',
     channel: 'push',
     title: 'Offer OF-1001 is live',
     body: '15 organisations were notified. 62 loaves and 40 rolls, collect by 17:30.',
     href: '/donor/offers/off-1001',
-    read: false,
+    readAt: null,
     createdAt: fromNow(-minutes(12)),
   },
   {
     id: 'ntf-002',
     userId: 'usr-nosipho',
-    kind: 'offer-posted',
+    kind: 'offer_posted',
     channel: 'whatsapp',
     title: 'New offer near you',
     body: "46 kg bakery, Woodstock, collect by 17:30. Ouma's Bakery.",
     href: '/recipient/offers/off-1001',
-    read: false,
+    readAt: null,
     createdAt: fromNow(-minutes(11)),
   },
   {
     id: 'ntf-003',
     userId: 'usr-peter',
-    kind: 'offer-posted',
+    kind: 'offer_posted',
     channel: 'push',
     title: 'New offer near you',
     body: '45 kg chilled dairy, Kenilworth. You have the fridge space.',
     href: '/recipient/offers/off-1002',
-    read: false,
+    readAt: null,
     createdAt: fromNow(-hours(3)),
   },
   {
@@ -1135,10 +1100,10 @@ export const notifications: AppNotification[] = [
     userId: 'usr-nadia',
     kind: 'dispute',
     channel: 'push',
-    title: '3 disputes need a decision',
-    body: 'A quantity mismatch, a non-collection and a food condition report.',
+    title: '2 disputes need a decision',
+    body: 'A quantity disagreement and a food condition report.',
     href: '/coordinator/disputes',
-    read: false,
+    readAt: null,
     createdAt: fromNow(-hours(6)),
   },
   {
@@ -1149,40 +1114,40 @@ export const notifications: AppNotification[] = [
     title: 'Hope Kitchen is waiting on verification',
     body: 'Registered 6 days ago. Site visit not yet booked.',
     href: '/coordinator/verify',
-    read: false,
+    readAt: null,
     createdAt: fromNow(-days(1)),
   },
   {
     id: 'ntf-006',
     userId: 'usr-nadia',
-    kind: 'offer-claimed',
+    kind: 'offer_claimed',
     channel: 'push',
     title: 'OF-0998 needs a driver',
     body: 'Siyakhula Shelter claimed 21 kg bakery and has no transport.',
     href: '/coordinator/dispatch',
-    read: false,
+    readAt: null,
     createdAt: fromNow(-hours(1) - minutes(35)),
   },
   {
     id: 'ntf-007',
     userId: 'usr-zanele',
-    kind: 'handover-confirmed',
+    kind: 'handover_confirmed',
     channel: 'push',
     title: '3 tax certificates are ready to issue',
     body: 'Kaap Foods, Ouma’s Bakery and Harbour View Hotel for this month.',
     href: '/admin/certificates',
-    read: false,
+    readAt: null,
     createdAt: fromNow(-hours(20)),
   },
   {
     id: 'ntf-008',
     userId: 'usr-nomsa',
-    kind: 'offer-claimed',
+    kind: 'offer_claimed',
     channel: 'push',
     title: 'OF-1002 has not been claimed yet',
     body: '45 kg chilled dairy. 4 organisations can take it, collection closes in 5 hours.',
     href: '/donor/offers/off-1002',
-    read: true,
+    readAt: fromNow(-hours(1)),
     createdAt: fromNow(-hours(2)),
   },
 ];
@@ -1230,7 +1195,6 @@ export function createInitialState(): AppState {
     handovers: [...history.handovers, ...disputeHandovers, ...inFlightHandovers],
     notifications,
     certificates,
-    disputes,
     audit,
     lastEvent: null,
   };

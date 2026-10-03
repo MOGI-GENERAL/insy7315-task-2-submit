@@ -19,6 +19,7 @@ const stageLabel: Record<ClaimView['stage'], string> = {
   'awaiting-other-party': 'Waiting for the donor',
   complete: 'Complete',
   released: 'Released',
+  expired: 'Expired before collection',
 };
 
 const stageTone: Record<ClaimView['stage'], string> = {
@@ -27,6 +28,7 @@ const stageTone: Record<ClaimView['stage'], string> = {
   'awaiting-other-party': 'open',
   complete: 'collected',
   released: 'expired',
+  expired: 'expired',
 };
 
 export function MyClaims() {
@@ -36,8 +38,8 @@ export function MyClaims() {
   const [tab, setTab] = useState<'active' | 'past'>('active');
 
   const all = claimsForRecipient(state, org.id);
-  const active = all.filter((c) => c.stage !== 'complete' && c.stage !== 'released');
-  const past = all.filter((c) => c.stage === 'complete' || c.stage === 'released');
+  const active = all.filter((c) => c.claim.status === 'active');
+  const past = all.filter((c) => c.claim.status !== 'active');
   const shown = tab === 'active' ? active : past;
 
   return (
@@ -109,7 +111,7 @@ export function MyClaims() {
                     <span className="badge" data-tone={stageTone[stage]}>
                       {stageLabel[stage]}
                     </span>
-                    {claim.needsTransport && (
+                    {claim.transportNeeded && (
                       <span className="badge badge--quiet">
                         <Icon name="truck" size={14} />
                         {collection
@@ -130,17 +132,11 @@ export function MyClaims() {
                         {t('handover.confirmReceipt')}
                       </Link>
                     ) : (
-                      <Link
-                        to={`/recipient/offers/${offer.id}`}
-                        className="btn btn--secondary"
-                      >
+                      <Link to={`/recipient/offers/${offer.id}`} className="btn btn--secondary">
                         View offer
                       </Link>
                     )}
-                    <Link
-                      to={`/recipient/claims/${claim.id}/release`}
-                      className="btn btn--ghost"
-                    >
+                    <Link to={`/recipient/claims/${claim.id}/release`} className="btn btn--ghost">
                       {t('claim.release')}
                     </Link>
                   </div>

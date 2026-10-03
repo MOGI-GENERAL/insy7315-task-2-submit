@@ -18,7 +18,9 @@ export function DonorHome() {
 
   const offers = offersForDonor(state, org.id);
   const live = offers.filter((o) => o.status === 'open' || o.status === 'claimed');
-  const recent = offers.filter((o) => o.status === 'collected' || o.status === 'expired').slice(0, 4);
+  const recent = offers
+    .filter((o) => o.status === 'collected' || o.status === 'expired')
+    .slice(0, 4);
 
   const claims = claimsForDonor(state, org.id);
   const awaitingMe = claims.filter((c) => c.stage === 'awaiting-your-confirmation');
@@ -26,7 +28,7 @@ export function DonorHome() {
   const thisMonth = new Date().toISOString().slice(0, 7);
   const monthKg = claims
     .filter((c) => c.handover?.recipientConfirmedAt?.startsWith(thisMonth))
-    .reduce((sum, c) => sum + (c.handover?.recipientQuantityKg ?? 0), 0);
+    .reduce((sum, c) => sum + (c.handover?.collectedQuantityKg ?? 0), 0);
 
   return (
     <>
@@ -51,7 +53,12 @@ export function DonorHome() {
           note={`${formatNumber(mealsFromKg(monthKg))} meals`}
           tone="good"
         />
-        <StatTile icon="list" label="Live offers" value={String(live.length)} note="Open or claimed" />
+        <StatTile
+          icon="list"
+          label="Live offers"
+          value={String(live.length)}
+          note="Open or claimed"
+        />
         <StatTile
           icon="clock"
           label="Waiting on you"

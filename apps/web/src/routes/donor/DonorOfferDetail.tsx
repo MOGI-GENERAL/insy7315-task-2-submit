@@ -30,8 +30,7 @@ export function DonorOfferDetail() {
   if (!offer || offer.donorOrganisationId !== org.id) {
     return (
       <Banner tone="bad" title="Offer not found">
-        That offer does not belong to {org.name}.{' '}
-        <Link to="/donor">Back to your offers</Link>.
+        That offer does not belong to {org.name}. <Link to="/donor">Back to your offers</Link>.
       </Banner>
     );
   }
@@ -68,7 +67,7 @@ export function DonorOfferDetail() {
               {recipient.suburb} · claimed {formatWhen(claim.claimedAt)}
             </span>
             <span className="claimed-alert__transport">
-              {claim.needsTransport ? (
+              {claim.transportNeeded ? (
                 collection ? (
                   <>
                     <Icon name="truck" size={16} /> {collection.driverName} is collecting on their
@@ -146,7 +145,7 @@ export function DonorOfferDetail() {
               </h3>
               {handover.donorConfirmedAt ? (
                 <DetailList>
-                  <Detail label="Weight">{formatKg(handover.donorQuantityKg ?? 0)}</Detail>
+                  <Detail label="Weight">{formatKg(handover.collectedQuantityKg)}</Detail>
                   <Detail label="Time">{formatDateTime(handover.donorConfirmedAt)}</Detail>
                 </DetailList>
               ) : (
@@ -161,8 +160,11 @@ export function DonorOfferDetail() {
               </h3>
               {handover.recipientConfirmedAt ? (
                 <DetailList>
-                  <Detail label="Weight">{formatKg(handover.recipientQuantityKg ?? 0)}</Detail>
-                  <Detail label="Condition">{handover.recipientCondition}</Detail>
+                  <Detail label="Condition">
+                    {handover.conditionOnReceipt === 'problem'
+                      ? 'Problem reported'
+                      : handover.conditionOnReceipt}
+                  </Detail>
                   <Detail label="Time">{formatDateTime(handover.recipientConfirmedAt)}</Detail>
                 </DetailList>
               ) : (

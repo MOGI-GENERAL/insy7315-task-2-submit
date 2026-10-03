@@ -42,7 +42,7 @@ export function DonorHandover() {
     return (
       <>
         <Banner tone="good" title={t('handover.done')}>
-          You confirmed {formatKg(handover.donorQuantityKg ?? 0)} leaving your premises.{' '}
+          You confirmed {formatKg(handover.collectedQuantityKg)} leaving your premises.{' '}
           {handover.recipientConfirmedAt
             ? 'The recipient has confirmed receipt, so the record is complete.'
             : t('handover.waitingOther') + '.'}
@@ -113,8 +113,8 @@ export function DonorHandover() {
           <span className="qty__unit">kg</span>
         </div>
         <span className="field__hint" id="handover-kg-hint">
-          Change it if less is going than you posted. The recipient confirms their own figure, and a
-          disagreement is referred to a coordinator rather than averaged away.
+          Change it if less is going than you posted. Whatever is left over is posted again as a new
+          offer, and this figure is the one the reports and your tax certificate use.
         </span>
         {touched && !valid && (
           <span className="field__error" role="alert">

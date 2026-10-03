@@ -13,11 +13,11 @@ import type { NotificationKind } from '../store/types';
 import './Notifications.css';
 
 const kindIcon: Record<NotificationKind, IconName> = {
-  'offer-posted': 'box',
-  'offer-claimed': 'check',
-  'claim-released': 'refresh',
-  'handover-confirmed': 'check-circle',
-  'driver-dispatched': 'truck',
+  offer_posted: 'box',
+  offer_claimed: 'check',
+  claim_released: 'refresh',
+  handover_confirmed: 'check-circle',
+  driver_dispatched: 'truck',
   verification: 'shield',
   dispute: 'alert',
 };
@@ -34,11 +34,7 @@ export function Notifications() {
     <>
       <PageHead
         title={t('notif.title')}
-        lead={
-          unread > 0
-            ? `${unread} unread`
-            : 'Everything here has been read.'
-        }
+        lead={unread > 0 ? `${unread} unread` : 'Everything here has been read.'}
         actions={
           unread > 0 ? (
             <button
@@ -66,7 +62,7 @@ export function Notifications() {
                   <span className="notif__top">
                     <ChannelBadge channel={n.channel} />
                     <time className="notif__time">{formatWhen(n.createdAt)}</time>
-                    {!n.read && <span className="notif__dot" aria-hidden="true" />}
+                    {!n.readAt && <span className="notif__dot" aria-hidden="true" />}
                   </span>
                   <strong className="notif__title">{n.title}</strong>
                   <span className="notif__body">{n.body}</span>
@@ -75,7 +71,7 @@ export function Notifications() {
             );
 
             return (
-              <li key={n.id} className={`notif${n.read ? '' : ' notif--unread'}`}>
+              <li key={n.id} className={`notif${n.readAt ? '' : ' notif--unread'}`}>
                 {n.href ? (
                   <Link
                     to={n.href}
@@ -90,7 +86,7 @@ export function Notifications() {
                 ) : (
                   <div className="notif__link">{body}</div>
                 )}
-                {!n.read && <span className="sr-only">Unread</span>}
+                {!n.readAt && <span className="sr-only">Unread</span>}
               </li>
             );
           })}

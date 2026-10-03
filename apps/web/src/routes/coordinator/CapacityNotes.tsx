@@ -11,6 +11,7 @@ import { useT, coldChainKey } from '../../i18n/useT';
 import { formatKg } from '../../lib/format';
 import type { Organisation } from '../../store/types';
 import './Coordinator.css';
+import { distanceFromOffice, storageList } from '../../lib/org';
 
 export function CapacityNotes() {
   const { state } = useApp();
@@ -40,7 +41,7 @@ export function CapacityNotes() {
         >
           {organisations.map((org) => (
             <option key={org.id} value={org.id}>
-              {org.name} · {org.kind === 'donor' ? 'Donor' : 'Recipient'} · {org.suburb}
+              {org.name} · {org.type === 'donor' ? 'Donor' : 'Recipient'} · {org.suburb}
             </option>
           ))}
         </select>
@@ -58,7 +59,7 @@ function OrgPanel({ org }: { org: Organisation }) {
   const t = useT();
 
   const [note, setNote] = useState(org.capacityNotes);
-  const claims = org.kind === 'recipient' ? claimsForRecipient(state, org.id) : [];
+  const claims = org.type === 'recipient' ? claimsForRecipient(state, org.id) : [];
   const dirty = note !== org.capacityNotes;
 
   return (
@@ -67,10 +68,11 @@ function OrgPanel({ org }: { org: Organisation }) {
         <div>
           <h2>{org.name}</h2>
           <p className="muted">
-            {org.kind === 'donor' ? 'Donor' : 'Recipient'} · {org.suburb} · {org.distanceKm} km
+            {org.type === 'donor' ? 'Donor' : 'Recipient'} · {org.suburb} ·{' '}
+            {distanceFromOffice(org)} km
           </p>
         </div>
-        <VerificationBadge status={org.verification} />
+        <VerificationBadge status={org.status} />
       </div>
 
       <hr className="divider" style={{ margin: 'var(--s-4) 0' }} />
@@ -80,15 +82,15 @@ function OrgPanel({ org }: { org: Organisation }) {
           {org.contactName}
           <div className="muted">{org.contactPhone}</div>
         </Detail>
-        {org.kind === 'recipient' && (
+        {org.type === 'recipient' && (
           <>
-            <Detail label="Capacity">{formatKg(org.capacityKg ?? 0)}</Detail>
+            <Detail label="Capacity">{formatKg(org.maxCapacityKg ?? 0)}</Detail>
             <Detail label="Storage">
-              {(org.storage ?? []).map((s) => t(coldChainKey(s))).join(', ')}
+              {storageList(org)
+                .map((s) => t(coldChainKey(s)))
+                .join(', ')}
             </Detail>
-            <Detail label="Transport">
-              {org.hasTransport ? 'Own vehicle' : 'Needs a driver'}
-            </Detail>
+            <Detail label="Transport">{org.hasTransport ? 'Own vehicle' : 'Needs a driver'}</Detail>
             <Detail label="Meals a day">{org.mealsPerDay ?? '-'}</Detail>
             <Detail label="Claims to date">{claims.length}</Detail>
           </>

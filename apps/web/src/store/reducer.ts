@@ -1,19 +1,20 @@
 /* REDUCER: ALL ACTIONS FLOW THROUGH HERE. CLAIM_OFFER GUARDS AGAINST DOUBLE-CLAIM */
 
+import type { VerificationDecision } from '@fedsa/contract';
 import type {
   AppNotification,
   AppState,
   Claim,
   ColdChain,
-  Dispute,
-  DisputeResolution,
+  Condition,
   FoodCategory,
-  FoodCondition,
+  HandoverRecord,
   Language,
   Offer,
-  VerificationStatus,
+  OrganisationStatus,
 } from './types';
 import { createInitialState } from './seed';
+import { nextStatus } from '../lib/org';
 
 let sequence = 0;
 const uid = (prefix: string) => `${prefix}-${Date.now().toString(36)}${(sequence++).toString(36)}`;
@@ -41,7 +42,7 @@ export type Action =
       notifiedOrganisationIds: string[];
     }
   | { type: 'CANCEL_OFFER'; offerId: string }
-  | { type: 'CLAIM_OFFER'; offerId: string; userId: string; needsTransport: boolean }
+  | { type: 'CLAIM_OFFER'; offerId: string; userId: string; transportNeeded: boolean }
   | { type: 'RELEASE_CLAIM'; claimId: string; reason: string }
   | {
       type: 'CONFIRM_HANDOVER_DONOR';
@@ -54,8 +55,7 @@ export type Action =
       type: 'CONFIRM_HANDOVER_RECIPIENT';
       claimId: string;
       userId: string;
-      quantityKg: number;
-      condition: FoodCondition;
+      condition: Condition;
       note: string;
     }
   | {
@@ -65,15 +65,14 @@ export type Action =
       driverName: string;
       driverPhone: string;
     }
-  | { type: 'SET_VERIFICATION'; organisationId: string; status: VerificationStatus; userId: string }
-  | { type: 'SAVE_CAPACITY_NOTE'; organisationId: string; note: string; userId: string }
   | {
-      type: 'RESOLVE_DISPUTE';
-      disputeId: string;
-      resolution: DisputeResolution;
-      note: string;
+      type: 'SET_VERIFICATION';
+      organisationId: string;
+      decision: VerificationDecision;
       userId: string;
     }
+  | { type: 'SAVE_CAPACITY_NOTE'; organisationId: string; note: string; userId: string }
+  | { type: 'RESOLVE_DISPUTE'; handoverId: string; note: string; userId: string }
   | { type: 'MARK_NOTIFICATION_READ'; notificationId: string }
   | { type: 'MARK_ALL_READ'; userId: string }
   | { type: 'ISSUE_CERTIFICATE'; certificateId: string; userId: string }
@@ -82,10 +81,8 @@ export type Action =
 
 const nowIso = () => new Date().toISOString();
 
-function notify(
-  partial: Omit<AppNotification, 'id' | 'read' | 'createdAt'>,
-): AppNotification {
-  return { ...partial, id: uid('ntf'), read: false, createdAt: nowIso() };
+function notify(partial: Omit<AppNotification, 'id' | 'readAt' | 'createdAt'>): AppNotification {
+  return { ...partial, id: uid('ntf'), readAt: null, createdAt: nowIso() };
 }
 
 /** ACTIVE COORDINATOR IDS, FOR ALERTS */
@@ -141,7 +138,7 @@ export function reducer(state: AppState, action: Action): AppState {
           .map((u) =>
             notify({
               userId: u.id,
-              kind: 'offer-posted',
+              kind: 'offer_posted',
               channel: 'push',
               title: 'New offer near you',
               body: `${action.offer.offeredQuantityKg} kg ${action.offer.category}, ${donorOrg?.suburb ?? ''}. ${donorOrg?.name ?? ''}`,
@@ -170,7 +167,11 @@ export function reducer(state: AppState, action: Action): AppState {
         offers: state.offers.map((o) =>
           o.id === action.offerId ? { ...o, status: 'cancelled' } : o,
         ),
-        lastEvent: { kind: 'offer-cancelled', id: offer.id, message: `${offer.reference} cancelled.` },
+        lastEvent: {
+          kind: 'offer-cancelled',
+          id: offer.id,
+          message: `${offer.reference} cancelled.`,
+        },
       };
     }
 
@@ -180,10 +181,8 @@ export function reducer(state: AppState, action: Action): AppState {
       if (!offer) return state;
 
       if (offer.status !== 'open') {
-        const holder = state.claims.find((c) => c.offerId === offer.id && !c.releasedAt);
-        const holderOrg = state.organisations.find(
-          (o) => o.id === holder?.recipientOrganisationId,
-        );
+        const holder = state.claims.find((c) => c.offerId === offer.id && c.status === 'active');
+        const holderOrg = state.organisations.find((o) => o.id === holder?.recipientOrganisationId);
         return {
           ...state,
           lastEvent: {
@@ -205,7 +204,8 @@ export function reducer(state: AppState, action: Action): AppState {
         offerId: offer.id,
         recipientOrganisationId: user.organisationId,
         claimedByUserId: user.id,
-        needsTransport: action.needsTransport,
+        transportNeeded: action.transportNeeded,
+        status: 'active',
         claimedAt: nowIso(),
         releasedAt: null,
         releaseReason: null,
@@ -216,7 +216,7 @@ export function reducer(state: AppState, action: Action): AppState {
       const alerts: AppNotification[] = [
         notify({
           userId: offer.postedByUserId,
-          kind: 'offer-claimed',
+          kind: 'offer_claimed',
           channel: 'push',
           title: `${offer.reference} claimed`,
           body: `${recipientOrg?.name ?? 'A recipient'} will collect ${offer.title.toLowerCase()}.`,
@@ -224,12 +224,12 @@ export function reducer(state: AppState, action: Action): AppState {
         }),
       ];
 
-      if (action.needsTransport) {
+      if (action.transportNeeded) {
         for (const cid of coordinatorIds(state)) {
           alerts.push(
             notify({
               userId: cid,
-              kind: 'offer-claimed',
+              kind: 'offer_claimed',
               channel: 'push',
               title: `${offer.reference} needs a driver`,
               body: `${recipientOrg?.name ?? 'A recipient'} claimed ${offer.offeredQuantityKg} kg and has no transport.`,
@@ -243,22 +243,6 @@ export function reducer(state: AppState, action: Action): AppState {
         ...state,
         offers: state.offers.map((o) => (o.id === offer.id ? { ...o, status: 'claimed' } : o)),
         claims: [...state.claims, claim],
-        handovers: [
-          ...state.handovers,
-          {
-            id: uid('hnd'),
-            claimId,
-            donorConfirmedAt: null,
-            donorConfirmedByUserId: null,
-            donorQuantityKg: null,
-            donorPhoto: null,
-            recipientConfirmedAt: null,
-            recipientConfirmedByUserId: null,
-            recipientQuantityKg: null,
-            recipientCondition: null,
-            recipientNote: null,
-          },
-        ],
         notifications: [...alerts, ...state.notifications],
         lastEvent: {
           kind: 'claim-made',
@@ -271,7 +255,7 @@ export function reducer(state: AppState, action: Action): AppState {
     /* RELEASE KEEPS HISTORY; OFFER REOPENS IF DEADLINE NOT PASSED */
     case 'RELEASE_CLAIM': {
       const claim = state.claims.find((c) => c.id === action.claimId);
-      if (!claim || claim.releasedAt) return state;
+      if (!claim || claim.status !== 'active') return state;
       const offer = state.offers.find((o) => o.id === claim.offerId);
       if (!offer) return state;
 
@@ -282,7 +266,12 @@ export function reducer(state: AppState, action: Action): AppState {
         ...state,
         claims: state.claims.map((c) =>
           c.id === claim.id
-            ? { ...c, releasedAt: nowIso(), releaseReason: action.reason || null }
+            ? {
+                ...c,
+                status: 'released',
+                releasedAt: nowIso(),
+                releaseReason: action.reason || null,
+              }
             : c,
         ),
         offers: state.offers.map((o) =>
@@ -298,7 +287,7 @@ export function reducer(state: AppState, action: Action): AppState {
         notifications: [
           notify({
             userId: offer.postedByUserId,
-            kind: 'claim-released',
+            kind: 'claim_released',
             channel: 'push',
             title: `${offer.reference} released`,
             body: stillOpen
@@ -318,34 +307,57 @@ export function reducer(state: AppState, action: Action): AppState {
       };
     }
 
+    /* RECORD STARTS HERE; A SHORTFALL SPLITS OFF A REMAINDER OFFER */
     case 'CONFIRM_HANDOVER_DONOR': {
-      const handover = state.handovers.find((h) => h.claimId === action.claimId);
-      if (!handover) return state;
-      const claim = state.claims.find((c) => c.id === action.claimId)!;
+      if (state.handovers.some((h) => h.claimId === action.claimId)) return state;
+      const claim = state.claims.find((c) => c.id === action.claimId);
+      if (!claim || claim.status !== 'active') return state;
       const offer = state.offers.find((o) => o.id === claim.offerId)!;
 
       const recipientUsers = state.users.filter(
         (u) => u.organisationId === claim.recipientOrganisationId && u.active,
       );
 
+      const handover: HandoverRecord = {
+        id: uid('hnd'),
+        claimId: claim.id,
+        donorConfirmedAt: nowIso(),
+        donorConfirmedByUserId: action.userId,
+        collectedQuantityKg: action.quantityKg,
+        donorPhoto: action.photo,
+        recipientConfirmedAt: null,
+        recipientConfirmedByUserId: null,
+        conditionOnReceipt: null,
+        conditionNotes: null,
+        resolvedAt: null,
+        resolvedByUserId: null,
+        resolutionNote: null,
+      };
+
+      const remainingKg = Math.round((offer.offeredQuantityKg - action.quantityKg) * 10) / 10;
+      const remainder: Offer | null =
+        remainingKg > 0 && new Date(offer.collectionDeadline).getTime() > Date.now()
+          ? {
+              ...offer,
+              id: uid('off'),
+              reference: `OF-${1100 + state.offers.length}`,
+              offeredQuantityKg: remainingKg,
+              status: 'open',
+              createdAt: nowIso(),
+              expiredAt: null,
+              parentOfferId: offer.id,
+            }
+          : null;
+
       return {
         ...state,
-        handovers: state.handovers.map((h) =>
-          h.claimId === action.claimId
-            ? {
-                ...h,
-                donorConfirmedAt: nowIso(),
-                donorConfirmedByUserId: action.userId,
-                donorQuantityKg: action.quantityKg,
-                donorPhoto: action.photo,
-              }
-            : h,
-        ),
+        handovers: [...state.handovers, handover],
+        offers: remainder ? [...state.offers, remainder] : state.offers,
         notifications: [
           ...recipientUsers.map((u) =>
             notify({
               userId: u.id,
-              kind: 'handover-confirmed',
+              kind: 'handover_confirmed',
               channel: 'push',
               title: `${offer.reference}: donor confirmed`,
               body: `${action.quantityKg} kg released. Confirm receipt when it reaches you.`,
@@ -357,42 +369,30 @@ export function reducer(state: AppState, action: Action): AppState {
         lastEvent: {
           kind: 'handover-donor',
           id: claim.id,
-          message: `Handover recorded for ${offer.reference}. Waiting on the recipient.`,
+          message: remainder
+            ? `Handover recorded for ${offer.reference}. The ${remainingKg} kg left over is posted again as ${remainder.reference}.`
+            : `Handover recorded for ${offer.reference}. Waiting on the recipient.`,
         },
       };
     }
 
-    /* 2ND CONFIRMATION CLOSES RECORD; POOR CONDITION OPENS A DISPUTE */
+    /* 2ND CONFIRMATION CLOSES RECORD; A PROBLEM CONDITION OPENS A DISPUTE */
     case 'CONFIRM_HANDOVER_RECIPIENT': {
       const handover = state.handovers.find((h) => h.claimId === action.claimId);
-      if (!handover) return state;
+      if (!handover || handover.recipientConfirmedAt) return state;
       const claim = state.claims.find((c) => c.id === action.claimId)!;
       const offer = state.offers.find((o) => o.id === claim.offerId)!;
 
-      const donorQty = handover.donorQuantityKg;
-      const mismatch = donorQty !== null && Math.abs(donorQty - action.quantityKg) > 2;
-      const poor = action.condition === 'poor';
-
-      const newDisputes: Dispute[] = [];
-      if (poor || mismatch) {
-        newDisputes.push({
-          id: uid('dsp'),
-          reference: `DP-${17 + state.disputes.length}`,
-          claimId: claim.id,
-          type: poor ? 'food-condition' : 'handover-mismatch',
-          openedAt: nowIso(),
-          status: 'open',
-          resolution: null,
-          resolutionNote: null,
-          resolvedAt: null,
-          resolvedByUserId: null,
-        });
-      }
+      const problem = action.condition === 'problem';
+      const firstFulfilment = !state.claims.some(
+        (c) =>
+          c.recipientOrganisationId === claim.recipientOrganisationId && c.status === 'fulfilled',
+      );
 
       const alerts: AppNotification[] = [
         notify({
           userId: offer.postedByUserId,
-          kind: 'handover-confirmed',
+          kind: 'handover_confirmed',
           channel: 'push',
           title: `${offer.reference} collected`,
           body: `Receipt confirmed. The handover record is complete and counts towards your tax certificate.`,
@@ -400,17 +400,15 @@ export function reducer(state: AppState, action: Action): AppState {
         }),
       ];
 
-      if (newDisputes.length > 0) {
+      if (problem) {
         for (const cid of coordinatorIds(state)) {
           alerts.push(
             notify({
               userId: cid,
               kind: 'dispute',
               channel: 'push',
-              title: `${newDisputes[0].reference} opened on ${offer.reference}`,
-              body: poor
-                ? 'The recipient reported the food condition as poor.'
-                : `Donor recorded ${donorQty} kg, recipient recorded ${action.quantityKg} kg.`,
+              title: `Problem reported on ${offer.reference}`,
+              body: action.note || 'The recipient reported a problem with the handover.',
               href: '/coordinator/disputes',
             }),
           );
@@ -420,30 +418,33 @@ export function reducer(state: AppState, action: Action): AppState {
       return {
         ...state,
         handovers: state.handovers.map((h) =>
-          h.claimId === action.claimId
+          h.id === handover.id
             ? {
                 ...h,
                 recipientConfirmedAt: nowIso(),
                 recipientConfirmedByUserId: action.userId,
-                recipientQuantityKg: action.quantityKg,
-                recipientCondition: action.condition,
-                recipientNote: action.note || null,
+                conditionOnReceipt: action.condition,
+                conditionNotes: action.note || null,
               }
             : h,
+        ),
+        claims: state.claims.map((c) => (c.id === claim.id ? { ...c, status: 'fulfilled' } : c)),
+        organisations: state.organisations.map((o) =>
+          o.id === claim.recipientOrganisationId && o.status === 'verified' && firstFulfilment
+            ? { ...o, status: 'active' }
+            : o,
         ),
         offers: state.offers.map((o) => (o.id === offer.id ? { ...o, status: 'collected' } : o)),
         collections: state.collections.map((c) =>
           c.claimId === claim.id ? { ...c, status: 'completed' } : c,
         ),
-        disputes: [...newDisputes, ...state.disputes],
         notifications: [...alerts, ...state.notifications],
         lastEvent: {
           kind: 'handover-complete',
           id: claim.id,
-          message:
-            newDisputes.length > 0
-              ? `Receipt recorded. ${newDisputes[0].reference} was opened for the coordinator.`
-              : `Receipt recorded. ${offer.reference} is complete.`,
+          message: problem
+            ? `Receipt recorded. A coordinator will look at the problem you reported.`
+            : `Receipt recorded. ${offer.reference} is complete.`,
         },
       };
     }
@@ -477,7 +478,7 @@ export function reducer(state: AppState, action: Action): AppState {
           ...recipientUsers.map((u) =>
             notify({
               userId: u.id,
-              kind: 'driver-dispatched',
+              kind: 'driver_dispatched',
               channel: 'whatsapp',
               title: `Driver arranged for ${offer.reference}`,
               body: `${action.driverName} is collecting on your behalf.`,
@@ -496,25 +497,29 @@ export function reducer(state: AppState, action: Action): AppState {
 
     case 'SET_VERIFICATION': {
       const org = state.organisations.find((o) => o.id === action.organisationId);
-      if (!org) return state;
-      const label: Record<VerificationStatus, string> = {
+      if (!org || org.type !== 'recipient') return state;
+      const fulfilled = state.claims.some(
+        (c) => c.recipientOrganisationId === org.id && c.status === 'fulfilled',
+      );
+      const status = nextStatus(org.status, action.decision, fulfilled);
+      if (!status) return state;
+      const label: Record<OrganisationStatus, string> = {
         pending: 'returned to pending',
-        'visit-booked': 'site visit booked',
         verified: 'verified and approved',
+        rejected: 'rejected',
+        active: 'reinstated',
         suspended: 'suspended',
       };
       return {
         ...state,
-        organisations: state.organisations.map((o) =>
-          o.id === org.id ? { ...o, verification: action.status } : o,
-        ),
+        organisations: state.organisations.map((o) => (o.id === org.id ? { ...o, status } : o)),
         audit: [
           {
             id: uid('aud'),
             actorUserId: action.userId,
-            action: `Organisation ${label[action.status]}`,
+            action: `Organisation ${label[status]}`,
             target: org.name,
-            detail: `Verification moved to ${action.status}.`,
+            detail: `Verification moved from ${org.status} to ${status}.`,
             at: nowIso(),
           },
           ...state.audit,
@@ -522,7 +527,7 @@ export function reducer(state: AppState, action: Action): AppState {
         lastEvent: {
           kind: 'verification',
           id: org.id,
-          message: `${org.name} ${label[action.status]}.`,
+          message: `${org.name} ${label[status]}.`,
         },
       };
     }
@@ -550,65 +555,43 @@ export function reducer(state: AppState, action: Action): AppState {
       };
     }
 
+    /* RESOLUTION IS WRITE-ONCE AND LEAVES THE HANDOVER FIGURES AS RECORDED */
     case 'RESOLVE_DISPUTE': {
-      const dispute = state.disputes.find((d) => d.id === action.disputeId);
-      if (!dispute) return state;
-      const claim = state.claims.find((c) => c.id === dispute.claimId);
+      const handover = state.handovers.find((h) => h.id === action.handoverId);
+      if (!handover || handover.conditionOnReceipt !== 'problem' || handover.resolvedAt)
+        return state;
+      if (!action.note) return state;
+      const claim = state.claims.find((c) => c.id === handover.claimId);
       const offer = claim && state.offers.find((o) => o.id === claim.offerId);
-      const handover = state.handovers.find((h) => h.claimId === dispute.claimId);
-
-      /* ACCEPTED FIGURE REWRITES THE REPORTING QUANTITY */
-      let handovers = state.handovers;
-      if (handover && action.resolution !== 'noted-and-closed') {
-        const agreed =
-          action.resolution === 'accepted-donor-figure'
-            ? handover.donorQuantityKg
-            : handover.recipientQuantityKg;
-        if (agreed !== null) {
-          handovers = state.handovers.map((h) =>
-            h.id === handover.id
-              ? { ...h, donorQuantityKg: agreed, recipientQuantityKg: agreed }
-              : h,
-          );
-        }
-      }
-
-      const label: Record<DisputeResolution, string> = {
-        'accepted-donor-figure': "accepted the donor's figure",
-        'accepted-recipient-figure': "accepted the recipient's figure",
-        'noted-and-closed': 'recorded a note and closed it',
-      };
+      const reference = offer?.reference ?? handover.claimId;
 
       return {
         ...state,
-        handovers,
-        disputes: state.disputes.map((d) =>
-          d.id === dispute.id
+        handovers: state.handovers.map((h) =>
+          h.id === handover.id
             ? {
-                ...d,
-                status: 'resolved',
-                resolution: action.resolution,
-                resolutionNote: action.note || null,
+                ...h,
                 resolvedAt: nowIso(),
                 resolvedByUserId: action.userId,
+                resolutionNote: action.note,
               }
-            : d,
+            : h,
         ),
         audit: [
           {
             id: uid('aud'),
             actorUserId: action.userId,
-            action: `Resolved dispute ${dispute.reference}`,
-            target: offer?.reference ?? dispute.claimId,
-            detail: `Coordinator ${label[action.resolution]}.`,
+            action: 'Resolved dispute',
+            target: reference,
+            detail: action.note,
             at: nowIso(),
           },
           ...state.audit,
         ],
         lastEvent: {
           kind: 'dispute-resolved',
-          id: dispute.id,
-          message: `${dispute.reference} closed. Coordinator ${label[action.resolution]}.`,
+          id: handover.id,
+          message: `Dispute on ${reference} closed with your note.`,
         },
       };
     }
@@ -617,7 +600,7 @@ export function reducer(state: AppState, action: Action): AppState {
       return {
         ...state,
         notifications: state.notifications.map((n) =>
-          n.id === action.notificationId ? { ...n, read: true } : n,
+          n.id === action.notificationId && !n.readAt ? { ...n, readAt: nowIso() } : n,
         ),
       };
 
@@ -625,7 +608,7 @@ export function reducer(state: AppState, action: Action): AppState {
       return {
         ...state,
         notifications: state.notifications.map((n) =>
-          n.userId === action.userId ? { ...n, read: true } : n,
+          n.userId === action.userId && !n.readAt ? { ...n, readAt: nowIso() } : n,
         ),
       };
 
@@ -646,7 +629,7 @@ export function reducer(state: AppState, action: Action): AppState {
           ...donorUsers.map((u) =>
             notify({
               userId: u.id,
-              kind: 'handover-confirmed',
+              kind: 'handover_confirmed',
               channel: 'push',
               title: `Tax certificate ${cert.reference} issued`,
               body: `${Math.round(cert.totalKg)} kg donated, ${cert.mealEquivalents.toLocaleString('en-ZA')} meal equivalents.`,
@@ -680,9 +663,7 @@ export function reducer(state: AppState, action: Action): AppState {
       const nowActive = !target.active;
       return {
         ...state,
-        users: state.users.map((u) =>
-          u.id === target.id ? { ...u, active: nowActive } : u,
-        ),
+        users: state.users.map((u) => (u.id === target.id ? { ...u, active: nowActive } : u)),
         audit: [
           {
             id: uid('aud'),

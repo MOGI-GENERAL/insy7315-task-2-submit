@@ -151,7 +151,7 @@ export function Dashboard() {
                       {orgById(state, offer.donorOrganisationId)?.name} →{' '}
                       {orgById(state, claim?.recipientOrganisationId)?.name}
                     </span>
-                    {!claim?.needsTransport ? (
+                    {!claim?.transportNeeded ? (
                       <span className="badge badge--quiet">Own vehicle</span>
                     ) : collection ? (
                       <span className="badge" data-tone="collected">

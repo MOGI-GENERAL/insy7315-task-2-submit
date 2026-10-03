@@ -27,9 +27,7 @@ export function OfferFeed() {
   const offers = eligibleOffers(state, org);
   const upcoming = scheduledOffers(state, org);
   const withheld = withheldOffers(state, org);
-  const active = claimsForRecipient(state, org.id).filter(
-    (c) => !c.claim.releasedAt && c.stage !== 'complete',
-  );
+  const active = claimsForRecipient(state, org.id).filter((c) => c.claim.status === 'active');
 
   return (
     <>
@@ -76,10 +74,7 @@ export function OfferFeed() {
                       {orgById(state, offer.donorOrganisationId)?.suburb}
                       {!org.hasTransport && ' · you will need a driver'}
                     </span>
-                    <Link
-                      to={`/recipient/offers/${offer.id}/claim`}
-                      className="btn btn--go"
-                    >
+                    <Link to={`/recipient/offers/${offer.id}/claim`} className="btn btn--go">
                       {t('claim.action')}
                     </Link>
                   </div>
