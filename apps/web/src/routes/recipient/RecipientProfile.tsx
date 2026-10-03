@@ -10,6 +10,7 @@ import { useT, coldChainKey } from '../../i18n/useT';
 import { useNow } from '../../lib/useNow';
 import type { ColdChain } from '../../store/types';
 import './Recipient.css';
+import { storageFields, storageList } from '../../lib/org';
 
 const storageOptions: ColdChain[] = ['ambient', 'refrigerated', 'frozen'];
 
@@ -19,8 +20,8 @@ export function RecipientProfile() {
   const t = useT();
   const now = useNow();
 
-  const [capacity, setCapacity] = useState(String(org.capacityKg ?? 0));
-  const [storage, setStorage] = useState<ColdChain[]>(org.storage ?? ['ambient']);
+  const [capacity, setCapacity] = useState(String(org.maxCapacityKg ?? 0));
+  const [storage, setStorage] = useState<ColdChain[]>(storageList(org));
   const [hasTransport, setHasTransport] = useState(Boolean(org.hasTransport));
   const [saved, setSaved] = useState(false);
 
@@ -32,18 +33,14 @@ export function RecipientProfile() {
   );
   const wouldSee = live.filter(
     (o) =>
-      checkEligibility(
-        { ...org, capacityKg: kg, storage, hasTransport },
-        o,
-      ).eligible,
+      checkEligibility({ ...org, maxCapacityKg: kg, ...storageFields(storage), hasTransport }, o)
+        .eligible,
   ).length;
 
   function toggleStorage(option: ColdChain) {
     setSaved(false);
     setStorage((current) =>
-      current.includes(option)
-        ? current.filter((c) => c !== option)
-        : [...current, option],
+      current.includes(option) ? current.filter((c) => c !== option) : [...current, option],
     );
   }
 
@@ -146,9 +143,7 @@ export function RecipientProfile() {
             />
             <span className="toggle__text">
               {t('profile.noTransport')}
-              <small>
-                FEDSA arranges a driver. This never reduces the offers you are shown.
-              </small>
+              <small>FEDSA arranges a driver. This never reduces the offers you are shown.</small>
             </span>
           </label>
         </div>
@@ -165,7 +160,11 @@ export function RecipientProfile() {
         </p>
       </div>
 
-      <button type="submit" className="btn btn--primary btn--lg" style={{ marginTop: 'var(--s-5)' }}>
+      <button
+        type="submit"
+        className="btn btn--primary btn--lg"
+        style={{ marginTop: 'var(--s-5)' }}
+      >
         {t('profile.save')}
       </button>
     </form>

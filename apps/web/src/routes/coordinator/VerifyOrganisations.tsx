@@ -9,6 +9,7 @@ import { useApp, useCurrentUser } from '../../store/context';
 import { formatDateFull, formatKg } from '../../lib/format';
 import { useT, coldChainKey } from '../../i18n/useT';
 import './Coordinator.css';
+import { canClaim, distanceFromOffice, storageList } from '../../lib/org';
 
 const checks = [
   'Premises visited in person',
@@ -25,11 +26,9 @@ export function VerifyOrganisations() {
   const [ticked, setTicked] = useState<Record<string, boolean>>({});
 
   const pending = state.organisations.filter(
-    (o) => o.kind === 'recipient' && (o.verification === 'pending' || o.verification === 'visit-booked'),
+    (o) => o.type === 'recipient' && o.status === 'pending',
   );
-  const verified = state.organisations.filter(
-    (o) => o.kind === 'recipient' && o.verification === 'verified',
-  );
+  const verified = state.organisations.filter((o) => o.type === 'recipient' && canClaim(o));
 
   const allTicked = checks.every((c) => ticked[c]);
 
@@ -56,11 +55,11 @@ export function VerifyOrganisations() {
                 <div>
                   <h3>{org.name}</h3>
                   <p className="muted">
-                    {org.suburb} · {org.distanceKm} km · registered{' '}
+                    {org.suburb} · {distanceFromOffice(org)} km · registered{' '}
                     {formatDateFull(org.joinedAt)}
                   </p>
                 </div>
-                <VerificationBadge status={org.verification} />
+                <VerificationBadge status={org.status} />
               </div>
 
               <DetailList>
@@ -68,9 +67,11 @@ export function VerifyOrganisations() {
                   {org.contactName}
                   <div className="muted">{org.contactPhone}</div>
                 </Detail>
-                <Detail label="Claimed capacity">{formatKg(org.capacityKg ?? 0)}</Detail>
+                <Detail label="Claimed capacity">{formatKg(org.maxCapacityKg ?? 0)}</Detail>
                 <Detail label="Claimed storage">
-                  {(org.storage ?? []).map((s) => t(coldChainKey(s))).join(', ')}
+                  {storageList(org)
+                    .map((s) => t(coldChainKey(s)))
+                    .join(', ')}
                 </Detail>
                 <Detail label="Transport">
                   {org.hasTransport ? 'Own vehicle' : 'Needs a driver'}
@@ -99,23 +100,21 @@ export function VerifyOrganisations() {
               </ul>
 
               <div className="row row--wrap" style={{ gap: 'var(--s-3)' }}>
-                {org.verification === 'pending' && (
-                  <button
-                    type="button"
-                    className="btn btn--secondary"
-                    onClick={() =>
-                      dispatch({
-                        type: 'SET_VERIFICATION',
-                        organisationId: org.id,
-                        status: 'visit-booked',
-                        userId: user.id,
-                      })
-                    }
-                  >
-                    <Icon name="clock" size={18} />
-                    Book the site visit
-                  </button>
-                )}
+                <button
+                  type="button"
+                  className="btn btn--secondary"
+                  onClick={() =>
+                    dispatch({
+                      type: 'SET_VERIFICATION',
+                      organisationId: org.id,
+                      decision: 'reject',
+                      userId: user.id,
+                    })
+                  }
+                >
+                  <Icon name="close" size={18} />
+                  Do not approve
+                </button>
                 <button
                   type="button"
                   className="btn btn--go"
@@ -124,7 +123,7 @@ export function VerifyOrganisations() {
                     dispatch({
                       type: 'SET_VERIFICATION',
                       organisationId: org.id,
-                      status: 'verified',
+                      decision: 'verify',
                       userId: user.id,
                     })
                   }
@@ -154,14 +153,16 @@ export function VerifyOrganisations() {
                   <span className="muted">{org.suburb}</span>
                 </span>
                 <span className="verify-row__value">
-                  <span className="num">{formatKg(org.capacityKg ?? 0)}</span>
+                  <span className="num">{formatKg(org.maxCapacityKg ?? 0)}</span>
                   <span className="muted">capacity</span>
                 </span>
               </div>
               <div className="verify-row__meta">
                 <span className="muted">
-                  {(org.storage ?? []).map((s) => t(coldChainKey(s))).join(', ')} ·{' '}
-                  {org.hasTransport ? 'Own vehicle' : 'Needs a driver'}
+                  {storageList(org)
+                    .map((s) => t(coldChainKey(s)))
+                    .join(', ')}{' '}
+                  · {org.hasTransport ? 'Own vehicle' : 'Needs a driver'}
                 </span>
                 <button
                   type="button"
@@ -170,7 +171,7 @@ export function VerifyOrganisations() {
                     dispatch({
                       type: 'SET_VERIFICATION',
                       organisationId: org.id,
-                      status: 'suspended',
+                      decision: 'suspend',
                       userId: user.id,
                     })
                   }

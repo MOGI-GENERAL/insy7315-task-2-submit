@@ -1,4 +1,4 @@
-/* RECIPIENT HANDOVER CONFIRMATION — QTY/CONDITION MISMATCH TRIGGERS DISPUTE */
+/* RECIPIENT HANDOVER CONFIRMATION — CONDITION ONLY; A PROBLEM GOES TO A COORDINATOR */
 
 import { useState } from 'react';
 import type { FormEvent } from 'react';
@@ -10,11 +10,11 @@ import { useApp, useCurrentOrg, useCurrentUser } from '../../store/context';
 import { claimById, handoverForClaim, offerById, orgById } from '../../store/selectors';
 import { useT } from '../../i18n/useT';
 import { formatDateTime, formatKg } from '../../lib/format';
-import type { FoodCondition } from '../../store/types';
+import type { Condition } from '../../store/types';
 import '../shared/Detail.css';
 import './Recipient.css';
 
-const conditions: FoodCondition[] = ['good', 'acceptable', 'poor'];
+const conditions: Condition[] = ['good', 'acceptable', 'problem'];
 
 export function RecipientHandover() {
   const { claimId } = useParams();
@@ -29,14 +29,7 @@ export function RecipientHandover() {
   const handover = claim ? handoverForClaim(state, claim.id) : undefined;
   const donor = orgById(state, offer?.donorOrganisationId);
 
-  const [quantity, setQuantity] = useState(
-    handover?.donorQuantityKg != null
-      ? String(handover.donorQuantityKg)
-      : offer
-        ? String(offer.offeredQuantityKg)
-        : '',
-  );
-  const [condition, setCondition] = useState<FoodCondition>('good');
+  const [condition, setCondition] = useState<Condition>('good');
   const [note, setNote] = useState('');
   const [touched, setTouched] = useState(false);
 
@@ -53,7 +46,7 @@ export function RecipientHandover() {
     return (
       <>
         <Banner tone="good" title={t('handover.done')}>
-          You confirmed {formatKg(handover.recipientQuantityKg ?? 0)} received on{' '}
+          You confirmed receipt of {formatKg(handover.collectedQuantityKg)} on{' '}
           {formatDateTime(handover.recipientConfirmedAt)}.
         </Banner>
         <Link to="/recipient/claims" className="btn btn--secondary">
@@ -63,20 +56,30 @@ export function RecipientHandover() {
     );
   }
 
-  const kg = Number(quantity);
-  const valid = Number.isFinite(kg) && kg > 0;
-  const donorKg = handover?.donorQuantityKg;
-  const mismatch = donorKg != null && valid && Math.abs(donorKg - kg) > 2;
+  if (!handover) {
+    return (
+      <>
+        <Banner tone="info" title="Waiting for the donor">
+          {donor?.name ?? 'The donor'} records the handover first, with the weight that left their
+          premises. You can confirm receipt once they have.
+        </Banner>
+        <Link to="/recipient/claims" className="btn btn--secondary">
+          {t('claims.title')}
+        </Link>
+      </>
+    );
+  }
+
+  const needsNote = condition === 'problem' && note.trim() === '';
 
   function submit(event: FormEvent) {
     event.preventDefault();
     setTouched(true);
-    if (!valid) return;
+    if (needsNote) return;
     dispatch({
       type: 'CONFIRM_HANDOVER_RECIPIENT',
       claimId: claim!.id,
       userId: user.id,
-      quantityKg: kg,
       condition,
       note: note.trim(),
     });
@@ -101,50 +104,12 @@ export function RecipientHandover() {
           <span>
             {offer.reference} · {donor?.name}
           </span>
-          {handover?.donorConfirmedAt && (
-            <span>
-              Donor recorded {formatKg(donorKg ?? 0)} at {formatDateTime(handover.donorConfirmedAt)}
-            </span>
-          )}
-        </div>
-      </div>
-
-      <div className="field">
-        <label className="field__label" htmlFor="recv-kg">
-          {t('handover.quantityReceived')}
-        </label>
-        <div className="qty">
-          <input
-            id="recv-kg"
-            className="input"
-            type="number"
-            inputMode="decimal"
-            min="0.1"
-            step="0.1"
-            value={quantity}
-            onChange={(e) => setQuantity(e.target.value)}
-            aria-invalid={touched && !valid}
-            aria-describedby="recv-kg-hint"
-          />
-          <span className="qty__unit">kg</span>
-        </div>
-        <span className="field__hint" id="recv-kg-hint">
-          Record what actually arrived, even if it differs from what was sent.
-        </span>
-        {touched && !valid && (
-          <span className="field__error" role="alert">
-            Enter the weight you received.
+          <span>
+            Donor recorded {formatKg(handover.collectedQuantityKg)} at{' '}
+            {formatDateTime(handover.donorConfirmedAt)}
           </span>
-        )}
+        </div>
       </div>
-
-      {mismatch && (
-        <Banner tone="warn" title="This does not match the donor's figure">
-          The donor recorded {formatKg(donorKg!)} and you have entered {formatKg(kg)}. Confirming
-          will open a dispute for a coordinator to settle, which is the right outcome: the figure
-          feeds both the funder report and the donor's tax certificate.
-        </Banner>
-      )}
 
       <fieldset className="field">
         <legend className="field__label">{t('handover.condition')}</legend>
@@ -168,21 +133,33 @@ export function RecipientHandover() {
             </label>
           ))}
         </div>
-        {condition === 'poor' && (
+        {condition === 'problem' && (
           <span className="field__hint">{t('handover.conditionPoorHint')}</span>
         )}
       </fieldset>
 
       <div className="field">
         <label className="field__label" htmlFor="recv-note">
-          {t('handover.note')} <span className="muted">({t('common.optional')})</span>
+          {t('handover.note')}{' '}
+          {condition !== 'problem' && <span className="muted">({t('common.optional')})</span>}
         </label>
         <textarea
           id="recv-note"
           className="textarea"
           value={note}
           onChange={(e) => setNote(e.target.value)}
+          aria-invalid={touched && needsNote}
+          aria-describedby="recv-note-hint"
         />
+        <span className="field__hint" id="recv-note-hint">
+          If less arrived than the donor recorded, choose Poor and say what arrived. A coordinator
+          settles it with both sides.
+        </span>
+        {touched && needsNote && (
+          <span className="field__error" role="alert">
+            Say what was wrong, so the coordinator can follow it up.
+          </span>
+        )}
       </div>
 
       <button type="submit" className="btn btn--go btn--lg btn--block">

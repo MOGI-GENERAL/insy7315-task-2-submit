@@ -4,15 +4,14 @@ import { Icon } from './Icon';
 import type { IconName } from './Icon';
 import { useT, statusKey, coldChainKey } from '../i18n/useT';
 import { isExpiringSoon } from '../lib/format';
-import type { ColdChain, NotificationChannel, OfferStatus, VerificationStatus } from '../store/types';
+import type {
+  ColdChain,
+  NotificationChannel,
+  OfferStatus,
+  OrganisationStatus,
+} from '../store/types';
 
-export function StatusBadge({
-  status,
-  deadline,
-}: {
-  status: OfferStatus;
-  deadline?: string;
-}) {
+export function StatusBadge({ status, deadline }: { status: OfferStatus; deadline?: string }) {
   const t = useT();
   const expiring = status === 'open' && deadline ? isExpiringSoon(deadline) : false;
   const tone = expiring ? 'expiring' : status;
@@ -47,34 +46,33 @@ export function ColdChainBadge({ coldChain }: { coldChain: ColdChain }) {
   );
 }
 
-const verificationTone: Record<VerificationStatus, string> = {
+const verificationTone: Record<OrganisationStatus, string> = {
   pending: 'expiring',
-  'visit-booked': 'open',
   verified: 'collected',
+  rejected: 'expired',
+  active: 'collected',
   suspended: 'expired',
 };
 
-const verificationLabel: Record<VerificationStatus, string> = {
+const verificationLabel: Record<OrganisationStatus, string> = {
   pending: 'Awaiting verification',
-  'visit-booked': 'Site visit booked',
   verified: 'Verified',
+  rejected: 'Not approved',
+  active: 'Active',
   suspended: 'Suspended',
 };
 
-export function VerificationBadge({ status }: { status: VerificationStatus }) {
+export function VerificationBadge({ status }: { status: OrganisationStatus }) {
+  const approved = status === 'verified' || status === 'active';
   return (
     <span className="badge" data-tone={verificationTone[status]}>
-      <Icon name={status === 'verified' ? 'check-circle' : 'shield'} size={14} />
+      <Icon name={approved ? 'check-circle' : 'shield'} size={14} />
       {verificationLabel[status]}
     </span>
   );
 }
 
 export function ChannelBadge({ channel }: { channel: NotificationChannel }) {
-  const label = channel === 'push' ? 'App' : channel === 'whatsapp' ? 'WhatsApp' : 'SMS';
-  return (
-    <span className="badge badge--quiet badge--sm">
-      {label}
-    </span>
-  );
+  const label = { in_app: 'App', push: 'App', whatsapp: 'WhatsApp', sms: 'SMS' }[channel];
+  return <span className="badge badge--quiet badge--sm">{label}</span>;
 }

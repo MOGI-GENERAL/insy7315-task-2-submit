@@ -13,6 +13,7 @@ import { formatKg, formatWhen, hasPassed, mealsFromKg } from '../../lib/format';
 import { useNow } from '../../lib/useNow';
 import '../shared/Detail.css';
 import './Recipient.css';
+import { distanceFromOffice } from '../../lib/org';
 
 export function OfferDetail() {
   const { offerId } = useParams();
@@ -77,11 +78,11 @@ export function OfferDetail() {
             </span>
             <span className="fit__line">
               <Icon name="scale" size={18} />
-              {formatKg(offer.offeredQuantityKg)} against your {org.capacityKg} kg limit
+              {formatKg(offer.offeredQuantityKg)} against your {org.maxCapacityKg} kg limit
             </span>
             <span className="fit__line">
               <Icon name={org.hasTransport ? 'truck' : 'pin'} size={18} />
-              {donor?.distanceKm != null && `${donor.distanceKm} km away · `}
+              {donor && `${distanceFromOffice(donor)} km away · `}
               {org.hasTransport
                 ? 'You can collect this yourselves'
                 : 'FEDSA will arrange a driver when you claim'}
@@ -142,18 +143,13 @@ export function OfferDetail() {
       </div>
 
       {canClaim && (
-        <Link
-          to={`/recipient/offers/${offer.id}/claim`}
-          className="btn btn--go btn--lg btn--block"
-        >
+        <Link to={`/recipient/offers/${offer.id}/claim`} className="btn btn--go btn--lg btn--block">
           <Icon name="check" size={20} />
           {t('claim.action')}
         </Link>
       )}
 
-      {closed && offer.status === 'open' && (
-        <Banner tone="bad">{t('offer.expired')}.</Banner>
-      )}
+      {closed && offer.status === 'open' && <Banner tone="bad">{t('offer.expired')}.</Banner>}
     </>
   );
 }

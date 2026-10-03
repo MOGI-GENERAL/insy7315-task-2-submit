@@ -12,6 +12,7 @@ import { useT } from '../../i18n/useT';
 import { formatKg, formatWhen, mealsFromKg } from '../../lib/format';
 import '../shared/Detail.css';
 import './Recipient.css';
+import { distanceFromOffice } from '../../lib/org';
 
 export function ClaimConfirm() {
   const { offerId } = useParams();
@@ -56,7 +57,7 @@ export function ClaimConfirm() {
       type: 'CLAIM_OFFER',
       offerId: offer!.id,
       userId: user.id,
-      needsTransport,
+      transportNeeded: needsTransport,
     });
     navigate('/recipient/claims');
   }
@@ -98,7 +99,9 @@ export function ClaimConfirm() {
             <Countdown deadline={offer.collectionDeadline} showClock={false} />
           </div>
         </Detail>
-        <Detail label="Distance">{donor?.distanceKm} km from the FEDSA office</Detail>
+        <Detail label="Distance">
+          {donor && distanceFromOffice(donor)} km from the FEDSA office
+        </Detail>
       </DetailList>
 
       <hr className="divider" style={{ margin: 'var(--s-5) 0' }} />

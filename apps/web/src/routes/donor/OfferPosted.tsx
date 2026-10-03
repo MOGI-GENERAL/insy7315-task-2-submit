@@ -32,12 +32,10 @@ export function OfferPosted() {
 
   /* DISPATCH LOG AS PROOF OF FAN-OUT */
   const notified = state.notifications.filter(
-    (n) => n.kind === 'offer-posted' && n.href === `/recipient/offers/${offer.id}`,
+    (n) => n.kind === 'offer_posted' && n.href === `/recipient/offers/${offer.id}`,
   );
   const notifiedOrgs = new Set(
-    notified
-      .map((n) => state.users.find((u) => u.id === n.userId)?.organisationId)
-      .filter(Boolean),
+    notified.map((n) => state.users.find((u) => u.id === n.userId)?.organisationId).filter(Boolean),
   );
 
   return (

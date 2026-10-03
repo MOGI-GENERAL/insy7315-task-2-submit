@@ -12,6 +12,7 @@ import { useT, categoryKey, coldChainKey } from '../../i18n/useT';
 import { mealsFromKg } from '../../lib/format';
 import type { ColdChain, FoodCategory } from '../../store/types';
 import './PostOffer.css';
+import { canClaim } from '../../lib/org';
 
 const categories: FoodCategory[] = ['bakery', 'produce', 'dairy', 'prepared', 'dry', 'other'];
 const coldChains: ColdChain[] = ['ambient', 'refrigerated', 'frozen'];
@@ -61,10 +62,7 @@ export function PostOffer() {
     if (!kgValid) return [];
     const draft = { offeredQuantityKg: kg, coldChain };
     return state.organisations.filter(
-      (o) =>
-        o.kind === 'recipient' &&
-        o.verification === 'verified' &&
-        checkEligibility(o, draft).eligible,
+      (o) => o.type === 'recipient' && canClaim(o) && checkEligibility(o, draft).eligible,
     );
   }, [state.organisations, kg, kgValid, coldChain]);
 
