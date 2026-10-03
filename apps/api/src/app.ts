@@ -8,10 +8,12 @@ import { globalLimit } from './middleware/rate-limits.js';
 import { securityHeaders } from './middleware/security-headers.js';
 import { sessions, type SessionSettings } from './middleware/session.js';
 import { authRouter } from './routes/auth-router.js';
+import { claimRouter } from './routes/claim-router.js';
 import { healthRouter } from './routes/health-router.js';
 import { meRouter } from './routes/me-router.js';
 import { offerRouter } from './routes/offer-router.js';
 import { organisationRouter } from './routes/organisation-router.js';
+import type { ClaimService } from './services/claim-service.js';
 import type { HealthService } from './services/health-service.js';
 import type { OfferService } from './services/offer-service.js';
 import type { OrganisationService } from './services/organisation-service.js';
@@ -22,6 +24,7 @@ export interface AppServices {
   users: UserService;
   organisations: OrganisationService;
   offers: OfferService;
+  claims: ClaimService;
 }
 
 export interface AppDeps {
@@ -53,6 +56,7 @@ export function createApp(deps: AppDeps) {
   app.use('/api', meRouter(deps.services.users));
   app.use('/api', organisationRouter(deps.services.organisations));
   app.use('/api', offerRouter(deps.services.offers));
+  app.use('/api', claimRouter(deps.services.claims));
   for (const router of deps.extraRouters ?? []) app.use(router);
 
   app.use(notFound);

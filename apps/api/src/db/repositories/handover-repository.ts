@@ -6,8 +6,8 @@ export class HandoverRepository {
     return HandoverRecordModel.findById(id, null, { session }).exec();
   }
 
-  findByClaim(claimId: Types.ObjectId | string) {
-    return HandoverRecordModel.findOne({ claimId }).exec();
+  findByClaim(claimId: Types.ObjectId | string, session?: ClientSession) {
+    return HandoverRecordModel.findOne({ claimId }, null, { session }).exec();
   }
 
   /** only handovers both sides have confirmed count as collected */
