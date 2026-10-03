@@ -2,6 +2,7 @@ import { once } from 'node:events';
 import type { AddressInfo } from 'node:net';
 import {
   suburbLocation,
+  type Language,
   type OrganisationStatus,
   type OrganisationType,
   type RegisterRequest,
@@ -10,6 +11,7 @@ import {
 import bcrypt from 'bcryptjs';
 import type { Router } from 'express';
 import type { Types } from 'mongoose';
+import type { Logger } from 'pino';
 import { createApp } from '../../src/app.js';
 import {
   AuditLogRepository,
@@ -17,6 +19,7 @@ import {
   CollectionRepository,
   HandoverRepository,
   HealthRepository,
+  NotificationRepository,
   OfferRepository,
   OrganisationModel,
   OrganisationRepository,
@@ -26,12 +29,14 @@ import {
 } from '../../src/db/index.js';
 import { createLogger } from '../../src/logger.js';
 import { createSessionStore } from '../../src/middleware/session.js';
+import type { NotificationChannel } from '../../src/notifications/notification-channel.js';
 import { LocalPhotoStore } from '../../src/photos/local-photo-store.js';
 import type { PhotoStore } from '../../src/photos/photo-store.js';
 import { AuditService } from '../../src/services/audit-service.js';
 import { DEFAULT_RADIUS_KM } from '../../src/services/eligibility.js';
 import { HealthService } from '../../src/services/health-service.js';
-import { LoggingNotifier, type OfferNotifier } from '../../src/services/offer-notifier.js';
+import { NotificationService } from '../../src/services/notification-service.js';
+import type { OfferNotifier } from '../../src/services/offer-notifier.js';
 import { OfferService } from '../../src/services/offer-service.js';
 import { OrganisationService } from '../../src/services/organisation-service.js';
 import { UserService } from '../../src/services/user-service.js';
@@ -53,6 +58,23 @@ export function newOrganisationService() {
   );
 }
 
+export interface NotificationTestOptions {
+  channels?: NotificationChannel[];
+  mirror?: boolean;
+  vapidPublicKey?: string | null;
+  logger?: Logger;
+}
+
+/** no channels unless a test passes some, so only inbox rows are written */
+export function newNotificationService(options: NotificationTestOptions = {}) {
+  return new NotificationService(new NotificationRepository(), new UserRepository(), {
+    channels: options.channels ?? [],
+    mirror: options.mirror ?? true,
+    vapidPublicKey: options.vapidPublicKey ?? null,
+    logger: options.logger ?? createLogger({ write: () => {} }),
+  });
+}
+
 export interface OfferTestOptions {
   photos?: PhotoStore;
   notifier?: OfferNotifier;
@@ -70,13 +92,17 @@ export function newOfferService(options: OfferTestOptions = {}) {
     new HandoverRepository(),
     new AuditService(new AuditLogRepository()),
     options.photos ?? new LocalPhotoStore(),
-    options.notifier ?? new LoggingNotifier(logger),
+    options.notifier ?? newNotificationService(),
     { radiusKm: DEFAULT_RADIUS_KM, logger, newReference: options.newReference },
   );
 }
 
 /** starts the real app on the test database. needs `startTestDb` to have run */
-export async function startTestApp(extraRouters: Router[] = [], offers = newOfferService()) {
+export async function startTestApp(
+  extraRouters: Router[] = [],
+  offers = newOfferService(),
+  notifications = newNotificationService(),
+) {
   const server = createApp({
     logger: createLogger({ write: () => {} }),
     services: {
@@ -88,6 +114,7 @@ export async function startTestApp(extraRouters: Router[] = [], offers = newOffe
       ),
       organisations: newOrganisationService(),
       offers,
+      notifications,
     },
     session: {
       secret: TEST_SESSION_SECRET,
@@ -222,6 +249,8 @@ export async function createUser(fields: {
   organisationId?: Types.ObjectId | null;
   status?: 'active' | 'disabled';
   mustChangePassword?: boolean;
+  phone?: string;
+  languagePreference?: Language;
 }) {
   // a low cost keeps the suite fast. registration covers the real cost
   testPasswordHash ??= bcrypt.hash(TEST_PASSWORD, 4);
@@ -231,8 +260,8 @@ export async function createUser(fields: {
     fullName: 'Test User',
     email: uniqueEmail(fields.role),
     passwordHash: await testPasswordHash,
-    phone: '+27820000000',
-    languagePreference: 'en',
+    phone: fields.phone ?? '+27820000000',
+    languagePreference: fields.languagePreference ?? 'en',
     status: fields.status ?? 'active',
     mustChangePassword: fields.mustChangePassword ?? false,
   });

@@ -15,6 +15,7 @@ import {
   ClaimRepository,
   CollectionRepository,
   HandoverRepository,
+  NotificationRepository,
   OfferRepository,
   OrganisationRepository,
   SessionRepository,
@@ -27,7 +28,7 @@ import { LocalPhotoStore } from './photos/local-photo-store.js';
 import { AuditService } from './services/audit-service.js';
 import { DEFAULT_RADIUS_KM } from './services/eligibility.js';
 import { HealthService } from './services/health-service.js';
-import { LoggingNotifier } from './services/offer-notifier.js';
+import { NotificationService } from './services/notification-service.js';
 import { OfferService } from './services/offer-service.js';
 import { OrganisationService } from './services/organisation-service.js';
 import { UserService } from './services/user-service.js';
@@ -61,6 +62,13 @@ throwaway.post('/api/webhooks/twilio/test', (_req, res) => {
   res.status(204).end();
 });
 
+const notifications = new NotificationService(new NotificationRepository(), new UserRepository(), {
+  channels: [],
+  mirror: true,
+  vapidPublicKey: null,
+  logger,
+});
+
 // no request in this file signs in, so the user service never reaches a database
 const server = createApp({
   logger,
@@ -86,9 +94,10 @@ const server = createApp({
       new HandoverRepository(),
       new AuditService(new AuditLogRepository()),
       new LocalPhotoStore(),
-      new LoggingNotifier(logger),
+      notifications,
       { radiusKm: DEFAULT_RADIUS_KM, logger },
     ),
+    notifications,
   },
   session: { secret: 'unit-test-session-secret', secureCookie: false },
   extraRouters: [throwaway],

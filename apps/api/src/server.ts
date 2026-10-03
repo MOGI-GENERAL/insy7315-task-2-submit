@@ -7,6 +7,7 @@ import {
   CollectionRepository,
   HandoverRepository,
   HealthRepository,
+  NotificationRepository,
   OfferRepository,
   OrganisationRepository,
   SessionRepository,
@@ -14,11 +15,12 @@ import {
 } from './db/index.js';
 import { createLogger } from './logger.js';
 import { createSessionStore } from './middleware/session.js';
+import { channelSettings } from './notifications/channel-settings.js';
 import { LocalPhotoStore } from './photos/local-photo-store.js';
 import { AuditService } from './services/audit-service.js';
 import { DEFAULT_RADIUS_KM } from './services/eligibility.js';
 import { HealthService } from './services/health-service.js';
-import { LoggingNotifier } from './services/offer-notifier.js';
+import { NotificationService } from './services/notification-service.js';
 import { OfferService } from './services/offer-service.js';
 import { OrganisationService } from './services/organisation-service.js';
 import { UserService } from './services/user-service.js';
@@ -52,6 +54,12 @@ async function start() {
     process.exit(1);
   }
 
+  const notifications = new NotificationService(
+    new NotificationRepository(),
+    new UserRepository(),
+    { ...channelSettings(process.env, logger), logger },
+  );
+
   const services = {
     // Render sets RENDER_GIT_COMMIT on every deploy
     health: new HealthService(new HealthRepository(), process.env.RENDER_GIT_COMMIT || 'dev'),
@@ -75,9 +83,10 @@ async function start() {
       new HandoverRepository(),
       new AuditService(new AuditLogRepository()),
       new LocalPhotoStore(),
-      new LoggingNotifier(logger),
+      notifications,
       { radiusKm, logger },
     ),
+    notifications,
   };
   const session = {
     secret: sessionSecret,
