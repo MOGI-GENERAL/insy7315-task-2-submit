@@ -1,12 +1,11 @@
-import { useMemo, useReducer } from 'react';
+import { useMemo, useSyncExternalStore } from 'react';
 import type { ReactNode } from 'react';
 import { AppContext } from './context';
-import { reducer } from './reducer';
-import { createInitialState } from './seed';
+import type { Store } from './store';
 
 /** IN-MEMORY STATE ONLY - NO PERSISTENCE BY DESIGN, REFRESH RESETS DEMO */
-export function AppProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(reducer, undefined, createInitialState);
-  const value = useMemo(() => ({ state, dispatch }), [state]);
+export function AppProvider({ store, children }: { store: Store; children: ReactNode }) {
+  const state = useSyncExternalStore(store.subscribe, store.getState);
+  const value = useMemo(() => ({ state, dispatch: store.dispatch }), [state, store]);
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }

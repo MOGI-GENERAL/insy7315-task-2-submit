@@ -9,14 +9,22 @@ import './styles/base.css';
 import './styles/components.css';
 
 import { AppProvider } from './store/AppProvider';
+import { createStore } from './store/store';
+import { createDataLayer } from './data';
+import { DataProvider } from './data/DataProvider';
 import { App } from './App';
+
+const store = createStore();
+const data = createDataLayer(store);
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
-      <AppProvider>
-        <App />
-      </AppProvider>
+      <DataProvider data={data}>
+        <AppProvider store={store}>
+          <App />
+        </AppProvider>
+      </DataProvider>
     </BrowserRouter>
   </StrictMode>,
 );

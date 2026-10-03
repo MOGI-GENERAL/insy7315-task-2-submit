@@ -1,0 +1,29 @@
+import type { Store } from '../store/store';
+import { createFakeDataLayer } from './fake';
+import type { DataLayer } from './repositories';
+
+export { ApiError, isApiError } from './ApiError';
+export { photoKeyFromUrl } from './fake/mappers';
+export type * from './repositories';
+
+export type DataMode = 'fake' | 'http';
+
+export function dataMode(): DataMode {
+  return import.meta.env.VITE_DATA === 'http' ? 'http' : 'fake';
+}
+
+/** `?fail=claim,post` makes those calls reject, to show the error states on demand */
+function failOnFromUrl(): Set<string> {
+  const fail = new URLSearchParams(window.location.search).get('fail');
+  return new Set(fail ? fail.split(',').map((s) => s.trim()) : []);
+}
+
+export function createDataLayer(store: Store): DataLayer {
+  if (dataMode() === 'http') {
+    throw new Error('VITE_DATA=http needs the HTTP repositories, which are not built yet');
+  }
+  return createFakeDataLayer(store, {
+    delayMs: Number(import.meta.env.VITE_FAKE_DELAY_MS ?? 400),
+    failOn: failOnFromUrl(),
+  });
+}
