@@ -1,7 +1,7 @@
 {
   "name": "@fedsa/api",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "exports": {
     "./db": {
@@ -19,7 +19,7 @@
     "test:contract": "vitest run --dir test/contract"
   },
   "dependencies": {
-    "@fedsa/contract": "0.0.0",
+    "@fedsa/contract": "*",
     "bcryptjs": "^3.0.3",
     "connect-mongo": "^6.0.0",
     "express": "^5.2.1",
