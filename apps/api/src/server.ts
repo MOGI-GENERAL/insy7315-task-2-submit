@@ -94,6 +94,7 @@ async function start() {
       new UserRepository(),
       new OrganisationRepository(),
       new SessionRepository(),
+      new AuditService(new AuditLogRepository()),
     ),
     organisations: new OrganisationService(
       new OrganisationRepository(),
@@ -122,6 +123,7 @@ async function start() {
       claims,
       logger,
     ),
+    audit: new AuditService(new AuditLogRepository()),
   };
   const session = {
     secret: sessionSecret,

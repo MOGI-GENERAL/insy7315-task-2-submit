@@ -45,3 +45,20 @@ export function requireOwnership(loadOwner: OwnerLoader) {
     next();
   };
 }
+
+/** all a user signed in with a temporary password can reach until they replace it */
+const BEFORE_PASSWORD_CHANGE = new Set([
+  'GET /api/auth/csrf',
+  'POST /api/auth/login',
+  'POST /api/auth/logout',
+  'GET /api/me',
+  'POST /api/me/password',
+]);
+
+export function requirePasswordChanged(req: Request, _res: Response, next: NextFunction) {
+  if (req.user?.mustChangePassword && !BEFORE_PASSWORD_CHANGE.has(`${req.method} ${req.path}`)) {
+    next(new ForbiddenError('Change your temporary password first'));
+    return;
+  }
+  next();
+}

@@ -93,6 +93,7 @@ export class WebhookService {
       id: sender._id.toString(),
       role: sender.role,
       organisationId: sender.organisationId!.toString(),
+      mustChangePassword: sender.mustChangePassword,
     };
     try {
       // a reply cannot ask for transport. the organisation's own record answers it
