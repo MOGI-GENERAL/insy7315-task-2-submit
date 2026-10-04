@@ -41,6 +41,7 @@ import { NotificationService } from '../../src/services/notification-service.js'
 import type { OfferNotifier } from '../../src/services/offer-notifier.js';
 import { OfferService } from '../../src/services/offer-service.js';
 import { OrganisationService } from '../../src/services/organisation-service.js';
+import { ReportingService } from '../../src/services/reporting-service.js';
 import { UserService } from '../../src/services/user-service.js';
 import { TestClient } from '../test-client.js';
 
@@ -58,6 +59,10 @@ export function newOrganisationService() {
     new HandoverRepository(),
     new AuditService(new AuditLogRepository()),
   );
+}
+
+export function newReportingService() {
+  return new ReportingService(new HandoverRepository(), new OfferRepository());
 }
 
 export interface NotificationTestOptions {
@@ -148,6 +153,7 @@ export async function startTestApp(
       offers,
       claims,
       notifications,
+      reports: newReportingService(),
     },
     session: {
       secret: TEST_SESSION_SECRET,

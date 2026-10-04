@@ -32,6 +32,7 @@ import { HealthService } from './services/health-service.js';
 import { NotificationService } from './services/notification-service.js';
 import { OfferService } from './services/offer-service.js';
 import { OrganisationService } from './services/organisation-service.js';
+import { ReportingService } from './services/reporting-service.js';
 import { UserService } from './services/user-service.js';
 
 const logLines: string[] = [];
@@ -110,6 +111,7 @@ const server = createApp({
       logger,
     ),
     notifications,
+    reports: new ReportingService(new HandoverRepository(), new OfferRepository()),
   },
   session: { secret: 'unit-test-session-secret', secureCookie: false },
   extraRouters: [throwaway],
