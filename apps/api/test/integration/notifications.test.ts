@@ -2,16 +2,25 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
+  ClaimResponse,
+  ClaimWithOfferResponse,
   ErrorEnvelope,
   NotificationListResponse,
   PostOfferResponse,
   VapidKeyResponse,
   type Language,
+  type NotificationKind,
   type Offer,
 } from '@fedsa/contract';
 import { Types } from 'mongoose';
-import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'vitest';
-import { NotificationModel, OfferModel, OrganisationModel, UserModel } from '../../src/db/index.js';
+import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
+import {
+  ClaimModel,
+  NotificationModel,
+  OfferModel,
+  OrganisationModel,
+  UserModel,
+} from '../../src/db/index.js';
 import { createLogger } from '../../src/logger.js';
 import { channelSettings } from '../../src/notifications/channel-settings.js';
 import { MemoryChannel } from '../../src/notifications/memory-channel.js';
@@ -21,12 +30,14 @@ import type {
 } from '../../src/notifications/notification-channel.js';
 import { TwilioSmsChannel, type TwilioMessages } from '../../src/notifications/twilio-channels.js';
 import { LOCAL_PHOTO_BASE_URL, LocalPhotoStore } from '../../src/photos/local-photo-store.js';
+import type { ClaimNotifier } from '../../src/services/claim-notifier.js';
 import type { NotificationService } from '../../src/services/notification-service.js';
 import type { TestClient } from '../test-client.js';
 import {
   anonymousClient,
   createOrganisation,
   createUser,
+  newClaimService,
   newNotificationService,
   newOfferService,
   signedInClient,
@@ -96,6 +107,7 @@ beforeEach(async () => {
     OrganisationModel.deleteMany({}),
     UserModel.deleteMany({}),
     OfferModel.deleteMany({}),
+    ClaimModel.deleteMany({}),
     NotificationModel.deleteMany({}),
   ]);
 });
@@ -245,7 +257,7 @@ describe('posting an offer', () => {
     expect(twilio.created).toHaveLength(1);
   });
 
-  test('logs how long the fan-out took from the moment of posting', async () => {
+  test('logs how long the fan-out took', async () => {
     const donorOrganisation = await createOrganisation({ type: 'donor' });
     const donorUser = await member(donorOrganisation._id, 'donor');
     const shelter = await createOrganisation({ type: 'recipient' });
@@ -420,6 +432,132 @@ describe('notifying from other work', () => {
     expect(await NotificationModel.find().lean()).toEqual([
       expect.objectContaining({ channel: 'sms', deliveryStatus: 'failed', sentAt: null }),
     ]);
+  });
+});
+
+describe('claims and releases', () => {
+  /** a donor, the shelter that claims, and a kitchen that was sent the offer too */
+  async function claimScene() {
+    const bakery = await createOrganisation({ type: 'donor' });
+    const donorUser = await member(bakery._id, 'donor');
+    const shelter = await createOrganisation({ type: 'recipient', name: 'Siyakhula Shelter' });
+    const shelterUser = await member(shelter._id, 'recipient');
+    const kitchen = await createOrganisation({ type: 'recipient', name: "St Michael's Kitchen" });
+    const kitchenUser = await member(kitchen._id, 'recipient');
+
+    const offer = await postOffer(await signedInClient(baseUrl, donorUser.email));
+    await notifications.whenIdle();
+    const claimer = await signedInClient(baseUrl, shelterUser.email);
+    return { donorUser, shelterUser, kitchenUser, offer, claimer };
+  }
+
+  async function claimOffer(client: TestClient, offerId: string) {
+    const res = await client.post(`/api/offers/${offerId}/claim`, { transportNeeded: false });
+    if (res.status !== 201) throw new Error(`claiming failed with ${res.status}`);
+    return ClaimResponse.parse(await res.json()).claim;
+  }
+
+  function inboxRows(userId: Types.ObjectId, kind: NotificationKind) {
+    return NotificationModel.find({ userId, kind, channel: 'in_app' }).lean().exec();
+  }
+
+  test('the donor hears who claimed, the other recipients that it has gone, and the claimer nothing', async () => {
+    const { donorUser, shelterUser, kitchenUser, offer, claimer } = await claimScene();
+
+    await claimOffer(claimer, offer.id);
+    await notifications.whenIdle();
+
+    expect(await inboxRows(donorUser._id, 'offer_claimed')).toEqual([
+      expect.objectContaining({
+        title: `Offer ${offer.reference} claimed`,
+        body: expect.stringContaining('Siyakhula Shelter claimed 31 kg'),
+        href: `/donor/offers/${offer.id}`,
+      }),
+    ]);
+    const gone = await inboxRows(kitchenUser._id, 'offer_claimed');
+    expect(gone).toEqual([
+      expect.objectContaining({
+        title: `Offer ${offer.reference} taken`,
+        body: 'This offer has been claimed and is no longer available.',
+      }),
+    ]);
+    expect(gone[0]!.body).not.toContain('Siyakhula');
+    expect(await inboxRows(shelterUser._id, 'offer_claimed')).toEqual([]);
+  });
+
+  test('the donor hears who released the claim', async () => {
+    const { donorUser, offer, claimer } = await claimScene();
+    const claim = await claimOffer(claimer, offer.id);
+    await notifications.whenIdle();
+
+    const res = await claimer.post(`/api/claims/${claim.id}/release`, {});
+    expect(res.status).toBe(200);
+    await notifications.whenIdle();
+
+    expect(await inboxRows(donorUser._id, 'claim_released')).toEqual([
+      expect.objectContaining({
+        title: `Offer ${offer.reference} released`,
+        body: expect.stringContaining('Siyakhula Shelter released the claim'),
+        href: `/donor/offers/${offer.id}`,
+      }),
+    ]);
+  });
+
+  test('a release still succeeds when its notification fails', async () => {
+    const failing: ClaimNotifier = {
+      notifyClaimed: async () => {},
+      notifyReleased: async () => {
+        throw new Error('notification store unreachable');
+      },
+    };
+    const offers = newOfferService({ notifier: notifications });
+    const app = await startTestApp(
+      [],
+      offers,
+      notifications,
+      newClaimService(offers, { offerNotifier: notifications, claimNotifier: failing }),
+    );
+    try {
+      const bakery = await createOrganisation({ type: 'donor' });
+      const donorUser = await member(bakery._id, 'donor');
+      const shelter = await createOrganisation({ type: 'recipient' });
+      const shelterUser = await member(shelter._id, 'recipient');
+      const offer = await postOffer(await signedInClient(app.baseUrl, donorUser.email));
+      const claimer = await signedInClient(app.baseUrl, shelterUser.email);
+      const claim = await claimOffer(claimer, offer.id);
+
+      const res = await claimer.post(`/api/claims/${claim.id}/release`, {});
+
+      expect(res.status).toBe(200);
+      expect(ClaimWithOfferResponse.parse(await res.json()).claim.status).toBe('released');
+      expect(await ClaimModel.findById(claim.id).lean()).toMatchObject({ status: 'released' });
+      await notifications.whenIdle();
+    } finally {
+      await app.close();
+    }
+  });
+
+  test('re-notifying after a release does not warn that the fan-out took over a minute', async () => {
+    const { kitchenUser, offer, claimer } = await claimScene();
+    // the raw collection, because Mongoose will not overwrite `createdAt`
+    await OfferModel.collection.updateOne(
+      { _id: new Types.ObjectId(offer.id) },
+      { $set: { createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000) } },
+    );
+    const claim = await claimOffer(claimer, offer.id);
+    await notifications.whenIdle();
+    logLines.length = 0;
+
+    await claimer.post(`/api/claims/${claim.id}/release`, {});
+    // the re-notify starts only once the eligible recipients have been read
+    await vi.waitFor(async () => {
+      expect(await inboxRows(kitchenUser._id, 'offer_posted')).toHaveLength(2);
+    });
+    await notifications.whenIdle();
+
+    const messages = logLines.map((line) => (JSON.parse(line) as { msg: string }).msg);
+    expect(messages).toContain('offer fan-out finished');
+    expect(messages).not.toContain('offer fan-out took longer than a minute');
   });
 });
 

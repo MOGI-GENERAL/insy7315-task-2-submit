@@ -1,6 +1,6 @@
-import { NotificationKind } from '@fedsa/contract';
+import { NotificationKind, type Offer } from '@fedsa/contract';
 import { Types } from 'mongoose';
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import { NotificationRepository, UserRepository } from '../db/index.js';
 import { createLogger } from '../logger.js';
 import { MemoryChannel } from '../notifications/memory-channel.js';
@@ -127,5 +127,43 @@ describe('fan-out', () => {
     expect(probe.sent).toHaveLength(45);
     expect(rows).toHaveLength(90);
     expect(result).toEqual({ users: 45, rows: 90, failed: 0 });
+  });
+
+  test('a fan-out that really takes over a minute still warns', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      const lines: string[] = [];
+      const slowUsers = {
+        findActiveInOrganisations: async () => {
+          vi.setSystemTime(Date.now() + 61_000);
+          return [];
+        },
+      };
+      const slow = new NotificationService(
+        {} as unknown as NotificationRepository,
+        slowUsers as unknown as UserRepository,
+        {
+          channels: [],
+          mirror: true,
+          vapidPublicKey: null,
+          logger: createLogger({ write: (line: string) => void lines.push(line) }),
+        },
+      );
+      const offer = {
+        id: new Types.ObjectId().toString(),
+        reference: 'K4F2',
+        offeredQuantityKg: 31,
+        donor: { suburb: 'Woodstock' },
+        collectionDeadline: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+      } as unknown as Offer;
+
+      await slow.notifyEligible(offer, ['any']);
+
+      const messages = lines.map((line) => (JSON.parse(line) as { msg: string }).msg);
+      expect(messages).toEqual(['offer fan-out took longer than a minute']);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
