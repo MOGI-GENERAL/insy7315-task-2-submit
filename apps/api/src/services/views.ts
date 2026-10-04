@@ -8,7 +8,9 @@ import type {
   Organisation,
   OrganisationSummary,
   Photo,
+  TaxCertificate,
   User,
+  ValuationRate,
 } from '@fedsa/contract';
 import type { Types } from 'mongoose';
 import type {
@@ -18,7 +20,9 @@ import type {
   NotificationDoc,
   OfferDoc,
   OrganisationDoc,
+  TaxCertificateDoc,
   UserDoc,
+  ValuationRateDoc,
 } from '../db/index.js';
 
 type Stored<T> = T & { _id: Types.ObjectId; createdAt: Date };
@@ -186,5 +190,37 @@ export function notificationView(notification: Stored<NotificationDoc>): Notific
     deliveryStatus: notification.deliveryStatus,
     readAt: iso(notification.readAt),
     createdAt: notification.createdAt.toISOString(),
+  };
+}
+
+export function valuationRateView(
+  rate: Stored<ValuationRateDoc> & { updatedAt: Date },
+): ValuationRate {
+  return {
+    category: rate.category,
+    ratePerKg: rate.ratePerKg,
+    updatedAt: rate.updatedAt.toISOString(),
+    updatedByUserId: rate.updatedByUserId ? rate.updatedByUserId.toString() : null,
+  };
+}
+
+/** leaves out the donor snapshot and the placeholder flag, which only the PDF prints */
+export function certificateView(certificate: Stored<TaxCertificateDoc>): TaxCertificate {
+  return {
+    id: certificate._id.toString(),
+    certificateNumber: certificate.certificateNumber,
+    donorOrganisationId: certificate.donorOrganisationId.toString(),
+    periodStart: certificate.periodStart.toISOString(),
+    periodEnd: certificate.periodEnd.toISOString(),
+    handoverRecordIds: certificate.handoverRecordIds.map((id) => id.toString()),
+    totalQuantityKg: certificate.totalQuantityKg,
+    valuationByCategory: certificate.valuationByCategory.map((line) => ({
+      category: line.category,
+      quantityKg: line.quantityKg,
+      ratePerKg: line.ratePerKg,
+      value: line.value,
+    })),
+    totalValue: certificate.totalValue,
+    issuedAt: certificate.issuedAt.toISOString(),
   };
 }

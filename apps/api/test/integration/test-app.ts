@@ -18,6 +18,7 @@ import {
   AuditLogRepository,
   ClaimRepository,
   CollectionRepository,
+  CounterRepository,
   HandoverRepository,
   HealthRepository,
   NotificationRepository,
@@ -25,8 +26,10 @@ import {
   OrganisationModel,
   OrganisationRepository,
   SessionRepository,
+  TaxCertificateRepository,
   UserModel,
   UserRepository,
+  ValuationRateRepository,
 } from '../../src/db/index.js';
 import { createLogger } from '../../src/logger.js';
 import { createSessionStore } from '../../src/middleware/session.js';
@@ -68,7 +71,15 @@ export function newOrganisationService() {
 }
 
 export function newReportingService() {
-  return new ReportingService(new HandoverRepository(), new OfferRepository());
+  return new ReportingService(
+    new HandoverRepository(),
+    new OfferRepository(),
+    new OrganisationRepository(),
+    new ValuationRateRepository(),
+    new TaxCertificateRepository(),
+    new CounterRepository(),
+    new AuditService(new AuditLogRepository()),
+  );
 }
 
 export interface NotificationTestOptions {

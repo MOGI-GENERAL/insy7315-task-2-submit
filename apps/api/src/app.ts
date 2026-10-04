@@ -9,6 +9,7 @@ import { securityHeaders } from './middleware/security-headers.js';
 import { sessions, type SessionSettings } from './middleware/session.js';
 import type { TwilioWebhookSettings } from './middleware/twilio-signature.js';
 import { authRouter } from './routes/auth-router.js';
+import { certificateRouter } from './routes/certificate-router.js';
 import { claimRouter } from './routes/claim-router.js';
 import { healthRouter } from './routes/health-router.js';
 import { meRouter } from './routes/me-router.js';
@@ -71,6 +72,7 @@ export function createApp(deps: AppDeps) {
   app.use('/api', claimRouter(deps.services.claims));
   app.use('/api', notificationRouter(deps.services.notifications));
   app.use('/api', reportRouter(deps.services.reports));
+  app.use('/api', certificateRouter(deps.services.reports));
   app.use('/api', webhookRouter(deps.services.webhooks, deps.twilioWebhooks ?? null));
   for (const router of deps.extraRouters ?? []) app.use(router);
 
