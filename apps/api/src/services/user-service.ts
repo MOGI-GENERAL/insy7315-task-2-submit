@@ -24,6 +24,11 @@ import { organisationView, userView } from './views.js';
 
 export const BCRYPT_COST = 12;
 
+/** registration, password changes and the seeded accounts all hash this way */
+export function hashPassword(password: string) {
+  return bcrypt.hash(password, BCRYPT_COST);
+}
+
 /** the privacy notice a user agreed to. change it when the notice changes */
 export const CONSENT_VERSION = '2026-10';
 
@@ -59,7 +64,7 @@ export class UserService {
   }
 
   async register(input: RegisterRequest): Promise<SessionResponse> {
-    const passwordHash = await bcrypt.hash(input.user.password, BCRYPT_COST);
+    const passwordHash = await hashPassword(input.user.password);
 
     try {
       return await runInTransaction(async (session) => {
@@ -138,7 +143,7 @@ export class UserService {
       throw new ValidationError({ currentPassword: 'The current password is not correct' });
     }
 
-    const passwordHash = await bcrypt.hash(input.newPassword, BCRYPT_COST);
+    const passwordHash = await hashPassword(input.newPassword);
     await this.users.updatePassword(user._id, passwordHash);
     await this.sessions.deleteForUser(userId, currentSessionId);
   }
