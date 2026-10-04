@@ -1,0 +1,73 @@
+name: deploy
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    needs: ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: production
+      url: ${{ vars.PRODUCTION_URL }}
+    env:
+      PRODUCTION_URL: ${{ vars.PRODUCTION_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+
+      - name: Build the web app
+        run: npm run build -w packages/contract && npm run build -w apps/web
+        env:
+          API_ORIGIN: ${{ vars.PRODUCTION_API_ORIGIN }}
+          VITE_DATA: ${{ vars.VITE_DATA }}
+
+      # the API goes first, so the new web app never talks to the old API
+      - name: Deploy the API on Render
+        run: curl -fsS -X POST "$RENDER_API_HOOK" > /dev/null
+        env:
+          RENDER_API_HOOK: ${{ secrets.RENDER_API_HOOK }}
+
+      - name: Wait for the new API version
+        run: |
+          for attempt in $(seq 1 60); do
+            version=$(curl -fsS "$PRODUCTION_API_ORIGIN/api/health" | jq -r .version || true)
+            if [ "$version" = "$GITHUB_SHA" ]; then
+              echo "API is serving $version"
+              exit 0
+            fi
+            echo "attempt $attempt: API is serving ${version:-nothing}"
+            sleep 10
+          done
+          echo "the API did not reach $GITHUB_SHA within 10 minutes" >&2
+          exit 1
+        env:
+          PRODUCTION_API_ORIGIN: ${{ vars.PRODUCTION_API_ORIGIN }}
+
+      - name: Deploy the web app on Netlify
+        run: npx --yes netlify-cli deploy --prod --no-build --filter @fedsa/web --dir apps/web/dist --message "$GITHUB_SHA"
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+
+      - name: Check the API through the Netlify rewrite
+        run: |
+          version=$(curl -fsS "$PRODUCTION_URL/api/health" | jq -r .version)
+          echo "production serves $version through $PRODUCTION_URL"
+          test "$version" = "$GITHUB_SHA"

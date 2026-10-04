@@ -1,0 +1,19 @@
+{
+  "name": "@fedsa/contract",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "test:unit": "vitest run --passWithNoTests --dir src"
+  },
+  "dependencies": {
+    "zod": "^4.6.5"
+  }
+}

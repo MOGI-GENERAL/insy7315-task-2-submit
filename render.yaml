@@ -1,0 +1,44 @@
+# secrets are marked sync: false and set in the Render dashboard, never here
+# both services are on the free plan, which sleeps when idle and has no cron jobs.
+# the API runs the expiry sweep itself while it is awake
+services:
+  - type: web
+    name: fedsa-api
+    runtime: node
+    plan: free
+    region: frankfurt
+    branch: main
+    # deploys come from the deploy workflow's hook once CI passes
+    autoDeployTrigger: "off"
+    buildCommand: npm ci --include=dev && npm run build -w packages/contract -w apps/api
+    startCommand: npm run start -w apps/api
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "22"
+      - key: MONGODB_URI
+        sync: false
+      - key: SESSION_SECRET
+        sync: false
+
+  - type: web
+    name: fedsa-api-staging
+    runtime: node
+    plan: free
+    region: frankfurt
+    branch: develop
+    autoDeployTrigger: commit
+    buildCommand: npm ci --include=dev && npm run build -w packages/contract -w apps/api
+    startCommand: npm run start -w apps/api
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "22"
+      - key: MONGODB_URI
+        sync: false
+      - key: SESSION_SECRET
+        sync: false

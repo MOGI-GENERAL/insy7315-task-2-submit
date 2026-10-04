@@ -1,0 +1,50 @@
+{
+  "name": "@fedsa/api",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    "./db": {
+      "types": "./dist/src/db/index.d.ts",
+      "default": "./dist/src/db/index.js"
+    }
+  },
+  "scripts": {
+    "dev": "tsx watch --env-file-if-exists=.env src/server.ts",
+    "build": "tsc -b",
+    "start": "node dist/src/server.js",
+    "seed": "node --env-file-if-exists=.env dist/src/seed/cli.js",
+    "test:unit": "vitest run --passWithNoTests --dir src",
+    "test:integration": "vitest run --passWithNoTests --no-file-parallelism --dir test/integration",
+    "test:contract": "vitest run --dir test/contract"
+  },
+  "dependencies": {
+    "@fedsa/contract": "*",
+    "bcryptjs": "^3.0.3",
+    "connect-mongo": "^6.0.0",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.7.0",
+    "express-session": "^1.19.0",
+    "file-type": "^22.1.1",
+    "helmet": "^8.3.0",
+    "mongoose": "^9.10.3",
+    "multer": "^2.4.0",
+    "pdfkit": "^0.20.2",
+    "pino": "^10.3.1",
+    "pino-http": "^11.0.0",
+    "twilio": "^6.1.2",
+    "web-push": "^3.6.7",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/express-session": "^1.19.0",
+    "@types/multer": "^2.3.0",
+    "@types/node": "^22.20.4",
+    "@types/pdfkit": "^0.17.6",
+    "@types/web-push": "^3.6.4",
+    "mongodb-memory-server-core": "^11.3.0",
+    "pdf-parse": "^2.4.5",
+    "tsx": "^4.23.15"
+  }
+}
