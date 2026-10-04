@@ -16,7 +16,7 @@
     "seed": "node --env-file-if-exists=.env dist/src/seed/cli.js",
     "test:unit": "vitest run --passWithNoTests --dir src",
     "test:integration": "vitest run --passWithNoTests --no-file-parallelism --dir test/integration",
-    "test:contract": "vitest run --passWithNoTests --dir test/contract"
+    "test:contract": "vitest run --dir test/contract"
   },
   "dependencies": {
     "@fedsa/contract": "0.0.0",
