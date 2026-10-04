@@ -11,6 +11,20 @@ import { WebPushChannel, vapidSender } from './web-push-channel.js';
 
 const KNOWN_CHANNELS = ['push', 'whatsapp', 'sms', 'console'];
 
+export const TWILIO_STATUS_PATH = '/api/webhooks/twilio/status';
+
+/**
+ * the address Twilio calls the API on, without a trailing slash. Twilio signs
+ * that address, which is not the one the API sees behind a proxy
+ */
+export function publicApiUrl(env: NodeJS.ProcessEnv): string | null {
+  const value = env.PUBLIC_API_URL?.trim().replace(/\/+$/, '');
+  if (!value || !URL.canParse(value)) return null;
+  const url = new URL(value);
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
+  return value;
+}
+
 export interface ChannelSettings {
   /** in the order the service prefers them */
   channels: NotificationChannel[];
@@ -64,10 +78,17 @@ export function channelSettings(env: NodeJS.ProcessEnv, logger: Logger): Channel
 
   const wantsTwilio = requested.includes('whatsapp') || requested.includes('sms');
   const twilio = wantsTwilio ? twilioClient(env, logger) : null;
+  const baseUrl = publicApiUrl(env);
+  const statusCallback = baseUrl ? `${baseUrl}${TWILIO_STATUS_PATH}` : null;
+  if (twilio && !statusCallback) {
+    logger.warn('Twilio will not report delivery because PUBLIC_API_URL is missing or not valid');
+  }
 
   if (requested.includes('whatsapp')) {
     if (twilio && env.TWILIO_WHATSAPP_FROM) {
-      channels.push(new TwilioWhatsAppChannel(twilio, env.TWILIO_WHATSAPP_FROM, logger));
+      channels.push(
+        new TwilioWhatsAppChannel(twilio, env.TWILIO_WHATSAPP_FROM, logger, statusCallback),
+      );
     } else {
       logger.warn('WhatsApp is off because a Twilio setting is missing');
     }
@@ -75,7 +96,7 @@ export function channelSettings(env: NodeJS.ProcessEnv, logger: Logger): Channel
 
   if (requested.includes('sms')) {
     if (twilio && env.TWILIO_SMS_FROM) {
-      channels.push(new TwilioSmsChannel(twilio, env.TWILIO_SMS_FROM, logger));
+      channels.push(new TwilioSmsChannel(twilio, env.TWILIO_SMS_FROM, logger, statusCallback));
     } else {
       logger.warn('SMS is off because a Twilio setting is missing');
     }
