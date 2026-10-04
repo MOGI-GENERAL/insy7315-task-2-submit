@@ -41,6 +41,7 @@ class RecordingClaimNotifier implements ClaimNotifier {
   async notifyClaimed(offer: Offer, claim: Claim) {
     this.calls.push({ offer, claim });
   }
+  async notifyReleased() {}
 }
 
 const offerNotifier = new RecordingOfferNotifier();

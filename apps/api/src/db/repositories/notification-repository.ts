@@ -28,6 +28,15 @@ export class NotificationRepository {
     return NotificationModel.findOne({ _id: id, userId, ...INBOX }).exec();
   }
 
+  /** every organisation sent the offer, on its first posting or after a release */
+  async organisationsNotifiedAbout(offerId: Types.ObjectId | string): Promise<string[]> {
+    const ids: (Types.ObjectId | null)[] = await NotificationModel.distinct('organisationId', {
+      offerId,
+      kind: 'offer_posted',
+    }).exec();
+    return ids.flatMap((id) => (id ? [id.toString()] : []));
+  }
+
   /** keeps the first read time if it was already read */
   markRead(id: Types.ObjectId | string) {
     return NotificationModel.updateOne(

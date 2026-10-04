@@ -18,7 +18,6 @@ import { createSessionStore } from './middleware/session.js';
 import { channelSettings } from './notifications/channel-settings.js';
 import { LocalPhotoStore } from './photos/local-photo-store.js';
 import { AuditService } from './services/audit-service.js';
-import { LoggingClaimNotifier } from './services/claim-notifier.js';
 import { ClaimService } from './services/claim-service.js';
 import { DEFAULT_RADIUS_KM } from './services/eligibility.js';
 import { HealthService } from './services/health-service.js';
@@ -95,7 +94,7 @@ async function start() {
       new HandoverRepository(),
       offers,
       notifications,
-      new LoggingClaimNotifier(logger),
+      notifications,
       logger,
     ),
     notifications,

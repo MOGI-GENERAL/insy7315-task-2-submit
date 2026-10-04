@@ -168,6 +168,9 @@ export class ClaimService {
           .filter((id) => id !== releasedBy);
         await this.offerNotifier.notifyEligible(view!, others);
       });
+      this.inBackground('notifying the release', () =>
+        this.claimNotifier.notifyReleased(view!, claimView(result.claim, recipient)),
+      );
     }
     return { claim: claimView(result.claim, recipient), offer: view! };
   }

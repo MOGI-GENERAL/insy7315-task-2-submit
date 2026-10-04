@@ -1,4 +1,5 @@
 import type {
+  Claim,
   DeliveryStatus,
   Language,
   NotificationKind,
@@ -23,6 +24,7 @@ import {
   type SendingChannel,
 } from '../notifications/notification-channel.js';
 import { offerDetails, renderMessage, type MessageData } from '../notifications/templates.js';
+import type { ClaimNotifier } from './claim-notifier.js';
 import type { OfferNotifier } from './offer-notifier.js';
 import { notificationView } from './views.js';
 
@@ -79,7 +81,7 @@ function recipientOf(user: StoredUser): Recipient {
   };
 }
 
-export class NotificationService implements OfferNotifier {
+export class NotificationService implements OfferNotifier, ClaimNotifier {
   private readonly notifications: NotificationRepository;
   private readonly users: UserRepository;
   private readonly channels: NotificationChannel[];
@@ -101,12 +103,13 @@ export class NotificationService implements OfferNotifier {
     this.logger = settings.logger;
   }
 
-  /** NFR01 is measured from the moment the offer was saved to the last row written */
+  /** timed from its own start, because a re-notify after a release sends an offer saved long ago */
   notifyEligible(offer: Offer, recipientOrganisationIds: string[]) {
     return this.track(async () => {
+      const started = Date.now();
       const users = await this.users.findActiveInOrganisations(recipientOrganisationIds);
       const result = await this.fanOut(users, 'offer_posted', offerDetails(offer), offer.id);
-      const durationMs = Date.now() - Date.parse(offer.createdAt);
+      const durationMs = Date.now() - started;
       const summary = {
         offerId: offer.id,
         organisations: recipientOrganisationIds.length,
@@ -118,6 +121,37 @@ export class NotificationService implements OfferNotifier {
       } else {
         this.logger.info(summary, 'offer fan-out finished');
       }
+    });
+  }
+
+  /** the recipients told it has gone are the ones it was sent to, read back from the stored rows */
+  notifyClaimed(offer: Offer, claim: Claim) {
+    return this.track(async () => {
+      const notified = await this.notifications.organisationsNotifiedAbout(offer.id);
+      const others = notified.filter(
+        (id) => id !== claim.recipientOrganisationId && id !== offer.donorOrganisationId,
+      );
+      const details = offerDetails(offer);
+      await Promise.all([
+        this.notifyOrganisations(
+          [offer.donorOrganisationId],
+          'offer_claimed',
+          { ...details, claimedBy: claim.recipient.name },
+          offer.id,
+        ),
+        this.notifyOrganisations(others, 'offer_claimed', details, offer.id),
+      ]);
+    });
+  }
+
+  notifyReleased(offer: Offer, claim: Claim) {
+    return this.track(async () => {
+      await this.notifyOrganisations(
+        [offer.donorOrganisationId],
+        'claim_released',
+        { ...offerDetails(offer), releasedBy: claim.recipient.name },
+        offer.id,
+      );
     });
   }
 

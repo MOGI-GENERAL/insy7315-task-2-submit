@@ -33,7 +33,7 @@ import type { NotificationChannel } from '../../src/notifications/notification-c
 import { LocalPhotoStore } from '../../src/photos/local-photo-store.js';
 import type { PhotoStore } from '../../src/photos/photo-store.js';
 import { AuditService } from '../../src/services/audit-service.js';
-import { LoggingClaimNotifier, type ClaimNotifier } from '../../src/services/claim-notifier.js';
+import type { ClaimNotifier } from '../../src/services/claim-notifier.js';
 import { ClaimService } from '../../src/services/claim-service.js';
 import { DEFAULT_RADIUS_KM } from '../../src/services/eligibility.js';
 import { HealthService } from '../../src/services/health-service.js';
@@ -107,14 +107,15 @@ export interface ClaimTestOptions {
 /** built on the same offer service the app uses, as in production */
 export function newClaimService(offers: OfferService, options: ClaimTestOptions = {}) {
   const logger = createLogger({ write: () => {} });
+  const notifications = newNotificationService();
   return new ClaimService(
     new ClaimRepository(),
     new OfferRepository(),
     new OrganisationRepository(),
     new HandoverRepository(),
     offers,
-    options.offerNotifier ?? newNotificationService(),
-    options.claimNotifier ?? new LoggingClaimNotifier(logger),
+    options.offerNotifier ?? notifications,
+    options.claimNotifier ?? notifications,
     logger,
   );
 }
@@ -129,7 +130,10 @@ export async function startTestApp(
   // a default parameter cannot see a later one, and offers has to share the notification service
   notifications ??= newNotificationService();
   offers ??= newOfferService({ notifier: notifications });
-  claims ??= newClaimService(offers, { offerNotifier: notifications });
+  claims ??= newClaimService(offers, {
+    offerNotifier: notifications,
+    claimNotifier: notifications,
+  });
 
   const server = createApp({
     logger: createLogger({ write: () => {} }),
