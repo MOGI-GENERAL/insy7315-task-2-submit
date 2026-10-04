@@ -34,6 +34,7 @@ import { OfferService } from './services/offer-service.js';
 import { OrganisationService } from './services/organisation-service.js';
 import { ReportingService } from './services/reporting-service.js';
 import { UserService } from './services/user-service.js';
+import { WebhookService } from './services/webhook-service.js';
 
 const logLines: string[] = [];
 const logger = createLogger({ write: (line: string) => void logLines.push(line) });
@@ -81,6 +82,16 @@ const offers = new OfferService(
   notifications,
   { radiusKm: DEFAULT_RADIUS_KM, logger },
 );
+const claims = new ClaimService(
+  new ClaimRepository(),
+  new OfferRepository(),
+  new OrganisationRepository(),
+  new HandoverRepository(),
+  offers,
+  notifications,
+  notifications,
+  logger,
+);
 
 // no request in this file signs in, so the user service never reaches a database
 const server = createApp({
@@ -100,18 +111,17 @@ const server = createApp({
       new AuditService(new AuditLogRepository()),
     ),
     offers,
-    claims: new ClaimService(
-      new ClaimRepository(),
-      new OfferRepository(),
-      new OrganisationRepository(),
-      new HandoverRepository(),
-      offers,
-      notifications,
-      notifications,
-      logger,
-    ),
+    claims,
     notifications,
     reports: new ReportingService(new HandoverRepository(), new OfferRepository()),
+    webhooks: new WebhookService(
+      new UserRepository(),
+      new OrganisationRepository(),
+      new OfferRepository(),
+      new NotificationRepository(),
+      claims,
+      logger,
+    ),
   },
   session: { secret: 'unit-test-session-secret', secureCookie: false },
   extraRouters: [throwaway],

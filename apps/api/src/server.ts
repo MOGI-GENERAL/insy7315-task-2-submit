@@ -15,6 +15,7 @@ import {
 } from './db/index.js';
 import { createLogger } from './logger.js';
 import { createSessionStore } from './middleware/session.js';
+import { twilioWebhookSettings } from './middleware/twilio-signature.js';
 import { channelSettings } from './notifications/channel-settings.js';
 import { LocalPhotoStore } from './photos/local-photo-store.js';
 import { AuditService } from './services/audit-service.js';
@@ -26,6 +27,7 @@ import { OfferService } from './services/offer-service.js';
 import { OrganisationService } from './services/organisation-service.js';
 import { ReportingService } from './services/reporting-service.js';
 import { UserService } from './services/user-service.js';
+import { WebhookService } from './services/webhook-service.js';
 
 const logger = createLogger();
 
@@ -72,6 +74,16 @@ async function start() {
     notifications,
     { radiusKm, logger },
   );
+  const claims = new ClaimService(
+    new ClaimRepository(),
+    new OfferRepository(),
+    new OrganisationRepository(),
+    new HandoverRepository(),
+    offers,
+    notifications,
+    notifications,
+    logger,
+  );
   const services = {
     // Render sets RENDER_GIT_COMMIT on every deploy
     health: new HealthService(new HealthRepository(), process.env.RENDER_GIT_COMMIT || 'dev'),
@@ -88,18 +100,17 @@ async function start() {
       new AuditService(new AuditLogRepository()),
     ),
     offers,
-    claims: new ClaimService(
-      new ClaimRepository(),
-      new OfferRepository(),
-      new OrganisationRepository(),
-      new HandoverRepository(),
-      offers,
-      notifications,
-      notifications,
-      logger,
-    ),
+    claims,
     notifications,
     reports: new ReportingService(new HandoverRepository(), new OfferRepository()),
+    webhooks: new WebhookService(
+      new UserRepository(),
+      new OrganisationRepository(),
+      new OfferRepository(),
+      new NotificationRepository(),
+      claims,
+      logger,
+    ),
   };
   const session = {
     secret: sessionSecret,
@@ -109,7 +120,9 @@ async function start() {
   };
   const port = Number(process.env.PORT || 3000);
 
-  createApp({ logger, services, session }).listen(port, () => {
+  const twilioWebhooks = twilioWebhookSettings(process.env, logger);
+
+  createApp({ logger, services, session, twilioWebhooks }).listen(port, () => {
     logger.info(`api listening on ${port}`);
   });
 }

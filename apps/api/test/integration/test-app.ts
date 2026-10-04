@@ -12,6 +12,7 @@ import bcrypt from 'bcryptjs';
 import type { Router } from 'express';
 import type { Types } from 'mongoose';
 import type { Logger } from 'pino';
+import twilio from 'twilio';
 import { createApp } from '../../src/app.js';
 import {
   AuditLogRepository,
@@ -29,6 +30,10 @@ import {
 } from '../../src/db/index.js';
 import { createLogger } from '../../src/logger.js';
 import { createSessionStore } from '../../src/middleware/session.js';
+import {
+  TWILIO_SIGNATURE_HEADER,
+  type TwilioWebhookSettings,
+} from '../../src/middleware/twilio-signature.js';
 import type { NotificationChannel } from '../../src/notifications/notification-channel.js';
 import { LocalPhotoStore } from '../../src/photos/local-photo-store.js';
 import type { PhotoStore } from '../../src/photos/photo-store.js';
@@ -43,6 +48,7 @@ import { OfferService } from '../../src/services/offer-service.js';
 import { OrganisationService } from '../../src/services/organisation-service.js';
 import { ReportingService } from '../../src/services/reporting-service.js';
 import { UserService } from '../../src/services/user-service.js';
+import { WebhookService } from '../../src/services/webhook-service.js';
 import { TestClient } from '../test-client.js';
 
 /** obviously fake. tests sign their own cookies and nothing else */
@@ -125,12 +131,51 @@ export function newClaimService(offers: OfferService, options: ClaimTestOptions 
   );
 }
 
+/** obviously fake. Twilio's signature is checked against these and nothing is ever sent */
+export const TEST_TWILIO_WEBHOOKS: TwilioWebhookSettings = {
+  authToken: 'fake-twilio-auth-token-for-tests',
+  publicUrl: 'https://fedsa.example.org',
+};
+
+export function newWebhookService(claims: ClaimService) {
+  return new WebhookService(
+    new UserRepository(),
+    new OrganisationRepository(),
+    new OfferRepository(),
+    new NotificationRepository(),
+    claims,
+    createLogger({ write: () => {} }),
+  );
+}
+
+/** the signature Twilio would send for this path and form, made with the test token */
+export function twilioSignatureFor(path: string, params: Record<string, string>) {
+  return twilio.getExpectedTwilioSignature(
+    TEST_TWILIO_WEBHOOKS.authToken,
+    `${TEST_TWILIO_WEBHOOKS.publicUrl}${path}`,
+    params,
+  );
+}
+
+/** posts a form the way Twilio does. null sends no signature header at all */
+export function twilioPost(
+  baseUrl: string,
+  path: string,
+  params: Record<string, string>,
+  signature: string | null = twilioSignatureFor(path, params),
+) {
+  const headers: Record<string, string> =
+    signature === null ? {} : { [TWILIO_SIGNATURE_HEADER]: signature };
+  return new TestClient(baseUrl).request('POST', path, new URLSearchParams(params), headers);
+}
+
 /** starts the real app on the test database. needs `startTestDb` to have run */
 export async function startTestApp(
   extraRouters: Router[] = [],
   offers?: OfferService,
   notifications?: NotificationService,
   claims?: ClaimService,
+  twilioWebhooks: TwilioWebhookSettings | null = TEST_TWILIO_WEBHOOKS,
 ) {
   // a default parameter cannot see a later one, and offers has to share the notification service
   notifications ??= newNotificationService();
@@ -154,12 +199,14 @@ export async function startTestApp(
       claims,
       notifications,
       reports: newReportingService(),
+      webhooks: newWebhookService(claims),
     },
     session: {
       secret: TEST_SESSION_SECRET,
       secureCookie: false,
       store: await createSessionStore(),
     },
+    twilioWebhooks,
     extraRouters,
   });
   const server = app.listen(0);
