@@ -2,17 +2,16 @@
 
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { FoodPhoto } from './FoodPhoto';
+import type { Offer } from '@fedsa/contract';
+import { OfferPhoto } from './OfferPhoto';
 import { Icon } from './Icon';
 import { ColdChainBadge, StatusBadge } from './StatusBadge';
 import { Countdown } from './Countdown';
 import { useT, categoryKey } from '../i18n/useT';
 import { formatKg, formatWhen, mealsFromKg } from '../lib/format';
-import type { Offer, Organisation } from '../store/types';
 
 export function OfferCard({
   offer,
-  donor,
   // NO LINK TARGET -> renders as static block
   to,
   fits,
@@ -22,7 +21,6 @@ export function OfferCard({
   footer,
 }: {
   offer: Offer;
-  donor?: Organisation;
   to?: string;
   fits?: boolean;
   scheduled?: boolean;
@@ -33,7 +31,7 @@ export function OfferCard({
 
   const body = (
     <>
-      <FoodPhoto photo={offer.photo} className="offer-card__photo" />
+      <OfferPhoto photos={offer.photos} alt={offer.title} className="offer-card__photo" />
       <div className="offer-card__body">
         <div className="row row--between offer-card__top">
           <span className="offer-card__ref">{offer.reference}</span>
@@ -46,18 +44,14 @@ export function OfferCard({
           <strong>{formatKg(offer.offeredQuantityKg)}</strong>
           <span aria-hidden="true"> · </span>
           {t(categoryKey(offer.category))}
-          {donor && (
-            <>
-              <span aria-hidden="true"> · </span>
-              {donor.suburb}
-            </>
-          )}
+          <span aria-hidden="true"> · </span>
+          {offer.donor.suburb}
         </p>
 
         <p className="offer-card__sub muted">
-          {donor?.name}
+          {offer.donor.name}
           <span aria-hidden="true"> · </span>
-          {mealsFromKg(offer.offeredQuantityKg).toLocaleString('en-ZA')} meals
+          {mealsFromKg(offer.offeredQuantityKg).toLocaleString('en-ZA')} {t('offer.meals')}
         </p>
 
         <div className="row row--wrap offer-card__tags">

@@ -1,31 +1,44 @@
-/* POST SURPLUS FORM — FAST DEFAULTS + LIVE REACH COUNT */
-
-import { useMemo, useState } from 'react';
-import type { FormEvent } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PhotoPicker } from '../../components/PhotoPicker';
+import {
+  MAX_PHOTOS_PER_OFFER,
+  PostOfferFields,
+  type ColdChain,
+  type FoodCategory,
+} from '@fedsa/contract';
+import { useSession } from '../../auth/context';
+import { useData } from '../../data';
+import { PendingButton } from '../../components/feedback';
+import { Field, FormError, useForm } from '../../components/forms';
+import type { Validator } from '../../components/forms';
 import { Icon } from '../../components/Icon';
+import { PhotoCapture } from '../../components/PhotoCapture';
 import { PageHead } from '../../components/ui';
-import { useApp, useCurrentOrg, useCurrentUser } from '../../store/context';
-import { checkEligibility } from '../../store/selectors';
 import { useT, categoryKey, coldChainKey } from '../../i18n/useT';
 import { mealsFromKg } from '../../lib/format';
-import type { ColdChain, FoodCategory } from '../../store/types';
+import { newRequestKey } from '../../lib/requestKey';
 import './PostOffer.css';
-import { canClaim } from '../../lib/org';
 
 const categories: FoodCategory[] = ['bakery', 'produce', 'dairy', 'prepared', 'dry', 'other'];
 const coldChains: ColdChain[] = ['ambient', 'refrigerated', 'frozen'];
 
-/* LOCAL DATETIME-LOCAL FORMAT */
+interface Values {
+  title: string;
+  offeredQuantityKg: number | undefined;
+  category: FoodCategory;
+  coldChain: ColdChain;
+  /** `datetime-local` values, in the phone's time zone */
+  availableFrom: string;
+  collectionDeadline: string;
+  description: string;
+}
+
 function toLocalInput(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
-function inMinutes(mins: number): string {
-  return toLocalInput(new Date(Date.now() + mins * 60_000));
-}
+const inMinutes = (mins: number) => toLocalInput(new Date(Date.now() + mins * 60_000));
 
 function tomorrowAt(hour: number): string {
   const d = new Date();
@@ -34,122 +47,102 @@ function tomorrowAt(hour: number): string {
   return toLocalInput(d);
 }
 
+/** an unparseable value goes through as it is, for the schema to report against the field */
+function toIso(local: string): string {
+  const date = new Date(local);
+  return Number.isNaN(date.getTime()) ? local : date.toISOString();
+}
+
+const fieldsSchema: Validator<PostOfferFields> = {
+  safeParse: (v) => {
+    const values = v as Values;
+    return PostOfferFields.safeParse({
+      title: values.title,
+      offeredQuantityKg: values.offeredQuantityKg,
+      category: values.category,
+      coldChain: values.coldChain,
+      availableFrom: values.availableFrom ? toIso(values.availableFrom) : undefined,
+      collectionDeadline: toIso(values.collectionDeadline),
+      description: values.description.trim() || undefined,
+    });
+  },
+};
+
 export function PostOffer() {
-  const { state, dispatch } = useApp();
-  const user = useCurrentUser()!;
-  const org = useCurrentOrg()!;
+  const { organisation } = useSession();
+  const { offers } = useData();
   const navigate = useNavigate();
   const t = useT();
+  const [photos, setPhotos] = useState<File[]>([]);
+  // one key for the life of the form. a retry after a dropped connection then posts once
+  const [requestKey] = useState(newRequestKey);
 
-  const [title, setTitle] = useState('');
-  const [quantity, setQuantity] = useState('');
-  const [category, setCategory] = useState<FoodCategory>('bakery');
-  const [coldChain, setColdChain] = useState<ColdChain>('ambient');
-  const [photo, setPhoto] = useState<string | null>('bread');
-  const [deadline, setDeadline] = useState(inMinutes(90));
-  const [availableFrom, setAvailableFrom] = useState(toLocalInput(new Date()));
-  const [notes, setNotes] = useState('');
-  const [touched, setTouched] = useState(false);
+  const [times] = useState(() => [inMinutes(60), inMinutes(90), inMinutes(180), tomorrowAt(17)]);
+  const presets = [
+    { label: t('post.in1h'), value: times[0] },
+    { label: t('post.in90m'), value: times[1] },
+    { label: t('post.in3h'), value: times[2] },
+    { label: t('post.tomorrow17'), value: times[3] },
+  ];
 
-  const kg = Number(quantity);
-  const titleValid = title.trim().length >= 3;
-  const kgValid = Number.isFinite(kg) && kg > 0;
-  const deadlineValid = new Date(deadline).getTime() > new Date(availableFrom).getTime();
-  const valid = titleValid && kgValid && deadlineValid;
+  const form = useForm<Values, PostOfferFields>({
+    initial: {
+      title: '',
+      offeredQuantityKg: undefined,
+      category: 'bakery',
+      coldChain: 'ambient',
+      availableFrom: toLocalInput(new Date()),
+      collectionDeadline: presets[1].value,
+      description: '',
+    },
+    schema: fieldsSchema,
+    onSubmit: async (fields) => {
+      const posted = await offers.post(fields, photos, requestKey);
+      navigate('/donor/posted', { state: posted, replace: true });
+    },
+  });
 
-  /* SAME ELIGIBILITY CHECK AS RECIPIENT FEED — REACH COUNT MATCHES ACTUAL NOTIFY */
-  const candidates = useMemo(() => {
-    if (!kgValid) return [];
-    const draft = { offeredQuantityKg: kg, coldChain };
-    return state.organisations.filter(
-      (o) => o.type === 'recipient' && canClaim(o) && checkEligibility(o, draft).eligible,
-    );
-  }, [state.organisations, kg, kgValid, coldChain]);
+  const { category, coldChain, collectionDeadline, offeredQuantityKg } = form.values;
 
-  function submit(event: FormEvent) {
-    event.preventDefault();
-    setTouched(true);
-    if (!valid) return;
-
-    dispatch({
-      type: 'POST_OFFER',
-      userId: user.id,
-      organisationId: org.id,
-      notifiedOrganisationIds: candidates.map((c) => c.id),
-      offer: {
-        title: title.trim(),
-        description: notes.trim(),
-        category,
-        offeredQuantityKg: kg,
-        coldChain,
-        photo,
-        availableFrom: new Date(availableFrom).toISOString(),
-        collectionDeadline: new Date(deadline).toISOString(),
-      },
-    });
-
-    navigate('/donor/posted');
+  function chooseCategory(c: FoodCategory) {
+    form.set('category', c);
+    if (c === 'dairy' || c === 'prepared') form.set('coldChain', 'refrigerated');
+    if (c === 'bakery' || c === 'dry') form.set('coldChain', 'ambient');
   }
 
   return (
-    <form className="post-form" onSubmit={submit} noValidate>
-      <PageHead title={t('post.title')} lead={`${org.name}, ${org.suburb}`} />
+    <form className="post-form" {...form.formProps}>
+      <PageHead
+        title={t('post.title')}
+        lead={organisation ? `${organisation.name}, ${organisation.suburb}` : undefined}
+      />
 
-      <div className="field">
-        <label className="field__label" htmlFor="offer-title">
-          {t('post.whatIsIt')}
-        </label>
-        <input
-          id="offer-title"
-          className="input"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder={t('post.titleHint')}
-          autoComplete="off"
-          autoFocus
-          aria-describedby="offer-title-hint"
-          aria-invalid={touched && !titleValid}
-        />
-        <span className="field__hint" id="offer-title-hint">
-          Plain and specific. Whoever collects it reads this first.
-        </span>
-        {touched && !titleValid && (
-          <span className="field__error" role="alert">
-            Say what the food is, in a few words.
-          </span>
-        )}
-      </div>
+      <FormError form={form} />
 
-      <div className="field">
-        <label className="field__label" htmlFor="offer-kg">
-          {t('post.howMuch')}
-        </label>
-        <div className="qty">
-          <input
-            id="offer-kg"
-            className="input"
-            type="number"
-            inputMode="decimal"
-            min="1"
-            max="5000"
-            value={quantity}
-            onChange={(e) => setQuantity(e.target.value)}
-            aria-invalid={touched && !kgValid}
-            aria-describedby="offer-kg-hint"
-          />
-          <span className="qty__unit">kg</span>
-        </div>
-        <span className="field__hint" id="offer-kg-hint">
-          {kgValid
-            ? `About ${mealsFromKg(kg).toLocaleString('en-ZA')} meals at the 0.4 kg standard.`
-            : 'An estimate is fine. It is corrected at handover.'}
-        </span>
-        {touched && !kgValid && (
-          <span className="field__error" role="alert">
-            Enter a weight in kilograms.
-          </span>
+      <Field form={form} name="title" label={t('post.whatIsIt')} hint={t('post.titleHelp')}>
+        {(props) => (
+          <input {...props} className="input" placeholder={t('post.titleHint')} autoComplete="off" />
         )}
-      </div>
+      </Field>
+
+      <Field
+        form={form}
+        name="offeredQuantityKg"
+        kind="number"
+        label={t('post.howMuch')}
+        hint={
+          offeredQuantityKg && offeredQuantityKg > 0
+            ? `${t('post.about')} ${mealsFromKg(offeredQuantityKg).toLocaleString('en-ZA')} ${t('offer.meals')}`
+            : t('post.estimateFine')
+        }
+      >
+        {(props) => (
+          <div className="qty">
+            <input {...props} className="input" type="number" inputMode="decimal" min="0.1" />
+            <span className="qty__unit">kg</span>
+          </div>
+        )}
+      </Field>
 
       <fieldset className="field">
         <legend className="field__label">{t('offer.category')}</legend>
@@ -161,11 +154,7 @@ export function PostOffer() {
                 name="category"
                 value={c}
                 checked={category === c}
-                onChange={() => {
-                  setCategory(c);
-                  if (c === 'dairy' || c === 'prepared') setColdChain('refrigerated');
-                  if (c === 'bakery' || c === 'dry') setColdChain('ambient');
-                }}
+                onChange={() => chooseCategory(c)}
               />
               <span>{t(categoryKey(c))}</span>
             </label>
@@ -180,116 +169,81 @@ export function PostOffer() {
             <label key={c} className="choice">
               <input
                 type="radio"
-                name="coldchain"
+                name="coldChain"
                 value={c}
                 checked={coldChain === c}
-                onChange={() => setColdChain(c)}
+                onChange={() => form.set('coldChain', c)}
               />
               <span>{t(coldChainKey(c))}</span>
             </label>
           ))}
         </div>
-        <span className="field__hint">
-          This decides who is offered the food. Only organisations that can store it are shown it.
-        </span>
+        <span className="field__hint">{t('post.storageWhy')}</span>
       </fieldset>
 
       <fieldset className="field">
         <legend className="field__label">{t('post.collectBy')}</legend>
         <div className="choices">
-          {[
-            { label: 'In 1 hour', value: inMinutes(60) },
-            { label: 'In 90 minutes', value: inMinutes(90) },
-            { label: 'In 3 hours', value: inMinutes(180) },
-            { label: 'Tomorrow 17:00', value: tomorrowAt(17) },
-          ].map((preset) => (
+          {presets.map((preset) => (
             <label key={preset.label} className="choice">
               <input
                 type="radio"
                 name="deadline-preset"
-                checked={deadline === preset.value}
-                onChange={() => setDeadline(preset.value)}
+                checked={collectionDeadline === preset.value}
+                onChange={() => form.set('collectionDeadline', preset.value)}
               />
               <span>{preset.label}</span>
             </label>
           ))}
         </div>
-        <label className="field__hint" htmlFor="offer-deadline">
-          Or set an exact time
-        </label>
-        <input
-          id="offer-deadline"
-          className="input"
-          type="datetime-local"
-          value={deadline}
-          onChange={(e) => setDeadline(e.target.value)}
-          aria-invalid={touched && !deadlineValid}
-        />
-        {touched && !deadlineValid && (
-          <span className="field__error" role="alert">
-            The collection deadline has to be after the food becomes available.
-          </span>
-        )}
       </fieldset>
 
+      <Field form={form} name="collectionDeadline" label={t('post.exactTime')}>
+        {(props) => <input {...props} className="input" type="datetime-local" />}
+      </Field>
+
       <details className="post-form__more">
-        <summary>More options</summary>
+        <summary>{t('post.moreOptions')}</summary>
 
-        <div className="field">
-          <label className="field__label" htmlFor="offer-from">
-            {t('post.availableFrom')}
-          </label>
-          <input
-            id="offer-from"
-            className="input"
-            type="datetime-local"
-            value={availableFrom}
-            onChange={(e) => setAvailableFrom(e.target.value)}
-          />
-          <span className="field__hint">
-            Set this to a later day to let organisations plan ahead rather than react.
-          </span>
-        </div>
+        <Field
+          form={form}
+          name="availableFrom"
+          label={t('post.availableFrom')}
+          hint={t('post.availableFromHint')}
+        >
+          {(props) => <input {...props} className="input" type="datetime-local" />}
+        </Field>
 
-        <div className="field">
-          <label className="field__label" htmlFor="offer-notes">
-            {t('post.notes')} <span className="muted">({t('common.optional')})</span>
-          </label>
-          <textarea
-            id="offer-notes"
-            className="textarea"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder={t('post.notesHint')}
-          />
-        </div>
+        <Field form={form} name="description" label={t('post.notes')} optional>
+          {(props) => (
+            <textarea {...props} className="textarea" placeholder={t('post.notesHint')} />
+          )}
+        </Field>
       </details>
 
-      <PhotoPicker
-        value={photo}
-        onChange={setPhoto}
+      <PhotoCapture
+        files={photos}
+        onChange={setPhotos}
+        max={MAX_PHOTOS_PER_OFFER}
         label={t('post.addPhoto')}
-        hint="A photograph is what makes a recipient confident the food is worth the trip."
+        hint={t('post.photoWhy')}
+        error={form.error('photos')}
       />
 
-      <div className="post-form__reach" aria-live="polite">
+      <div className="post-form__reach">
         <Icon name="people" size={20} />
-        <div>
-          <strong>
-            {candidates.length} organisation{candidates.length === 1 ? '' : 's'} can take this
-          </strong>
-          <span>
-            {candidates.length === 0
-              ? 'Nobody can store this quantity in these conditions. Try a smaller amount.'
-              : 'All of them are notified at once, not one at a time.'}
-          </span>
-        </div>
+        <span>{t('post.reach')}</span>
       </div>
 
-      <button type="submit" className="btn btn--primary btn--lg btn--block">
+      <PendingButton
+        type="submit"
+        className="btn btn--primary btn--lg btn--block"
+        pending={form.pending}
+        pendingLabel={t('post.posting')}
+      >
         <Icon name="check" size={20} />
         {t('post.submit')}
-      </button>
+      </PendingButton>
     </form>
   );
 }

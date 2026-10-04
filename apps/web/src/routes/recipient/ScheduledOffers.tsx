@@ -2,10 +2,11 @@
 
 import { Link } from 'react-router-dom';
 import { OfferCard } from '../../components/OfferCard';
+import { toOffer } from '../../data/fake/mappers';
 import { EmptyState, PageHead } from '../../components/ui';
 import { Icon } from '../../components/Icon';
 import { useAppState, useCurrentOrg } from '../../store/context';
-import { orgById, scheduledOffers } from '../../store/selectors';
+import { scheduledOffers } from '../../store/selectors';
 import { useT } from '../../i18n/useT';
 import { formatWhen } from '../../lib/format';
 import './Recipient.css';
@@ -59,8 +60,7 @@ export function ScheduledOffers() {
               {dayOffers.map((offer) => (
                 <OfferCard
                   key={offer.id}
-                  offer={offer}
-                  donor={orgById(state, offer.donorOrganisationId)}
+                  offer={toOffer(offer, state)}
                   to={`/recipient/offers/${offer.id}`}
                   scheduled
                   fits

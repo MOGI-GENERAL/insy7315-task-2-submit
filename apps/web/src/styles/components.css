@@ -95,6 +95,10 @@
   background: var(--c-surface-sunk);
 }
 
+.foodphoto--img {
+  object-fit: cover;
+}
+
 .foodphoto--none {
   display: grid;
   place-items: center;
@@ -600,6 +604,32 @@
 
 .photo-picker__frame .foodphoto {
   aspect-ratio: 4 / 3;
+}
+
+.photo-capture__list {
+  list-style: none;
+  padding: 0;
+  margin-bottom: var(--s-3);
+}
+
+.photo-capture__list .foodphoto {
+  height: auto;
+  aspect-ratio: 4 / 3;
+}
+
+.photo-capture__remove {
+  width: 100%;
+  min-height: 48px;
+  border-radius: 0;
+}
+
+.photo-capture__add {
+  cursor: pointer;
+}
+
+.photo-capture__add:focus-within {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
 }
 
 .photo-picker__caption {
