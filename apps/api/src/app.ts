@@ -14,11 +14,13 @@ import { meRouter } from './routes/me-router.js';
 import { notificationRouter } from './routes/notification-router.js';
 import { offerRouter } from './routes/offer-router.js';
 import { organisationRouter } from './routes/organisation-router.js';
+import { reportRouter } from './routes/report-router.js';
 import type { ClaimService } from './services/claim-service.js';
 import type { HealthService } from './services/health-service.js';
 import type { NotificationService } from './services/notification-service.js';
 import type { OfferService } from './services/offer-service.js';
 import type { OrganisationService } from './services/organisation-service.js';
+import type { ReportingService } from './services/reporting-service.js';
 import type { UserService } from './services/user-service.js';
 
 export interface AppServices {
@@ -28,6 +30,7 @@ export interface AppServices {
   offers: OfferService;
   claims: ClaimService;
   notifications: NotificationService;
+  reports: ReportingService;
 }
 
 export interface AppDeps {
@@ -61,6 +64,7 @@ export function createApp(deps: AppDeps) {
   app.use('/api', offerRouter(deps.services.offers));
   app.use('/api', claimRouter(deps.services.claims));
   app.use('/api', notificationRouter(deps.services.notifications));
+  app.use('/api', reportRouter(deps.services.reports));
   for (const router of deps.extraRouters ?? []) app.use(router);
 
   app.use(notFound);

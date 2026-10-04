@@ -1,5 +1,5 @@
 /** South Africa has no daylight saving, so every day starts at the same offset */
-const SA_OFFSET = '+02:00';
+export const SA_OFFSET = '+02:00';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
