@@ -1,8 +1,9 @@
 /* PHOTO PICKER: camera-roll style radio grid, stands in for device camera */
 
 import { FoodPhoto } from './FoodPhoto';
-import { photoKeys, photoLabels } from './photoKeys';
+import { photoKeys, photoLabelKeys } from './photoKeys';
 import { Icon } from './Icon';
+import { useT } from '../i18n/useT';
 
 export function PhotoPicker({
   value,
@@ -17,6 +18,7 @@ export function PhotoPicker({
   hint?: string;
   name?: string;
 }) {
+  const t = useT();
   return (
     <fieldset className="photo-picker">
       <legend className="field__label">
@@ -35,7 +37,7 @@ export function PhotoPicker({
             />
             <span className="photo-picker__frame">
               <FoodPhoto photo={key} />
-              <span className="photo-picker__caption">{photoLabels[key]}</span>
+              <span className="photo-picker__caption">{t(photoLabelKeys[key])}</span>
               <span className="photo-picker__tick" aria-hidden="true">
                 <Icon name="check" size={16} />
               </span>

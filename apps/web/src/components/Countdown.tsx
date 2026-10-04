@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { Icon } from './Icon';
-import { formatTime, isExpiringSoon, timeLeft } from '../lib/format';
+import { isExpiringSoon } from '../lib/format';
+import { useFormat } from '../i18n/useFormat';
+import { useT } from '../i18n/useT';
 
 export function Countdown({
   deadline,
@@ -12,6 +14,8 @@ export function Countdown({
   showClock?: boolean;
 }) {
   const [, tick] = useState(0);
+  const t = useT();
+  const { time, timeLeft } = useFormat();
 
   useEffect(() => {
     const id = window.setInterval(() => tick((n) => n + 1), 30_000);
@@ -25,7 +29,7 @@ export function Countdown({
     return (
       <span className="countdown countdown--past">
         <Icon name="clock" size={15} />
-        Collection window closed
+        {t('offer.expired')}
       </span>
     );
   }
@@ -35,7 +39,7 @@ export function Countdown({
       <Icon name="clock" size={15} />
       {showClock ? (
         <>
-          Collect by {formatTime(deadline)}
+          {t('offer.collectBy')} {time(deadline)}
           <span className="countdown__left">· {left}</span>
         </>
       ) : (
