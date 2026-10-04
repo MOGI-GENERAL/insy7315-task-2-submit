@@ -11,7 +11,7 @@ import {
 
 /** what the channels need from the Twilio client, so tests can pass a fake */
 export interface TwilioMessages {
-  create(params: { to: string; from: string; body: string }): Promise<{
+  create(params: { to: string; from: string; body: string; statusCallback?: string }): Promise<{
     sid: string;
     status: string;
   }>;
@@ -50,18 +50,40 @@ function whatsAppAddress(phone: string) {
   return phone.startsWith(WHATSAPP_PREFIX) ? phone : `${WHATSAPP_PREFIX}${phone}`;
 }
 
+/** the number as users store it, whichever channel the message came in on */
+export function phoneFromAddress(address: string) {
+  const phone = address.trim();
+  return phone.startsWith(WHATSAPP_PREFIX) ? phone.slice(WHATSAPP_PREFIX.length) : phone;
+}
+
+/** Twilio sends the text back to whoever wrote in, on the same channel */
+export function twimlReply(text: string) {
+  const response = new twilio.twiml.MessagingResponse();
+  response.message(text);
+  return response.toString();
+}
+
 /** SMS and WhatsApp differ only in how Twilio addresses the two ends */
 class TwilioChannel implements NotificationChannel {
   readonly name: 'sms' | 'whatsapp';
   private readonly messages: TwilioMessages;
   private readonly from: string;
   private readonly logger: Logger;
+  /** null when the API has no public address for Twilio to report delivery to */
+  private readonly statusCallback: string | null;
 
-  constructor(name: 'sms' | 'whatsapp', messages: TwilioMessages, from: string, logger: Logger) {
+  constructor(
+    name: 'sms' | 'whatsapp',
+    messages: TwilioMessages,
+    from: string,
+    logger: Logger,
+    statusCallback: string | null,
+  ) {
     this.name = name;
     this.messages = messages;
     this.from = from;
     this.logger = logger;
+    this.statusCallback = statusCallback;
   }
 
   supports(recipient: Recipient) {
@@ -78,6 +100,7 @@ class TwilioChannel implements NotificationChannel {
         to: this.address(phone),
         from: this.address(this.from),
         body: message.phoneText,
+        ...(this.statusCallback ? { statusCallback: this.statusCallback } : {}),
       });
       return [
         {
@@ -103,13 +126,23 @@ class TwilioChannel implements NotificationChannel {
 }
 
 export class TwilioSmsChannel extends TwilioChannel {
-  constructor(messages: TwilioMessages, from: string, logger: Logger) {
-    super('sms', messages, from, logger);
+  constructor(
+    messages: TwilioMessages,
+    from: string,
+    logger: Logger,
+    statusCallback: string | null = null,
+  ) {
+    super('sms', messages, from, logger, statusCallback);
   }
 }
 
 export class TwilioWhatsAppChannel extends TwilioChannel {
-  constructor(messages: TwilioMessages, from: string, logger: Logger) {
-    super('whatsapp', messages, from, logger);
+  constructor(
+    messages: TwilioMessages,
+    from: string,
+    logger: Logger,
+    statusCallback: string | null = null,
+  ) {
+    super('whatsapp', messages, from, logger, statusCallback);
   }
 }

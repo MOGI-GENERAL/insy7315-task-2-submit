@@ -1,6 +1,7 @@
 import { beforeEach, expect, test } from 'vitest';
 import { createLogger } from '../logger.js';
-import { channelSettings } from './channel-settings.js';
+import { twilioWebhookSettings } from '../middleware/twilio-signature.js';
+import { channelSettings, publicApiUrl } from './channel-settings.js';
 import { ConsoleChannel } from './console-channel.js';
 import { TwilioSmsChannel, TwilioWhatsAppChannel } from './twilio-channels.js';
 import { WebPushChannel } from './web-push-channel.js';
@@ -90,4 +91,35 @@ test.each([
   [' FALSE ', false],
 ])('NOTIFY_MIRROR=%s leaves mirroring %s', (value, expected) => {
   expect(channelSettings({ NOTIFY_MIRROR: value }, logger).mirror).toBe(expected);
+});
+
+test.each([
+  ['https://fedsa.example.org', 'https://fedsa.example.org'],
+  [' https://fedsa.example.org/ ', 'https://fedsa.example.org'],
+  [undefined, null],
+  ['', null],
+  ['fedsa.example.org', null],
+  ['ftp://fedsa.example.org', null],
+])('PUBLIC_API_URL=%j is the address %s', (value, expected) => {
+  expect(publicApiUrl({ PUBLIC_API_URL: value })).toBe(expected);
+});
+
+test('Twilio channels without a public address say delivery will not be reported', () => {
+  channelSettings(COMPLETE, logger);
+  expect(logs()).toContain('PUBLIC_API_URL');
+
+  logLines.length = 0;
+  channelSettings({ ...COMPLETE, PUBLIC_API_URL: 'https://fedsa.example.org' }, logger);
+  expect(logs()).not.toContain('PUBLIC_API_URL');
+});
+
+test('the webhooks are on only with both the auth token and the public address', () => {
+  const url = { PUBLIC_API_URL: 'https://fedsa.example.org' };
+  expect(twilioWebhookSettings({ ...COMPLETE, ...url }, logger)).toEqual({
+    authToken: COMPLETE.TWILIO_AUTH_TOKEN,
+    publicUrl: url.PUBLIC_API_URL,
+  });
+  expect(twilioWebhookSettings(COMPLETE, logger)).toBeNull();
+  expect(twilioWebhookSettings(url, logger)).toBeNull();
+  expect(logs()).not.toContain(COMPLETE.TWILIO_AUTH_TOKEN);
 });

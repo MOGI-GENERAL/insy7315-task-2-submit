@@ -25,8 +25,8 @@ export class TestClient {
     body?: unknown,
     headers: Record<string, string> = {},
   ) {
-    // fetch sends a FormData body as multipart and writes the boundary into the content type itself
-    const isForm = body instanceof FormData;
+    // fetch writes the content type of a FormData or URLSearchParams body itself
+    const isForm = body instanceof FormData || body instanceof URLSearchParams;
     const res = await fetch(`${this.baseUrl}${path}`, {
       method,
       headers: {

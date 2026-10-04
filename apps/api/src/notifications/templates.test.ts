@@ -1,6 +1,6 @@
 import { Language, NotificationKind } from '@fedsa/contract';
 import { describe, expect, test } from 'vitest';
-import { renderMessage, type MessageData } from './templates.js';
+import { UNKNOWN_SENDER_REPLY, renderMessage, renderReply, type MessageData } from './templates.js';
 
 /** 15:00 UTC is 17:00 in Cape Town */
 const DEADLINE = '2026-10-03T15:00:00.000Z';
@@ -105,4 +105,57 @@ test('a claim notice without a claimant tells the reader the offer is gone', () 
     expect(message.body).not.toContain('Siyakhula');
     expect(message.title).toContain('K4F2');
   }
+});
+
+const CLAIMED = {
+  reference: 'K4F2',
+  pickupAddress: '12 Long Street, Woodstock',
+  contactName: 'Riaan de Villiers',
+  contactPhone: '+27820000001',
+  deadline: DEADLINE,
+};
+
+describe.each(Language.options)('replies to a claim in %s', (language) => {
+  test('a claim names the offer, where to collect, by when and whom to call', () => {
+    const text = renderReply('claimed', language, CLAIMED);
+    for (const value of [
+      'K4F2',
+      '12 Long Street, Woodstock',
+      '17:00',
+      'Riaan de Villiers',
+      '+27820000001',
+    ]) {
+      expect(text).toContain(value);
+    }
+  });
+
+  test('an unavailable offer is named, and nothing says why', () => {
+    const text = renderReply('unavailable', language, { reference: 'K4F2' });
+    expect(text).toContain('K4F2');
+  });
+
+  test('a reply that was not understood says how to claim', () => {
+    expect(renderReply('not_understood', language, {})).toContain('YES');
+  });
+
+  test('every reply starts with the sender name and fits one message', () => {
+    for (const text of [
+      renderReply('claimed', language, CLAIMED),
+      renderReply('unavailable', language, { reference: 'K4F2' }),
+      renderReply('not_understood', language, {}),
+    ]) {
+      expect(text.startsWith('FEDSA: ')).toBe(true);
+      expect(text.length).toBeLessThanOrEqual(1600);
+    }
+  });
+});
+
+test('the three languages reply with different text', () => {
+  const replies = Language.options.map((l) => renderReply('not_understood', l, {}));
+  expect(new Set(replies).size).toBe(3);
+});
+
+test('the reply to an unknown number names no offer and no account', () => {
+  expect(UNKNOWN_SENDER_REPLY).not.toMatch(/YES [A-Z0-9]{4}/);
+  expect(UNKNOWN_SENDER_REPLY.startsWith('FEDSA: ')).toBe(true);
 });

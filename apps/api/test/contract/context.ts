@@ -10,7 +10,7 @@ import {
 import { seedPeriod } from '../../src/seed/records.js';
 import { DONORS, MARIUS, NADIA, RECIPIENTS, ZANELE, type Person } from '../../src/seed/scenario.js';
 import type { TestClient } from '../test-client.js';
-import { anonymousClient, signedInClient } from '../integration/test-app.js';
+import { anonymousClient, signedInClient, twilioPost } from '../integration/test-app.js';
 
 /** only ever used against the in-memory database */
 export const SEED_PASSWORD = 'seed accounts in contract tests';
@@ -80,10 +80,23 @@ export class ContractContext {
     return (await this.client(caller)).request(method, path, body);
   }
 
+  /** signed as Twilio would sign it, unless a case passes its own signature or null for none */
+  twilio(path: string, params: Record<string, string>, signature?: string | null) {
+    return twilioPost(this.baseUrl, path, params, signature);
+  }
+
   async offerId(title: string) {
+    return (await this.offer(title))._id.toHexString();
+  }
+
+  async offerReference(title: string) {
+    return (await this.offer(title)).reference;
+  }
+
+  private async offer(title: string) {
     const offers = await OfferModel.find({ title });
     if (offers.length !== 1) throw new Error(`${offers.length} seeded offers are titled ${title}`);
-    return offers[0]!._id.toHexString();
+    return offers[0]!;
   }
 
   async organisationId(name: string) {

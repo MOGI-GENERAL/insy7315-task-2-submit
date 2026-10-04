@@ -313,6 +313,39 @@ export const CONTRACT_CASES: Partial<Record<RouteKey, ContractCase>> = {
       send: (t) => t.request('peter', 'POST', `/api/notifications/${UNKNOWN_ID}/read`),
     },
   },
+  'POST /api/webhooks/twilio/inbound': {
+    success: async (t) =>
+      t.twilio('/api/webhooks/twilio/inbound', {
+        MessageSid: `SM${'c'.repeat(32)}`,
+        From: `whatsapp:${personFor('thandi').phone}`,
+        Body: `yes ${await t.offerReference('Mixed produce, full pallet')}`,
+      }),
+    error: {
+      code: 'FORBIDDEN',
+      send: (t) =>
+        t.twilio(
+          '/api/webhooks/twilio/inbound',
+          { MessageSid: `SM${'d'.repeat(32)}`, From: personFor('thandi').phone, Body: 'YES' },
+          null,
+        ),
+    },
+  },
+  'POST /api/webhooks/twilio/status': {
+    success: (t) =>
+      t.twilio('/api/webhooks/twilio/status', {
+        MessageSid: `SM${'e'.repeat(32)}`,
+        MessageStatus: 'delivered',
+      }),
+    error: {
+      code: 'FORBIDDEN',
+      send: (t) =>
+        t.twilio(
+          '/api/webhooks/twilio/status',
+          { MessageSid: `SM${'e'.repeat(32)}`, MessageStatus: 'delivered' },
+          'bm90IGEgdHdpbGlvIHNpZ25hdHVyZQ==',
+        ),
+    },
+  },
 
   'GET /api/reports/impact': {
     success: (t) =>
@@ -344,8 +377,6 @@ export const NOT_YET_SERVED: RouteKey[] = [
   'GET /api/handovers',
   'POST /api/handovers/:id/resolution',
   'GET /api/handovers/:id/photo',
-  'POST /api/webhooks/twilio/inbound',
-  'POST /api/webhooks/twilio/status',
   'GET /api/reports/export',
   'GET /api/valuation-rates',
   'PUT /api/valuation-rates',
