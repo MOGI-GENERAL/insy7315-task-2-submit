@@ -39,13 +39,10 @@ jobs:
           VITE_DATA: ${{ vars.VITE_DATA }}
 
       # the API goes first, so the new web app never talks to the old API
-      - name: Deploy the API and the jobs on Render
-        run: |
-          curl -fsS -X POST "$RENDER_API_HOOK" > /dev/null
-          curl -fsS -X POST "$RENDER_JOBS_HOOK" > /dev/null
+      - name: Deploy the API on Render
+        run: curl -fsS -X POST "$RENDER_API_HOOK" > /dev/null
         env:
           RENDER_API_HOOK: ${{ secrets.RENDER_API_HOOK }}
-          RENDER_JOBS_HOOK: ${{ secrets.RENDER_JOBS_HOOK }}
 
       - name: Wait for the new API version
         run: |
