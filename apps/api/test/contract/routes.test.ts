@@ -60,9 +60,16 @@ afterAll(async () => {
   if (photoDir) await rm(photoDir, { recursive: true, force: true });
 });
 
+/** a body that is not JSON, such as TwiML, reads as undefined and fails any schema check */
 async function readBody(res: Response) {
   const text = await res.text();
-  return { text, json: text ? (JSON.parse(text) as unknown) : undefined };
+  let json: unknown;
+  try {
+    json = text ? JSON.parse(text) : undefined;
+  } catch {
+    json = undefined;
+  }
+  return { text, json };
 }
 
 /** fails with every field that does not match, rather than the first */
