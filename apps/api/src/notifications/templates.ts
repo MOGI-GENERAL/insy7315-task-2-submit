@@ -161,6 +161,56 @@ const TEMPLATES: Record<Language, Templates> = {
   },
 };
 
+/** the answer to a text or WhatsApp reply that tries to claim an offer */
+export type ClaimReplyKind = 'claimed' | 'unavailable' | 'not_understood';
+
+export interface ClaimReplyData {
+  claimed: {
+    reference: string;
+    pickupAddress: string;
+    contactName: string;
+    contactPhone: string;
+    deadline: string;
+  };
+  /** one answer whether taken, unknown or not eligible. a reply cannot probe for offers */
+  unavailable: { reference: string };
+  not_understood: Record<string, never>;
+}
+
+type Reply<D> = (data: D, f: Format) => string;
+type Replies = { [K in ClaimReplyKind]: Reply<ClaimReplyData[K]> };
+
+const REPLIES: Record<Language, Replies> = {
+  en: {
+    claimed: (d, f) =>
+      `You have claimed offer ${d.reference}. Collect from ${d.pickupAddress} by ${f.time(d.deadline)}. Contact ${d.contactName} on ${d.contactPhone}.`,
+    unavailable: (d) =>
+      `Offer ${d.reference} has already been claimed or is not available to your organisation.`,
+    not_understood: () =>
+      'To claim an offer, reply YES followed by the reference in the offer message.',
+  },
+  af: {
+    claimed: (d, f) =>
+      `Julle het aanbod ${d.reference} geëis. Haal by ${d.pickupAddress} af teen ${f.time(d.deadline)}. Kontak ${d.contactName} by ${d.contactPhone}.`,
+    unavailable: (d) =>
+      `Aanbod ${d.reference} is reeds geëis of is nie vir julle organisasie beskikbaar nie.`,
+    not_understood: () =>
+      "Om 'n aanbod te eis, antwoord YES gevolg deur die verwysing in die aanbodboodskap.",
+  },
+  xh: {
+    claimed: (d, f) =>
+      `Nibange isibonelelo ${d.reference}. Dilesi yokuthatha: ${d.pickupAddress}. Ixesha lokugqibela lokuthatha: ${f.time(d.deadline)}. Qhagamshelana no-${d.contactName} ku-${d.contactPhone}.`,
+    unavailable: (d) =>
+      `Isibonelelo ${d.reference} sele sibangiwe okanye asifumaneki kumbutho wenu.`,
+    not_understood: () =>
+      'Ukubanga isibonelelo, phendula u-YES kunye nesalathiso esikumyalezo wesibonelelo.',
+  },
+};
+
+/** in English, because nothing is known about the sender, their language included */
+export const UNKNOWN_SENDER_REPLY =
+  'FEDSA: We could not act on this message. Use the FEDSA app to claim offers.';
+
 function formatFor(language: Language): Format {
   const locale = LOCALE[language];
   const quantity = new Intl.NumberFormat(locale, { maximumFractionDigits: 1 });
@@ -189,6 +239,15 @@ export function renderMessage<K extends NotificationKind>(
   const { title, body, reply } = template(data, formatFor(language));
   const phoneText = `FEDSA: ${title}. ${body}${reply ? ` ${reply}` : ''}`;
   return { title, body, phoneText };
+}
+
+export function renderReply<K extends ClaimReplyKind>(
+  kind: K,
+  language: Language,
+  data: ClaimReplyData[K],
+): string {
+  const reply: Reply<ClaimReplyData[K]> = REPLIES[language][kind];
+  return `FEDSA: ${reply(data, formatFor(language))}`;
 }
 
 export function offerDetails(offer: Offer): OfferDetails {
