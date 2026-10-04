@@ -1,4 +1,5 @@
 import type {
+  AuditEntry,
   Claim,
   Collection,
   GeoPoint,
@@ -14,6 +15,7 @@ import type {
 } from '@fedsa/contract';
 import type { Types } from 'mongoose';
 import type {
+  AuditLogDoc,
   ClaimDoc,
   CollectionDoc,
   HandoverRecordDoc,
@@ -222,5 +224,17 @@ export function certificateView(certificate: Stored<TaxCertificateDoc>): TaxCert
     })),
     totalValue: certificate.totalValue,
     issuedAt: certificate.issuedAt.toISOString(),
+  };
+}
+
+export function auditEntryView(entry: Stored<AuditLogDoc>): AuditEntry {
+  return {
+    id: entry._id.toString(),
+    userId: entry.userId.toString(),
+    action: entry.action,
+    targetType: entry.targetType,
+    targetId: entry.targetId.toString(),
+    note: entry.note ?? null,
+    at: entry.at.toISOString(),
   };
 }

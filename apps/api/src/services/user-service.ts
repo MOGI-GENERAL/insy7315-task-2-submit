@@ -3,15 +3,20 @@ import {
   SUBURBS,
   suburbLocation,
   type ChangePasswordRequest,
+  type CreateUserRequest,
+  type CreateUserResponse,
+  type ListUsersQuery,
   type LoginRequest,
   type RegisterRequest,
   type Role,
   type SessionResponse,
   type UpdateMeRequest,
+  type UpdateUserRequest,
+  type UserListResponse,
   type UserResponse,
 } from '@fedsa/contract';
 import bcrypt from 'bcryptjs';
-import { mongo } from 'mongoose';
+import { mongo, Types } from 'mongoose';
 import {
   runInTransaction,
   type OrganisationDoc,
@@ -19,7 +24,13 @@ import {
   type SessionRepository,
   type UserRepository,
 } from '../db/index.js';
-import { UnauthenticatedError, ValidationError } from '../errors.js';
+import {
+  InvalidStateError,
+  NotFoundError,
+  UnauthenticatedError,
+  ValidationError,
+} from '../errors.js';
+import type { AuditService } from './audit-service.js';
 import { organisationView, userView } from './views.js';
 
 export const BCRYPT_COST = 12;
@@ -40,27 +51,41 @@ const LOGIN_FAILED = 'The email or password is not correct';
 
 const DUPLICATE_KEY = 11000;
 
+const AUDIT_TARGET = 'users';
+
+/** staff have no organisation and members need one. a role never changes from one group to the other */
+const STAFF_ROLES: readonly Role[] = ['coordinator', 'administrator'];
+
+/** 16 URL-safe characters, inside the password length rule */
+function newTemporaryPassword() {
+  return randomBytes(12).toString('base64url');
+}
+
 /** what the guards need, read from the database on every request */
 export interface SessionUser {
   id: string;
   role: Role;
   organisationId: string | null;
+  mustChangePassword: boolean;
 }
 
 export class UserService {
   private readonly users: UserRepository;
   private readonly organisations: OrganisationRepository;
   private readonly sessions: SessionRepository;
+  private readonly audit: AuditService;
   private unknownUserHash: Promise<string> | undefined;
 
   constructor(
     users: UserRepository,
     organisations: OrganisationRepository,
     sessions: SessionRepository,
+    audit: AuditService,
   ) {
     this.users = users;
     this.organisations = organisations;
     this.sessions = sessions;
+    this.audit = audit;
   }
 
   async register(input: RegisterRequest): Promise<SessionResponse> {
@@ -125,6 +150,7 @@ export class UserService {
       id: user._id.toString(),
       role: user.role,
       organisationId: user.organisationId ? user.organisationId.toString() : null,
+      mustChangePassword: user.mustChangePassword,
     };
   }
 
@@ -146,6 +172,108 @@ export class UserService {
     const passwordHash = await hashPassword(input.newPassword);
     await this.users.updatePassword(user._id, passwordHash);
     await this.sessions.deleteForUser(userId, currentSessionId);
+  }
+
+  async listUsers(query: ListUsersQuery): Promise<UserListResponse> {
+    const users = await this.users.list(query);
+    return { items: users.map(userView) };
+  }
+
+  /** the temporary password is returned here and nowhere else, and only its hash is stored */
+  async createUser(adminId: string, input: CreateUserRequest): Promise<CreateUserResponse> {
+    if (input.organisationId) {
+      const organisation = await this.organisations.findById(input.organisationId);
+      if (!organisation || organisation.type !== input.role) {
+        throw new ValidationError({ organisationId: `Choose a ${input.role} organisation` });
+      }
+    }
+
+    const tempPassword = newTemporaryPassword();
+    const passwordHash = await hashPassword(tempPassword);
+
+    try {
+      const user = await runInTransaction(async (session) => {
+        const created = await this.users.create(
+          {
+            organisationId: input.organisationId ? new Types.ObjectId(input.organisationId) : null,
+            role: input.role,
+            fullName: input.fullName,
+            email: input.email,
+            passwordHash,
+            phone: input.phone,
+            languagePreference: input.languagePreference,
+            status: 'active',
+            mustChangePassword: true,
+          },
+          session,
+        );
+        await this.audit.record(
+          adminId,
+          'create_user',
+          { type: AUDIT_TARGET, id: created._id },
+          { session },
+        );
+        return created;
+      });
+      return { user: userView(user), tempPassword };
+    } catch (err) {
+      if (err instanceof mongo.MongoServerError && err.code === DUPLICATE_KEY) {
+        throw new ValidationError({ email: 'An account with this email already exists' });
+      }
+      throw err;
+    }
+  }
+
+  /** a role or status change signs the user out of every browser */
+  async updateUser(
+    adminId: string,
+    userId: string,
+    input: UpdateUserRequest,
+  ): Promise<UserResponse> {
+    const user = await this.users.findById(userId);
+    if (!user) throw new NotFoundError();
+
+    const role = input.role ?? user.role;
+    const status = input.status ?? user.status;
+
+    if (userId === adminId && (role !== 'administrator' || status !== 'active')) {
+      throw new InvalidStateError(
+        'You cannot disable your own account or remove your own administrator role',
+      );
+    }
+    if (role !== user.role && !(STAFF_ROLES.includes(role) && STAFF_ROLES.includes(user.role))) {
+      throw new ValidationError({
+        role: 'A role can only change between coordinator and administrator',
+      });
+    }
+    if (role === user.role && status === user.status) return { user: userView(user) };
+
+    const updated = await runInTransaction(async (session) => {
+      const changed = await this.users.updateAccess(
+        user._id,
+        { role: user.role, status: user.status },
+        { role, status },
+        session,
+      );
+      // another administrator changed the account first
+      if (!changed) throw new InvalidStateError();
+
+      const target = { type: AUDIT_TARGET, id: changed._id };
+      if (role !== user.role) {
+        await this.audit.record(adminId, 'change_role', target, {
+          note: `${user.role} to ${role}`,
+          session,
+        });
+      }
+      if (status !== user.status) {
+        const action = status === 'disabled' ? 'disable_user' : 'enable_user';
+        await this.audit.record(adminId, action, target, { session });
+      }
+      return changed;
+    });
+
+    await this.sessions.deleteForUser(userId);
+    return { user: userView(updated) };
   }
 
   private async sessionResponse(user: Parameters<typeof userView>[0]): Promise<SessionResponse> {

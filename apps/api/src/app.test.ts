@@ -105,6 +105,7 @@ const server = createApp({
       new UserRepository(),
       new OrganisationRepository(),
       new SessionRepository(),
+      new AuditService(new AuditLogRepository()),
     ),
     organisations: new OrganisationService(
       new OrganisationRepository(),
@@ -133,6 +134,7 @@ const server = createApp({
       claims,
       logger,
     ),
+    audit: new AuditService(new AuditLogRepository()),
   },
   session: { secret: 'unit-test-session-secret', secureCookie: false },
   extraRouters: [throwaway],

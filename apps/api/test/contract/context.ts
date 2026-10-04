@@ -130,6 +130,12 @@ export class ContractContext {
     return ((await res.json()) as CertificateResponse).certificate.id;
   }
 
+  async userId(caller: Caller) {
+    const user = await UserModel.findOne({ email: personFor(caller).email });
+    if (!user) throw new Error(`${caller} has no account`);
+    return user._id.toHexString();
+  }
+
   async notificationId(caller: Caller) {
     const user = await UserModel.findOne({ email: personFor(caller).email });
     const notification = await NotificationModel.findOne({ userId: user?._id });

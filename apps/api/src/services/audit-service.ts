@@ -1,6 +1,8 @@
-import type { AuditAction } from '@fedsa/contract';
+import type { AuditAction, AuditLogQuery, AuditLogResponse } from '@fedsa/contract';
 import { Types, type ClientSession } from 'mongoose';
 import type { AuditLogRepository } from '../db/index.js';
+import { dayRange } from './day-range.js';
+import { auditEntryView } from './views.js';
 
 type Id = Types.ObjectId | string;
 
@@ -34,5 +36,13 @@ export class AuditService {
       },
       options.session,
     );
+  }
+
+  async list(query: AuditLogQuery): Promise<AuditLogResponse> {
+    const entries = await this.repository.list({
+      action: query.action,
+      at: dayRange(query.from, query.to),
+    });
+    return { items: entries.map(auditEntryView) };
   }
 }

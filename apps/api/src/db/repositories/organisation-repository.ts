@@ -10,7 +10,7 @@ export interface OrganisationFilter {
 }
 
 /** the search text is matched literally, so a `.` or `*` in it is not a pattern */
-function escapeRegex(text: string) {
+export function escapeRegex(text: string) {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 

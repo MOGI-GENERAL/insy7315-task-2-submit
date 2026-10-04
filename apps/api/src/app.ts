@@ -4,10 +4,12 @@ import { pinoHttp } from 'pino-http';
 import { csrfProtection } from './middleware/csrf.js';
 import { loadCurrentUser } from './middleware/current-user.js';
 import { errorHandler, notFound } from './middleware/error-handler.js';
+import { requirePasswordChanged } from './middleware/guards.js';
 import { globalLimit } from './middleware/rate-limits.js';
 import { securityHeaders } from './middleware/security-headers.js';
 import { sessions, type SessionSettings } from './middleware/session.js';
 import type { TwilioWebhookSettings } from './middleware/twilio-signature.js';
+import { auditLogRouter } from './routes/audit-log-router.js';
 import { authRouter } from './routes/auth-router.js';
 import { certificateRouter } from './routes/certificate-router.js';
 import { claimRouter } from './routes/claim-router.js';
@@ -17,7 +19,9 @@ import { notificationRouter } from './routes/notification-router.js';
 import { offerRouter } from './routes/offer-router.js';
 import { organisationRouter } from './routes/organisation-router.js';
 import { reportRouter } from './routes/report-router.js';
+import { userRouter } from './routes/user-router.js';
 import { webhookRouter } from './routes/webhook-router.js';
+import type { AuditService } from './services/audit-service.js';
 import type { ClaimService } from './services/claim-service.js';
 import type { HealthService } from './services/health-service.js';
 import type { NotificationService } from './services/notification-service.js';
@@ -36,6 +40,7 @@ export interface AppServices {
   notifications: NotificationService;
   reports: ReportingService;
   webhooks: WebhookService;
+  audit: AuditService;
 }
 
 export interface AppDeps {
@@ -63,6 +68,7 @@ export function createApp(deps: AppDeps) {
   app.use(globalLimit());
   app.use(csrfProtection);
   app.use(loadCurrentUser(deps.services.users));
+  app.use(requirePasswordChanged);
 
   app.use('/api', healthRouter(deps.services.health));
   app.use('/api', authRouter(deps.services.users));
@@ -73,6 +79,8 @@ export function createApp(deps: AppDeps) {
   app.use('/api', notificationRouter(deps.services.notifications));
   app.use('/api', reportRouter(deps.services.reports));
   app.use('/api', certificateRouter(deps.services.reports));
+  app.use('/api', userRouter(deps.services.users));
+  app.use('/api', auditLogRouter(deps.services.audit));
   app.use('/api', webhookRouter(deps.services.webhooks, deps.twilioWebhooks ?? null));
   for (const router of deps.extraRouters ?? []) app.use(router);
 

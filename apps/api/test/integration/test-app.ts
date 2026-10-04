@@ -204,6 +204,7 @@ export async function startTestApp(
         new UserRepository(),
         new OrganisationRepository(),
         new SessionRepository(),
+        new AuditService(new AuditLogRepository()),
       ),
       organisations: newOrganisationService(),
       offers,
@@ -211,6 +212,7 @@ export async function startTestApp(
       notifications,
       reports: newReportingService(),
       webhooks: newWebhookService(claims),
+      audit: new AuditService(new AuditLogRepository()),
     },
     session: {
       secret: TEST_SESSION_SECRET,

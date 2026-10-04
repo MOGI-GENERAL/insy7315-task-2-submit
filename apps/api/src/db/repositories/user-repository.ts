@@ -1,7 +1,41 @@
+import type { Role, UserStatus } from '@fedsa/contract';
 import type { ClientSession, Types } from 'mongoose';
 import { UserModel, type UserDoc } from '../models/user.js';
+import { escapeRegex } from './organisation-repository.js';
+
+export interface UserFilter {
+  role?: Role;
+  status?: UserStatus;
+  /** matched against the full name and email in any case */
+  q?: string;
+}
 
 export class UserRepository {
+  list(filter: UserFilter) {
+    const query: Record<string, unknown> = {};
+    if (filter.role) query.role = filter.role;
+    if (filter.status) query.status = filter.status;
+    if (filter.q) {
+      const pattern = new RegExp(escapeRegex(filter.q), 'i');
+      query.$or = [{ fullName: pattern }, { email: pattern }];
+    }
+    return UserModel.find(query).sort({ fullName: 1, _id: 1 }).exec();
+  }
+
+  /** null if the role or status changed since it was read */
+  updateAccess(
+    id: Types.ObjectId | string,
+    from: { role: Role; status: UserStatus },
+    changes: { role: Role; status: UserStatus },
+    session?: ClientSession,
+  ) {
+    return UserModel.findOneAndUpdate(
+      { _id: id, role: from.role, status: from.status },
+      { $set: changes },
+      { returnDocument: 'after', runValidators: true, session },
+    ).exec();
+  }
+
   findById(id: Types.ObjectId | string, session?: ClientSession) {
     return UserModel.findById(id, null, { session }).exec();
   }
