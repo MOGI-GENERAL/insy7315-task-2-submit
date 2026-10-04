@@ -1,7 +1,8 @@
 /* SA FORMATTING: 24H CLOCK, DAY-MONTH ORDER, RAND, PLAIN TIME (NEVER "5.30PM") */
 
-/** SECTOR-STANDARD KG -> MEAL CONVERSION */
-export const KG_PER_MEAL = 0.4;
+import { KG_PER_MEAL } from '@fedsa/contract';
+
+export { KG_PER_MEAL };
 
 const LOCALE = 'en-ZA';
 
@@ -61,8 +62,9 @@ export function formatNumber(n: number): string {
   return Math.round(n).toLocaleString(LOCALE);
 }
 
+/** the API's rule. counted in whole grams, as 1.2 / 0.4 is 2.9999 */
 export function mealsFromKg(kg: number): number {
-  return Math.round(kg / KG_PER_MEAL);
+  return Math.floor(Math.round(kg * 1000) / Math.round(KG_PER_MEAL * 1000));
 }
 
 export function formatZar(amount: number): string {

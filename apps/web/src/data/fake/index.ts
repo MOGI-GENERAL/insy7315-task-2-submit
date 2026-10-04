@@ -1,4 +1,5 @@
-import { KG_PER_MEAL, type ImpactRow, type ListOffersQuery } from '@fedsa/contract';
+import { type ImpactRow, type ListOffersQuery } from '@fedsa/contract';
+import { mealsFromKg } from '../../lib/format';
 import { canClaim, nextStatus, storageFields } from '../../lib/org';
 import {
   activeClaimForOffer,
@@ -526,10 +527,10 @@ export function createFakeDataLayer(store: Store, options: FakeOptions): DataLay
           }
           const items = [...rows.values()].map((r) => ({
             ...r,
-            meals: Math.floor(r.kg / KG_PER_MEAL),
+            meals: mealsFromKg(r.kg),
           }));
           const kg = items.reduce((sum, r) => sum + r.kg, 0);
-          return { rows: items, totals: { kg, meals: Math.floor(kg / KG_PER_MEAL) } };
+          return { rows: items, totals: { kg, meals: mealsFromKg(kg) } };
         }),
       outcomes: (query) =>
         call('reports', 'outcomes', () => {
