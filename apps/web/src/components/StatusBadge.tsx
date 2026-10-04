@@ -3,6 +3,7 @@
 import { Icon } from './Icon';
 import type { IconName } from './Icon';
 import { useT, statusKey, coldChainKey } from '../i18n/useT';
+import type { StringKey } from '../i18n/strings';
 import { isExpiringSoon } from '../lib/format';
 import type {
   ColdChain,
@@ -54,25 +55,25 @@ const verificationTone: Record<OrganisationStatus, string> = {
   suspended: 'expired',
 };
 
-const verificationLabel: Record<OrganisationStatus, string> = {
-  pending: 'Awaiting verification',
-  verified: 'Verified',
-  rejected: 'Not approved',
-  active: 'Active',
-  suspended: 'Suspended',
+const channelKey: Record<NotificationChannel, StringKey> = {
+  in_app: 'notif.viaPush',
+  push: 'notif.viaPush',
+  whatsapp: 'notif.viaWhatsapp',
+  sms: 'notif.viaSms',
 };
 
 export function VerificationBadge({ status }: { status: OrganisationStatus }) {
+  const t = useT();
   const approved = status === 'verified' || status === 'active';
   return (
     <span className="badge" data-tone={verificationTone[status]}>
       <Icon name={approved ? 'check-circle' : 'shield'} size={14} />
-      {verificationLabel[status]}
+      {t(`orgStatus.${status}`)}
     </span>
   );
 }
 
 export function ChannelBadge({ channel }: { channel: NotificationChannel }) {
-  const label = { in_app: 'App', push: 'App', whatsapp: 'WhatsApp', sms: 'SMS' }[channel];
-  return <span className="badge badge--quiet badge--sm">{label}</span>;
+  const t = useT();
+  return <span className="badge badge--quiet badge--sm">{t(channelKey[channel])}</span>;
 }

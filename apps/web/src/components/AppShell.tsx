@@ -11,46 +11,48 @@ import { useAppState } from '../store/context';
 import { unreadCount } from '../store/selectors';
 import { useLanguage, useT } from '../i18n/useT';
 import { languageNames } from '../i18n/strings';
+import type { StringKey } from '../i18n/strings';
+import { CHANGE_PASSWORD_PATH } from '../auth/context';
 import './AppShell.css';
 
 interface NavItem {
   to: string;
-  label: string;
+  label: StringKey;
   icon: IconName;
   end?: boolean;
 }
 
 const navByRole: Record<Role, NavItem[]> = {
   donor: [
-    { to: '/donor', label: 'Home', icon: 'home', end: true },
-    { to: '/donor/post', label: 'Post', icon: 'plus' },
-    { to: '/donor/certificates', label: 'Tax', icon: 'file' },
+    { to: '/donor', label: 'nav.home', icon: 'home', end: true },
+    { to: '/donor/post', label: 'nav.post', icon: 'plus' },
+    { to: '/donor/certificates', label: 'nav.tax', icon: 'file' },
   ],
   recipient: [
-    { to: '/recipient', label: 'Offers', icon: 'list', end: true },
-    { to: '/recipient/claims', label: 'My claims', icon: 'check-circle' },
-    { to: '/recipient/scheduled', label: 'Scheduled', icon: 'clock' },
-    { to: '/recipient/profile', label: 'Profile', icon: 'pin' },
+    { to: '/recipient', label: 'nav.offers', icon: 'list', end: true },
+    { to: '/recipient/claims', label: 'nav.myClaims', icon: 'check-circle' },
+    { to: '/recipient/scheduled', label: 'nav.scheduled', icon: 'clock' },
+    { to: '/recipient/profile', label: 'nav.profile', icon: 'pin' },
   ],
   coordinator: [
-    { to: '/coordinator', label: 'Board', icon: 'home', end: true },
-    { to: '/coordinator/dispatch', label: 'Dispatch', icon: 'truck' },
-    { to: '/coordinator/verify', label: 'Verify', icon: 'shield' },
-    { to: '/coordinator/organisations', label: 'Notes', icon: 'people' },
-    { to: '/coordinator/disputes', label: 'Disputes', icon: 'alert' },
+    { to: '/coordinator', label: 'nav.board', icon: 'home', end: true },
+    { to: '/coordinator/dispatch', label: 'nav.dispatch', icon: 'truck' },
+    { to: '/coordinator/verify', label: 'nav.verify', icon: 'shield' },
+    { to: '/coordinator/organisations', label: 'nav.notes', icon: 'people' },
+    { to: '/coordinator/disputes', label: 'nav.disputes', icon: 'alert' },
   ],
   administrator: [
-    { to: '/admin', label: 'Reports', icon: 'chart', end: true },
-    { to: '/admin/certificates', label: 'Tax', icon: 'file' },
-    { to: '/admin/accounts', label: 'Accounts', icon: 'people' },
+    { to: '/admin', label: 'nav.reports', icon: 'chart', end: true },
+    { to: '/admin/certificates', label: 'nav.tax', icon: 'file' },
+    { to: '/admin/accounts', label: 'nav.accounts', icon: 'people' },
   ],
 };
 
-const roleLabel: Record<Role, string> = {
-  donor: 'Donor',
-  recipient: 'Recipient',
-  coordinator: 'Coordinator',
-  administrator: 'Administrator',
+const roleLabel: Record<Role, StringKey> = {
+  donor: 'role.donor',
+  recipient: 'role.recipient',
+  coordinator: 'role.coordinator',
+  administrator: 'role.administrator',
 };
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -68,14 +70,14 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="shell" data-role={user.role}>
       <a className="skip-link" href="#main">
-        Skip to main content
+        {t('nav.skip')}
       </a>
 
       <header className="shell__header">
         <Link to={`/${user.role === 'administrator' ? 'admin' : user.role}`} className="shell__brand">
           <LogoMark size={32} />
           <span className="shell__brand-text">
-            <small>{org?.name ?? roleLabel[user.role]}</small>
+            <small>{org?.name ?? t(roleLabel[user.role])}</small>
           </span>
         </Link>
 
@@ -99,15 +101,25 @@ export function AppShell({ children }: { children: ReactNode }) {
           <NavLink
             to="/notifications"
             className="shell__bell"
-            aria-label={`${t('nav.notifications')}${unread > 0 ? `, ${unread} unread` : ''}`}
+            aria-label={`${t('nav.notifications')}${unread > 0 ? `, ${unread} ${t('nav.unread')}` : ''}`}
           >
             <Icon name="bell" size={20} />
             {unread > 0 && <span className="shell__badge">{unread}</span>}
           </NavLink>
 
+          <NavLink
+            to={CHANGE_PASSWORD_PATH}
+            className="shell__signout"
+            aria-label={t('nav.account')}
+          >
+            <Icon name="shield" size={18} />
+            <span className="shell__signout-text">{t('nav.account')}</span>
+          </NavLink>
+
           <button
             type="button"
             className="shell__signout"
+            aria-label={t('nav.signOut')}
             onClick={() => void logout()}
           >
             <Icon name="signout" size={18} />
@@ -117,9 +129,9 @@ export function AppShell({ children }: { children: ReactNode }) {
       </header>
 
       <div className="shell__frame">
-        <nav className="shell__nav" aria-label={`${roleLabel[user.role]} sections`}>
+        <nav className="shell__nav" aria-label={t('nav.sections')}>
           <p className="shell__nav-who">
-            <span className="shell__nav-role">{roleLabel[user.role]}</span>
+            <span className="shell__nav-role">{t(roleLabel[user.role])}</span>
             <span className="shell__nav-name">{user.fullName}</span>
           </p>
           <ul>
@@ -127,7 +139,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <li key={item.to}>
                 <NavLink to={item.to} end={item.end} className="shell__nav-link">
                   <Icon name={item.icon} size={22} />
-                  <span>{item.label}</span>
+                  <span>{t(item.label)}</span>
                 </NavLink>
               </li>
             ))}

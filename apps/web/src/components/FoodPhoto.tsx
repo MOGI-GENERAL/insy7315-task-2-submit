@@ -2,7 +2,8 @@
 
 import type { ReactElement } from 'react';
 import type { PhotoKey } from './photoKeys';
-import { photoLabels } from './photoKeys';
+import { photoLabelKeys } from './photoKeys';
+import { useT } from '../i18n/useT';
 
 const C = {
   crust: '#c9762b',
@@ -119,14 +120,15 @@ export function FoodPhoto({
   className?: string;
   alt?: string;
 }) {
+  const t = useT();
   const key = (photo && photo in shapes ? photo : 'mixed') as PhotoKey;
   const Shape = shapes[key];
-  const label = alt ?? photoLabels[key];
+  const label = alt ?? t(photoLabelKeys[key]);
 
   if (!photo) {
     return (
-      <div className={`foodphoto foodphoto--none ${className ?? ''}`} role="img" aria-label="No photograph">
-        <span aria-hidden="true">No photo</span>
+      <div className={`foodphoto foodphoto--none ${className ?? ''}`} role="img" aria-label={t('photo.noneLabel')}>
+        <span aria-hidden="true">{t('photo.none')}</span>
       </div>
     );
   }

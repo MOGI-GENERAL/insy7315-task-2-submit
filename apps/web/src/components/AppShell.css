@@ -129,6 +129,10 @@
   font-size: var(--t-sm);
 }
 
+a.shell__signout {
+  text-decoration: none;
+}
+
 .shell__signout:hover {
   background: #443e37;
 }

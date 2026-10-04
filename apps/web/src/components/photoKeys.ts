@@ -1,14 +1,16 @@
 /* SPLIT FROM FoodPhoto.tsx FOR FAST REFRESH COMPAT */
 
+import type { StringKey } from '../i18n/strings';
+
 export type PhotoKey = 'bread' | 'produce' | 'dairy' | 'prepared' | 'dry' | 'mixed';
 
 export const photoKeys: PhotoKey[] = ['bread', 'produce', 'dairy', 'prepared', 'dry', 'mixed'];
 
-export const photoLabels: Record<PhotoKey, string> = {
-  bread: 'Bread and rolls',
-  produce: 'Fruit and vegetables',
-  dairy: 'Milk and yoghurt',
-  prepared: 'Prepared meals in trays',
-  dry: 'Tins and dry goods',
-  mixed: 'A crate of mixed groceries',
+export const photoLabelKeys: Record<PhotoKey, StringKey> = {
+  bread: 'photo.bread',
+  produce: 'photo.produce',
+  dairy: 'photo.dairy',
+  prepared: 'photo.prepared',
+  dry: 'photo.dry',
+  mixed: 'photo.mixed',
 };
