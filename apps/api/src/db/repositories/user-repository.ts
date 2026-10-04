@@ -36,4 +36,43 @@ export class UserRepository {
       { $set: { passwordHash, mustChangePassword: false } },
     ).exec();
   }
+
+  findActiveByIds(ids: (Types.ObjectId | string)[]) {
+    return UserModel.find({ _id: { $in: ids }, status: 'active' })
+      .sort({ _id: 1 })
+      .exec();
+  }
+
+  findActiveInOrganisations(organisationIds: (Types.ObjectId | string)[]) {
+    return UserModel.find({ organisationId: { $in: organisationIds }, status: 'active' })
+      .sort({ _id: 1 })
+      .exec();
+  }
+
+  /** the oldest subscription drops off once a user has more than `max` */
+  addPushSubscription(
+    id: Types.ObjectId | string,
+    subscription: { endpoint: string; keys: { p256dh: string; auth: string } },
+    max: number,
+  ) {
+    return UserModel.updateOne(
+      { _id: id },
+      {
+        $push: {
+          pushSubscriptions: { $each: [{ ...subscription, createdAt: new Date() }], $slice: -max },
+        },
+      },
+    ).exec();
+  }
+
+  removePushSubscription(id: Types.ObjectId | string, endpoint: string) {
+    return UserModel.updateOne({ _id: id }, { $pull: { pushSubscriptions: { endpoint } } }).exec();
+  }
+
+  removePushEndpointFromEveryone(endpoint: string) {
+    return UserModel.updateMany(
+      { 'pushSubscriptions.endpoint': endpoint },
+      { $pull: { pushSubscriptions: { endpoint } } },
+    ).exec();
+  }
 }

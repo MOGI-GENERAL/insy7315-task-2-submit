@@ -33,6 +33,7 @@ const notificationSchema = new Schema(
 );
 
 notificationSchema.index({ offerId: 1 });
+notificationSchema.index({ userId: 1, channel: 1, createdAt: -1 });
 
 export const notificationValidator = {
   $jsonSchema: {

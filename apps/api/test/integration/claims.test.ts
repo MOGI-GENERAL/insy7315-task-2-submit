@@ -22,6 +22,7 @@ import {
   createOrganisation,
   createUser,
   newClaimService,
+  newNotificationService,
   newOfferService,
   signedInClient,
   startTestApp,
@@ -40,6 +41,7 @@ class RecordingClaimNotifier implements ClaimNotifier {
   async notifyClaimed(offer: Offer, claim: Claim) {
     this.calls.push({ offer, claim });
   }
+  async notifyReleased() {}
 }
 
 const offerNotifier = new RecordingOfferNotifier();
@@ -54,6 +56,7 @@ beforeAll(async () => {
   const app = await startTestApp(
     [],
     offers,
+    newNotificationService(),
     newClaimService(offers, { offerNotifier, claimNotifier }),
   );
   closeApp = app.close;
