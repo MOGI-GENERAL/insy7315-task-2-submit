@@ -546,10 +546,12 @@ export function createFakeDataLayer(store: Store, options: FakeOptions): DataLay
           );
           return {
             posted: offers.length,
+            open: offers.filter((o) => o.status === 'open').length,
             claimed,
             collected: offers.filter((o) => o.status === 'collected').length,
             expiredUnclaimed: expired - expiredClaimed,
             expiredClaimed,
+            cancelled: offers.filter((o) => o.status === 'cancelled').length,
             claimedPct: offers.length === 0 ? 0 : Math.round((claimed / offers.length) * 1000) / 10,
             distinctRecipients: new Set(fulfilled.map((c) => c.recipientOrganisationId)).size,
           };

@@ -31,12 +31,15 @@ export const ImpactResponse = z.object({
 });
 export type ImpactResponse = z.infer<typeof ImpactResponse>;
 
+/** `open`, `claimed`, `collected`, both expired counts and `cancelled` add up to `posted` */
 export const OutcomesResponse = z.object({
   posted: z.number().int(),
+  open: z.number().int(),
   claimed: z.number().int(),
   collected: z.number().int(),
   expiredUnclaimed: z.number().int(),
   expiredClaimed: z.number().int(),
+  cancelled: z.number().int(),
   claimedPct: z.number(),
   distinctRecipients: z.number().int(),
 });
