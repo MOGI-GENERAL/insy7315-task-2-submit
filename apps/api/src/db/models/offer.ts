@@ -50,6 +50,8 @@ const offerSchema = new Schema(
 offerSchema.index({ status: 1, collectionDeadline: 1 });
 offerSchema.index({ donorOrganisationId: 1, createdAt: 1 });
 offerSchema.index({ parentOfferId: 1 });
+/** reports count offers by the day they were posted */
+offerSchema.index({ createdAt: 1 });
 offerSchema.index({ reference: 1 }, { unique: true });
 offerSchema.index({ clientRequestId: 1 }, { unique: true, sparse: true });
 

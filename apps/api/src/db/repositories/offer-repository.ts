@@ -1,5 +1,34 @@
+import type { OfferStatus } from '@fedsa/contract';
 import type { ClientSession, Types } from 'mongoose';
+import { ClaimModel } from '../models/claim.js';
 import { OfferModel, type OfferDoc } from '../models/offer.js';
+import { ORGANISATION_ROWS, type KgRow } from './organisation-rows.js';
+
+export interface OutcomeCounts {
+  posted: number;
+  open: number;
+  claimed: number;
+  collected: number;
+  expiredUnclaimed: number;
+  expiredClaimed: number;
+  cancelled: number;
+}
+
+type DateRange = { $gte?: Date; $lt?: Date };
+
+const NO_OUTCOMES: OutcomeCounts = {
+  posted: 0,
+  open: 0,
+  claimed: 0,
+  collected: 0,
+  expiredUnclaimed: 0,
+  expiredClaimed: 0,
+  cancelled: 0,
+};
+
+const hasStatus = (status: OfferStatus) => ({ $eq: ['$status', status] });
+const countWhere = (condition: object) => ({ $sum: { $cond: [condition, 1, 0] } });
+const hadExpiredClaim = { $gt: [{ $size: '$expiredClaims' }, 0] };
 
 export class OfferRepository {
   findById(id: Types.ObjectId | string, session?: ClientSession) {
@@ -57,5 +86,72 @@ export class OfferRepository {
 
   idsForDonor(donorOrganisationId: Types.ObjectId | string) {
     return OfferModel.distinct('_id', { donorOrganisationId }).exec() as Promise<Types.ObjectId[]>;
+  }
+
+  /**
+   * each offer posted within `range` by its current status. an expired offer whose
+   * claim expired with it failed at collection, any other expired offer at matching
+   */
+  async outcomeCounts(range: DateRange): Promise<OutcomeCounts> {
+    const [row] = await OfferModel.aggregate<OutcomeCounts>([
+      { $match: { createdAt: range } },
+      {
+        $lookup: {
+          from: ClaimModel.collection.collectionName,
+          localField: '_id',
+          foreignField: 'offerId',
+          pipeline: [{ $match: { status: 'expired' } }, { $limit: 1 }, { $project: { _id: 1 } }],
+          as: 'expiredClaims',
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          posted: { $sum: 1 },
+          open: countWhere(hasStatus('open')),
+          claimed: countWhere(hasStatus('claimed')),
+          collected: countWhere(hasStatus('collected')),
+          expiredUnclaimed: countWhere({
+            $and: [hasStatus('expired'), { $not: [hadExpiredClaim] }],
+          }),
+          expiredClaimed: countWhere({ $and: [hasStatus('expired'), hadExpiredClaim] }),
+          cancelled: countWhere(hasStatus('cancelled')),
+        },
+      },
+      { $project: { _id: 0 } },
+    ]).exec();
+    return row ?? NO_OUTCOMES;
+  }
+
+  /** recipient organisations with a fulfilled claim on an offer posted within `range` */
+  async countRecipientsServed(range: DateRange) {
+    const [row] = await OfferModel.aggregate<{ recipients: number }>([
+      { $match: { createdAt: range } },
+      {
+        $lookup: {
+          from: ClaimModel.collection.collectionName,
+          localField: '_id',
+          foreignField: 'offerId',
+          pipeline: [
+            { $match: { status: 'fulfilled' } },
+            { $project: { recipientOrganisationId: 1 } },
+          ],
+          as: 'fulfilledClaims',
+        },
+      },
+      { $unwind: '$fulfilledClaims' },
+      { $group: { _id: '$fulfilledClaims.recipientOrganisationId' } },
+      { $count: 'recipients' },
+    ]).exec();
+    return row?.recipients ?? 0;
+  }
+
+  /** a remainder's quantity is already inside its parent's. only offers with no parent are summed */
+  offeredKgByDonor(range: DateRange) {
+    return OfferModel.aggregate<KgRow>([
+      { $match: { createdAt: range, parentOfferId: null } },
+      { $group: { _id: '$donorOrganisationId', kg: { $sum: '$offeredQuantityKg' } } },
+      ...ORGANISATION_ROWS,
+    ]).exec();
   }
 }

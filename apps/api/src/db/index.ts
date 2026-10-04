@@ -20,5 +20,6 @@ export * from './repositories/health-repository.js';
 export * from './repositories/notification-repository.js';
 export * from './repositories/offer-repository.js';
 export * from './repositories/organisation-repository.js';
+export * from './repositories/organisation-rows.js';
 export * from './repositories/session-repository.js';
 export * from './repositories/user-repository.js';

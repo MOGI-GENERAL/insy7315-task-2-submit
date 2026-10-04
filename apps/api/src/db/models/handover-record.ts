@@ -46,6 +46,8 @@ const handoverRecordSchema = new Schema(
 );
 
 handoverRecordSchema.index({ retainUntil: 1 });
+/** impact reports read handovers by the day the recipient confirmed */
+handoverRecordSchema.index({ recipientConfirmedAt: 1 });
 handoverRecordSchema.index({ claimId: 1 }, { unique: true });
 
 export const handoverRecordValidator = {
