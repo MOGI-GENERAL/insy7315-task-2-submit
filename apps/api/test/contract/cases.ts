@@ -365,6 +365,75 @@ export const CONTRACT_CASES: Partial<Record<RouteKey, ContractCase>> = {
         t.request('nadia', 'GET', `/api/reports/outcomes?from=${t.period.from}&to=${t.period.to}`),
     },
   },
+  'GET /api/valuation-rates': {
+    success: (t) => t.request('zanele', 'GET', '/api/valuation-rates'),
+    error: { code: 'FORBIDDEN', send: (t) => t.request('nadia', 'GET', '/api/valuation-rates') },
+  },
+  'PUT /api/valuation-rates': {
+    success: (t) =>
+      t.request('zanele', 'PUT', '/api/valuation-rates', {
+        items: [{ category: 'bakery', ratePerKg: 24.5 }],
+      }),
+    error: {
+      code: 'VALIDATION_FAILED',
+      send: (t) =>
+        t.request('zanele', 'PUT', '/api/valuation-rates', {
+          items: [
+            { category: 'bakery', ratePerKg: 24.5 },
+            { category: 'bakery', ratePerKg: 25 },
+          ],
+        }),
+    },
+  },
+  'POST /api/tax-certificates': {
+    success: async (t) =>
+      t.request('zanele', 'POST', '/api/tax-certificates', {
+        donorOrganisationId: await t.organisationId('Woodstock Deli & Bistro'),
+        periodStart: t.period.from,
+        periodEnd: t.period.to,
+      }),
+    error: {
+      code: 'INVALID_STATE',
+      send: async (t) =>
+        t.request('zanele', 'POST', '/api/tax-certificates', {
+          donorOrganisationId: await t.organisationId('Woodstock Deli & Bistro'),
+          periodStart: '2020-01-01',
+          periodEnd: '2020-01-31',
+        }),
+    },
+  },
+  'GET /api/tax-certificates': {
+    success: async (t) => {
+      await t.certificateId("Ouma's Bakery");
+      return t.request('riaan', 'GET', '/api/tax-certificates');
+    },
+    error: {
+      code: 'NOT_FOUND',
+      send: async (t) =>
+        t.request(
+          'riaan',
+          'GET',
+          `/api/tax-certificates?donorOrganisationId=${await t.organisationId('Kaap Foods')}`,
+        ),
+    },
+  },
+  'GET /api/tax-certificates/:id/pdf': {
+    success: async (t) =>
+      t.request(
+        'riaan',
+        'GET',
+        `/api/tax-certificates/${await t.certificateId("Ouma's Bakery")}/pdf`,
+      ),
+    error: {
+      code: 'NOT_FOUND',
+      send: async (t) =>
+        t.request(
+          'riaan',
+          'GET',
+          `/api/tax-certificates/${await t.certificateId('Kaap Foods')}/pdf`,
+        ),
+    },
+  },
 };
 
 /** in the routes table but not served yet. a route leaves this list when its case above is added */
@@ -378,11 +447,6 @@ export const NOT_YET_SERVED: RouteKey[] = [
   'POST /api/handovers/:id/resolution',
   'GET /api/handovers/:id/photo',
   'GET /api/reports/export',
-  'GET /api/valuation-rates',
-  'PUT /api/valuation-rates',
-  'POST /api/tax-certificates',
-  'GET /api/tax-certificates',
-  'GET /api/tax-certificates/:id/pdf',
   'GET /api/users',
   'POST /api/users',
   'PATCH /api/users/:id',
