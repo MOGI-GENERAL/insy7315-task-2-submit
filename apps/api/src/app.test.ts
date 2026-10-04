@@ -15,6 +15,7 @@ import {
   ClaimRepository,
   CollectionRepository,
   HandoverRepository,
+  NotificationRepository,
   OfferRepository,
   OrganisationRepository,
   SessionRepository,
@@ -25,11 +26,10 @@ import { createLogger } from './logger.js';
 import { validate } from './middleware/validate.js';
 import { LocalPhotoStore } from './photos/local-photo-store.js';
 import { AuditService } from './services/audit-service.js';
-import { LoggingClaimNotifier } from './services/claim-notifier.js';
 import { ClaimService } from './services/claim-service.js';
 import { DEFAULT_RADIUS_KM } from './services/eligibility.js';
 import { HealthService } from './services/health-service.js';
-import { LoggingNotifier } from './services/offer-notifier.js';
+import { NotificationService } from './services/notification-service.js';
 import { OfferService } from './services/offer-service.js';
 import { OrganisationService } from './services/organisation-service.js';
 import { UserService } from './services/user-service.js';
@@ -63,6 +63,12 @@ throwaway.post('/api/webhooks/twilio/test', (_req, res) => {
   res.status(204).end();
 });
 
+const notifications = new NotificationService(new NotificationRepository(), new UserRepository(), {
+  channels: [],
+  mirror: true,
+  vapidPublicKey: null,
+  logger,
+});
 const offers = new OfferService(
   new OfferRepository(),
   new OrganisationRepository(),
@@ -71,7 +77,7 @@ const offers = new OfferService(
   new HandoverRepository(),
   new AuditService(new AuditLogRepository()),
   new LocalPhotoStore(),
-  new LoggingNotifier(logger),
+  notifications,
   { radiusKm: DEFAULT_RADIUS_KM, logger },
 );
 
@@ -99,10 +105,11 @@ const server = createApp({
       new OrganisationRepository(),
       new HandoverRepository(),
       offers,
-      new LoggingNotifier(logger),
-      new LoggingClaimNotifier(logger),
+      notifications,
+      notifications,
       logger,
     ),
+    notifications,
   },
   session: { secret: 'unit-test-session-secret', secureCookie: false },
   extraRouters: [throwaway],
