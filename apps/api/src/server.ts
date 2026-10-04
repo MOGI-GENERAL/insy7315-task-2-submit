@@ -18,6 +18,8 @@ import { createSessionStore } from './middleware/session.js';
 import { channelSettings } from './notifications/channel-settings.js';
 import { LocalPhotoStore } from './photos/local-photo-store.js';
 import { AuditService } from './services/audit-service.js';
+import { LoggingClaimNotifier } from './services/claim-notifier.js';
+import { ClaimService } from './services/claim-service.js';
 import { DEFAULT_RADIUS_KM } from './services/eligibility.js';
 import { HealthService } from './services/health-service.js';
 import { NotificationService } from './services/notification-service.js';
@@ -59,7 +61,17 @@ async function start() {
     new UserRepository(),
     { ...channelSettings(process.env, logger), logger },
   );
-
+  const offers = new OfferService(
+    new OfferRepository(),
+    new OrganisationRepository(),
+    new ClaimRepository(),
+    new CollectionRepository(),
+    new HandoverRepository(),
+    new AuditService(new AuditLogRepository()),
+    new LocalPhotoStore(),
+    notifications,
+    { radiusKm, logger },
+  );
   const services = {
     // Render sets RENDER_GIT_COMMIT on every deploy
     health: new HealthService(new HealthRepository(), process.env.RENDER_GIT_COMMIT || 'dev'),
@@ -75,16 +87,16 @@ async function start() {
       new HandoverRepository(),
       new AuditService(new AuditLogRepository()),
     ),
-    offers: new OfferService(
+    offers,
+    claims: new ClaimService(
+      new ClaimRepository(),
       new OfferRepository(),
       new OrganisationRepository(),
-      new ClaimRepository(),
-      new CollectionRepository(),
       new HandoverRepository(),
-      new AuditService(new AuditLogRepository()),
-      new LocalPhotoStore(),
+      offers,
       notifications,
-      { radiusKm, logger },
+      new LoggingClaimNotifier(logger),
+      logger,
     ),
     notifications,
   };

@@ -232,6 +232,14 @@ export class OfferService {
     };
   }
 
+  /** list views, as `listOffers` builds them, for services that embed offers */
+  async toViews(offers: StoredOffer[]): Promise<Offer[]> {
+    const donors = await this.donorsOf(offers);
+    return offers.map((offer) =>
+      this.view(offer, donors.get(offer.donorOrganisationId.toString())!, false),
+    );
+  }
+
   /** for the ownership guard. coordinators skip it */
   async ownerOf(id: string) {
     const offer = await this.offers.findById(id);

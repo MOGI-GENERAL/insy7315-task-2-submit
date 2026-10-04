@@ -33,6 +33,8 @@ import type { NotificationChannel } from '../../src/notifications/notification-c
 import { LocalPhotoStore } from '../../src/photos/local-photo-store.js';
 import type { PhotoStore } from '../../src/photos/photo-store.js';
 import { AuditService } from '../../src/services/audit-service.js';
+import { LoggingClaimNotifier, type ClaimNotifier } from '../../src/services/claim-notifier.js';
+import { ClaimService } from '../../src/services/claim-service.js';
 import { DEFAULT_RADIUS_KM } from '../../src/services/eligibility.js';
 import { HealthService } from '../../src/services/health-service.js';
 import { NotificationService } from '../../src/services/notification-service.js';
@@ -97,12 +99,38 @@ export function newOfferService(options: OfferTestOptions = {}) {
   );
 }
 
+export interface ClaimTestOptions {
+  offerNotifier?: OfferNotifier;
+  claimNotifier?: ClaimNotifier;
+}
+
+/** built on the same offer service the app uses, as in production */
+export function newClaimService(offers: OfferService, options: ClaimTestOptions = {}) {
+  const logger = createLogger({ write: () => {} });
+  return new ClaimService(
+    new ClaimRepository(),
+    new OfferRepository(),
+    new OrganisationRepository(),
+    new HandoverRepository(),
+    offers,
+    options.offerNotifier ?? newNotificationService(),
+    options.claimNotifier ?? new LoggingClaimNotifier(logger),
+    logger,
+  );
+}
+
 /** starts the real app on the test database. needs `startTestDb` to have run */
 export async function startTestApp(
   extraRouters: Router[] = [],
-  offers = newOfferService(),
-  notifications = newNotificationService(),
+  offers?: OfferService,
+  notifications?: NotificationService,
+  claims?: ClaimService,
 ) {
+  // a default parameter cannot see a later one, and offers has to share the notification service
+  notifications ??= newNotificationService();
+  offers ??= newOfferService({ notifier: notifications });
+  claims ??= newClaimService(offers, { offerNotifier: notifications });
+
   const server = createApp({
     logger: createLogger({ write: () => {} }),
     services: {
@@ -114,6 +142,7 @@ export async function startTestApp(
       ),
       organisations: newOrganisationService(),
       offers,
+      claims,
       notifications,
     },
     session: {
