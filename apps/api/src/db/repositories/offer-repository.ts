@@ -35,6 +35,10 @@ export class OfferRepository {
     return OfferModel.findById(id, null, { session }).exec();
   }
 
+  findByReference(reference: string) {
+    return OfferModel.findOne({ reference }).exec();
+  }
+
   findByClientRequestId(clientRequestId: string) {
     return OfferModel.findOne({ clientRequestId }).exec();
   }
