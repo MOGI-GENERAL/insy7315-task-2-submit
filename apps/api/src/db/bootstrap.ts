@@ -11,7 +11,7 @@ import { taxCertificateValidator, TaxCertificateModel } from './models/tax-certi
 import { userValidator, UserModel } from './models/user.js';
 import { valuationRateValidator, ValuationRateModel } from './models/valuation-rate.js';
 
-interface ManagedCollection {
+export interface ManagedCollection {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   model: Model<any>;
   validator: object;
@@ -21,7 +21,7 @@ interface ManagedCollection {
  * only these collections are touched. collections that other components
  * own, such as the session store's, keep whatever indexes they create
  */
-const MANAGED: ManagedCollection[] = [
+export const MANAGED: ManagedCollection[] = [
   { model: OrganisationModel, validator: organisationValidator },
   { model: UserModel, validator: userValidator },
   { model: OfferModel, validator: offerValidator },
