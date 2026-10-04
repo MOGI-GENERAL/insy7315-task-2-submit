@@ -1,10 +1,11 @@
 import { request as httpRequest } from 'node:http';
-import type { ErrorCode } from '@fedsa/contract';
+import type { CertificateResponse, ErrorCode } from '@fedsa/contract';
 import {
   ClaimModel,
   NotificationModel,
   OfferModel,
   OrganisationModel,
+  TaxCertificateModel,
   UserModel,
 } from '../../src/db/index.js';
 import { seedPeriod } from '../../src/seed/records.js';
@@ -112,6 +113,21 @@ export class ContractContext {
     });
     if (!claim) throw new Error(`no claim on ${offerTitle}`);
     return claim._id.toHexString();
+  }
+
+  /** the seed writes no certificates. Zanele issues one over the seeded period the first time */
+  async certificateId(donorName: string) {
+    const donorOrganisationId = await this.organisationId(donorName);
+    const existing = await TaxCertificateModel.findOne({ donorOrganisationId });
+    if (existing) return existing._id.toHexString();
+
+    const res = await this.request('zanele', 'POST', '/api/tax-certificates', {
+      donorOrganisationId,
+      periodStart: this.period.from,
+      periodEnd: this.period.to,
+    });
+    if (res.status !== 201) throw new Error(`issuing for ${donorName} gave ${res.status}`);
+    return ((await res.json()) as CertificateResponse).certificate.id;
   }
 
   async notificationId(caller: Caller) {

@@ -3,6 +3,7 @@ import mongoose, { type Model } from 'mongoose';
 import { auditLogValidator, AuditLogModel } from './models/audit-log.js';
 import { claimValidator, ClaimModel } from './models/claim.js';
 import { collectionValidator, CollectionModel } from './models/collection.js';
+import { counterValidator, CounterModel } from './models/counter.js';
 import { handoverRecordValidator, HandoverRecordModel } from './models/handover-record.js';
 import { notificationValidator, NotificationModel } from './models/notification.js';
 import { offerValidator, OfferModel } from './models/offer.js';
@@ -32,6 +33,7 @@ export const MANAGED: ManagedCollection[] = [
   { model: TaxCertificateModel, validator: taxCertificateValidator },
   { model: AuditLogModel, validator: auditLogValidator },
   { model: ValuationRateModel, validator: valuationRateValidator },
+  { model: CounterModel, validator: counterValidator },
 ];
 
 const VALIDATION = { validationLevel: 'strict', validationAction: 'error' } as const;

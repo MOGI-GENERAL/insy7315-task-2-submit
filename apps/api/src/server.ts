@@ -5,13 +5,16 @@ import {
   bootstrapDb,
   ClaimRepository,
   CollectionRepository,
+  CounterRepository,
   HandoverRepository,
   HealthRepository,
   NotificationRepository,
   OfferRepository,
   OrganisationRepository,
   SessionRepository,
+  TaxCertificateRepository,
   UserRepository,
+  ValuationRateRepository,
 } from './db/index.js';
 import { createLogger } from './logger.js';
 import { createSessionStore } from './middleware/session.js';
@@ -102,7 +105,15 @@ async function start() {
     offers,
     claims,
     notifications,
-    reports: new ReportingService(new HandoverRepository(), new OfferRepository()),
+    reports: new ReportingService(
+      new HandoverRepository(),
+      new OfferRepository(),
+      new OrganisationRepository(),
+      new ValuationRateRepository(),
+      new TaxCertificateRepository(),
+      new CounterRepository(),
+      new AuditService(new AuditLogRepository()),
+    ),
     webhooks: new WebhookService(
       new UserRepository(),
       new OrganisationRepository(),

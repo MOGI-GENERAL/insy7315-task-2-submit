@@ -42,7 +42,7 @@ test('a second bootstrap run changes nothing', async () => {
 
 test('every collection has a validator', async () => {
   const collections = await mongoose.connection.db!.listCollections().toArray();
-  expect(collections).toHaveLength(10);
+  expect(collections).toHaveLength(11);
   for (const c of collections) {
     expect('options' in c && c.options?.validator).toBeTruthy();
   }
