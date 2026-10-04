@@ -5,6 +5,8 @@ import {
   TwilioSmsChannel,
   TwilioWhatsAppChannel,
   deliveryStatusFor,
+  phoneFromAddress,
+  twimlReply,
   type TwilioMessages,
 } from './twilio-channels.js';
 
@@ -67,6 +69,27 @@ describe('SMS', () => {
     expect(logged).not.toContain(UNVERIFIED);
   });
 
+  test('asks Twilio for delivery reports when given an address for them', async () => {
+    const fake = fakeMessages();
+    const callback = 'https://fedsa.example.org/api/webhooks/twilio/status';
+    const channel = new TwilioSmsChannel(fake.messages, FROM, logger, callback);
+
+    await channel.send({ phone: PHONE, pushSubscriptions: [] }, MESSAGE);
+
+    expect(fake.created).toEqual([
+      { to: PHONE, from: FROM, body: MESSAGE.phoneText, statusCallback: callback },
+    ]);
+  });
+
+  test('without that address the request carries no callback at all', async () => {
+    const fake = fakeMessages();
+    await new TwilioSmsChannel(fake.messages, FROM, logger, null).send(
+      { phone: PHONE, pushSubscriptions: [] },
+      MESSAGE,
+    );
+    expect(fake.created[0]).not.toHaveProperty('statusCallback');
+  });
+
   test('reaches only a person with a phone number', () => {
     const channel = new TwilioSmsChannel(fakeMessages().messages, FROM, logger);
     expect(channel.supports({ phone: null, pushSubscriptions: [] })).toBe(false);
@@ -85,6 +108,16 @@ describe('WhatsApp', () => {
       { to: `whatsapp:${PHONE}`, from: `whatsapp:${FROM}`, body: MESSAGE.phoneText },
     ]);
     expect(delivery).toMatchObject({ to: PHONE, status: 'queued' });
+  });
+
+  test('asks for delivery reports in the same way', async () => {
+    const fake = fakeMessages();
+    const callback = 'https://fedsa.example.org/api/webhooks/twilio/status';
+    const channel = new TwilioWhatsAppChannel(fake.messages, FROM, logger, callback);
+
+    await channel.send({ phone: PHONE, pushSubscriptions: [] }, MESSAGE);
+
+    expect(fake.created[0]).toMatchObject({ to: `whatsapp:${PHONE}`, statusCallback: callback });
   });
 
   test('a sender already written with the prefix is not prefixed twice', async () => {
@@ -108,4 +141,18 @@ test.each([
   ['failed', 'failed'],
 ])('Twilio status %s is recorded as %s', (twilioStatus, expected) => {
   expect(deliveryStatusFor(twilioStatus)).toBe(expected);
+});
+
+test.each([
+  ['+27820000001', '+27820000001'],
+  ['whatsapp:+27820000001', '+27820000001'],
+  [' +27820000001 ', '+27820000001'],
+])('%j is the stored number %s', (address, phone) => {
+  expect(phoneFromAddress(address)).toBe(phone);
+});
+
+test('a TwiML reply escapes the text it carries', () => {
+  expect(twimlReply('FEDSA: <b> & co')).toBe(
+    '<?xml version="1.0" encoding="UTF-8"?><Response><Message>FEDSA: &lt;b&gt; &amp; co</Message></Response>',
+  );
 });

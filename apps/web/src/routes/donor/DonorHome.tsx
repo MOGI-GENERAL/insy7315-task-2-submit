@@ -2,6 +2,7 @@
 
 import { Link } from 'react-router-dom';
 import { OfferCard } from '../../components/OfferCard';
+import { toOffer } from '../../data/fake/mappers';
 import { EventBanner } from '../../components/EventBanner';
 import { Icon } from '../../components/Icon';
 import { PageHead, Section, StatRow, StatTile, EmptyState } from '../../components/ui';
@@ -77,8 +78,7 @@ export function DonorHome() {
             {awaitingMe.map(({ claim, offer, recipientOrg }) => (
               <OfferCard
                 key={claim.id}
-                offer={offer}
-                donor={org}
+                offer={toOffer(offer, state)}
                 to={`/donor/offers/${offer.id}`}
                 footer={
                   <div className="row row--between row--wrap">
@@ -115,8 +115,7 @@ export function DonorHome() {
               return (
                 <OfferCard
                   key={offer.id}
-                  offer={offer}
-                  donor={org}
+                  offer={toOffer(offer, state)}
                   to={`/donor/offers/${offer.id}`}
                   footer={
                     claim ? (
@@ -143,8 +142,7 @@ export function DonorHome() {
             {recent.map((offer) => (
               <OfferCard
                 key={offer.id}
-                offer={offer}
-                donor={org}
+                offer={toOffer(offer, state)}
                 to={`/donor/offers/${offer.id}`}
                 footer={
                   <span className="muted">

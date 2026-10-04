@@ -1,6 +1,7 @@
 /* APP SHELL: bottom nav < 64rem, sidebar >= 64rem, shared header */
 
 import { NavLink, Link, useLocation } from 'react-router-dom';
+import { useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { Icon } from './Icon';
 import type { IconName } from './Icon';
@@ -62,6 +63,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   const language = useLanguage();
   const t = useT();
   const location = useLocation();
+
+  // BrowserRouter keeps the old scroll position, which opens a new screen halfway down
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location.pathname]);
 
   const items = navByRole[user.role];
   // TODO: read from the notifications repository once the inbox is wired

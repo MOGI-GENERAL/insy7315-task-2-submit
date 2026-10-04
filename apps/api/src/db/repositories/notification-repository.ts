@@ -1,3 +1,4 @@
+import type { DeliveryStatus } from '@fedsa/contract';
 import type { ClientSession, Types } from 'mongoose';
 import { NotificationModel, type NotificationDoc } from '../models/notification.js';
 
@@ -35,6 +36,14 @@ export class NotificationRepository {
       kind: 'offer_posted',
     }).exec();
     return ids.flatMap((id) => (id ? [id.toString()] : []));
+  }
+
+  /** a row whose status is not in `from` is left as it is */
+  updateDeliveryStatus(providerMessageId: string, status: DeliveryStatus, from: DeliveryStatus[]) {
+    return NotificationModel.updateOne(
+      { providerMessageId, deliveryStatus: { $in: from } },
+      { $set: { deliveryStatus: status } },
+    ).exec();
   }
 
   /** keeps the first read time if it was already read */

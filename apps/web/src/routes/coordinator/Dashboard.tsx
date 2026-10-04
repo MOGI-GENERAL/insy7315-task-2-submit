@@ -2,6 +2,7 @@
 
 import { Link } from 'react-router-dom';
 import { OfferCard } from '../../components/OfferCard';
+import { toOffer } from '../../data/fake/mappers';
 import { EventBanner } from '../../components/EventBanner';
 import { Icon } from '../../components/Icon';
 import { EmptyState, PageHead, Section, StatRow, StatTile } from '../../components/ui';
@@ -117,8 +118,7 @@ export function Dashboard() {
             {board.expiringSoon.map((offer) => (
               <OfferCard
                 key={offer.id}
-                offer={offer}
-                donor={orgById(state, offer.donorOrganisationId)}
+                offer={toOffer(offer, state)}
                 footer={<span className="muted">Unclaimed - no coordinator action yet</span>}
               />
             ))}

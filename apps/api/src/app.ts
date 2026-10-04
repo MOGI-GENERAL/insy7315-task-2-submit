@@ -7,7 +7,9 @@ import { errorHandler, notFound } from './middleware/error-handler.js';
 import { globalLimit } from './middleware/rate-limits.js';
 import { securityHeaders } from './middleware/security-headers.js';
 import { sessions, type SessionSettings } from './middleware/session.js';
+import type { TwilioWebhookSettings } from './middleware/twilio-signature.js';
 import { authRouter } from './routes/auth-router.js';
+import { certificateRouter } from './routes/certificate-router.js';
 import { claimRouter } from './routes/claim-router.js';
 import { healthRouter } from './routes/health-router.js';
 import { meRouter } from './routes/me-router.js';
@@ -15,6 +17,7 @@ import { notificationRouter } from './routes/notification-router.js';
 import { offerRouter } from './routes/offer-router.js';
 import { organisationRouter } from './routes/organisation-router.js';
 import { reportRouter } from './routes/report-router.js';
+import { webhookRouter } from './routes/webhook-router.js';
 import type { ClaimService } from './services/claim-service.js';
 import type { HealthService } from './services/health-service.js';
 import type { NotificationService } from './services/notification-service.js';
@@ -22,6 +25,7 @@ import type { OfferService } from './services/offer-service.js';
 import type { OrganisationService } from './services/organisation-service.js';
 import type { ReportingService } from './services/reporting-service.js';
 import type { UserService } from './services/user-service.js';
+import type { WebhookService } from './services/webhook-service.js';
 
 export interface AppServices {
   health: HealthService;
@@ -31,12 +35,15 @@ export interface AppServices {
   claims: ClaimService;
   notifications: NotificationService;
   reports: ReportingService;
+  webhooks: WebhookService;
 }
 
 export interface AppDeps {
   logger: Logger;
   services: AppServices;
   session: SessionSettings;
+  /** absent or null refuses every Twilio webhook */
+  twilioWebhooks?: TwilioWebhookSettings | null;
   /** lets tests mount throwaway routes in front of the 404 */
   extraRouters?: Router[];
 }
@@ -65,6 +72,8 @@ export function createApp(deps: AppDeps) {
   app.use('/api', claimRouter(deps.services.claims));
   app.use('/api', notificationRouter(deps.services.notifications));
   app.use('/api', reportRouter(deps.services.reports));
+  app.use('/api', certificateRouter(deps.services.reports));
+  app.use('/api', webhookRouter(deps.services.webhooks, deps.twilioWebhooks ?? null));
   for (const router of deps.extraRouters ?? []) app.use(router);
 
   app.use(notFound);

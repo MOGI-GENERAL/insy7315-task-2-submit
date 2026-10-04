@@ -43,6 +43,13 @@ export class UserRepository {
       .exec();
   }
 
+  /** staff of FEDSA have no organisation and are left out */
+  findActiveOrganisationUsersByPhone(phone: string) {
+    return UserModel.find({ phone, status: 'active', organisationId: { $ne: null } })
+      .sort({ _id: 1 })
+      .exec();
+  }
+
   findActiveInOrganisations(organisationIds: (Types.ObjectId | string)[]) {
     return UserModel.find({ organisationId: { $in: organisationIds }, status: 'active' })
       .sort({ _id: 1 })

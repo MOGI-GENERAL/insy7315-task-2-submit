@@ -3,6 +3,7 @@ import mongoose, { type Model } from 'mongoose';
 import { auditLogValidator, AuditLogModel } from './models/audit-log.js';
 import { claimValidator, ClaimModel } from './models/claim.js';
 import { collectionValidator, CollectionModel } from './models/collection.js';
+import { counterValidator, CounterModel } from './models/counter.js';
 import { handoverRecordValidator, HandoverRecordModel } from './models/handover-record.js';
 import { notificationValidator, NotificationModel } from './models/notification.js';
 import { offerValidator, OfferModel } from './models/offer.js';
@@ -11,7 +12,7 @@ import { taxCertificateValidator, TaxCertificateModel } from './models/tax-certi
 import { userValidator, UserModel } from './models/user.js';
 import { valuationRateValidator, ValuationRateModel } from './models/valuation-rate.js';
 
-interface ManagedCollection {
+export interface ManagedCollection {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   model: Model<any>;
   validator: object;
@@ -21,7 +22,7 @@ interface ManagedCollection {
  * only these collections are touched. collections that other components
  * own, such as the session store's, keep whatever indexes they create
  */
-const MANAGED: ManagedCollection[] = [
+export const MANAGED: ManagedCollection[] = [
   { model: OrganisationModel, validator: organisationValidator },
   { model: UserModel, validator: userValidator },
   { model: OfferModel, validator: offerValidator },
@@ -32,6 +33,7 @@ const MANAGED: ManagedCollection[] = [
   { model: TaxCertificateModel, validator: taxCertificateValidator },
   { model: AuditLogModel, validator: auditLogValidator },
   { model: ValuationRateModel, validator: valuationRateValidator },
+  { model: CounterModel, validator: counterValidator },
 ];
 
 const VALIDATION = { validationLevel: 'strict', validationAction: 'error' } as const;

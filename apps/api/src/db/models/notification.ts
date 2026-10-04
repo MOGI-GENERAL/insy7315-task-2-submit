@@ -34,6 +34,14 @@ const notificationSchema = new Schema(
 
 notificationSchema.index({ offerId: 1 });
 notificationSchema.index({ userId: 1, channel: 1, createdAt: -1 });
+/**
+ * a sparse index would still keep the null that every in-app row stores. `$gt`
+ * matches strings only, and unlike `$type` a lookup by one id can use it
+ */
+notificationSchema.index(
+  { providerMessageId: 1 },
+  { partialFilterExpression: { providerMessageId: { $gt: '' } } },
+);
 
 export const notificationValidator = {
   $jsonSchema: {
