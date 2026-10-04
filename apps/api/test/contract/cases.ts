@@ -434,6 +434,55 @@ export const CONTRACT_CASES: Partial<Record<RouteKey, ContractCase>> = {
         ),
     },
   },
+
+  'GET /api/users': {
+    success: (t) => t.request('zanele', 'GET', '/api/users?role=coordinator'),
+    error: { code: 'FORBIDDEN', send: (t) => t.request('nadia', 'GET', '/api/users') },
+  },
+  'POST /api/users': {
+    success: (t) =>
+      t.request('zanele', 'POST', '/api/users', {
+        fullName: 'Lerato Mokoena',
+        email: 'lerato@fedsa.example',
+        role: 'coordinator',
+        phone: '+27829990001',
+        languagePreference: 'en',
+      }),
+    error: {
+      code: 'VALIDATION_FAILED',
+      send: (t) =>
+        t.request('zanele', 'POST', '/api/users', {
+          fullName: 'Riaan again',
+          email: personFor('riaan').email,
+          role: 'coordinator',
+          phone: '+27829990002',
+          languagePreference: 'en',
+        }),
+    },
+  },
+  'PATCH /api/users/:id': {
+    success: async (t) =>
+      t.request('zanele', 'PATCH', `/api/users/${await t.userId('marius')}`, { status: 'active' }),
+    error: {
+      code: 'INVALID_STATE',
+      send: async (t) =>
+        t.request('zanele', 'PATCH', `/api/users/${await t.userId('zanele')}`, {
+          status: 'disabled',
+        }),
+    },
+  },
+  'GET /api/audit-log': {
+    success: (t) =>
+      t.request(
+        'zanele',
+        'GET',
+        `/api/audit-log?from=${t.period.from}&to=${t.period.to}&action=disable_user`,
+      ),
+    error: {
+      code: 'VALIDATION_FAILED',
+      send: (t) => t.request('zanele', 'GET', '/api/audit-log?action=delete_everything'),
+    },
+  },
 };
 
 /** in the routes table but not served yet. a route leaves this list when its case above is added */
@@ -447,8 +496,4 @@ export const NOT_YET_SERVED: RouteKey[] = [
   'POST /api/handovers/:id/resolution',
   'GET /api/handovers/:id/photo',
   'GET /api/reports/export',
-  'GET /api/users',
-  'POST /api/users',
-  'PATCH /api/users/:id',
-  'GET /api/audit-log',
 ];
