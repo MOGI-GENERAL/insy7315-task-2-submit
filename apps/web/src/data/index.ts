@@ -1,5 +1,6 @@
 import type { Store } from '../store/store';
 import { createFakeDataLayer } from './fake';
+import { createHttpDataLayer } from './http';
 import type { DataLayer } from './repositories';
 
 export { ApiError, isApiError } from './ApiError';
@@ -23,9 +24,7 @@ function failOnFromUrl(): Set<string> {
 }
 
 export function createDataLayer(store: Store): DataLayer {
-  if (dataMode() === 'http') {
-    throw new Error('VITE_DATA=http needs the HTTP repositories, which are not built yet');
-  }
+  if (dataMode() === 'http') return createHttpDataLayer();
   return createFakeDataLayer(store, {
     delayMs: Number(import.meta.env.VITE_FAKE_DELAY_MS ?? 400),
     failOn: failOnFromUrl(),
