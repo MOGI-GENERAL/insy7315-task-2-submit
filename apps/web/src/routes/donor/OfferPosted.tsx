@@ -1,42 +1,21 @@
-/* POST CONFIRMATION — SHOWS NOTIFIED COUNT */
-
-import { Link } from 'react-router-dom';
+import { Link, Navigate, useLocation } from 'react-router-dom';
+import type { PostOfferResponse } from '@fedsa/contract';
 import { Icon } from '../../components/Icon';
-import { FoodPhoto } from '../../components/FoodPhoto';
+import { OfferPhoto } from '../../components/OfferPhoto';
 import { Detail, DetailList } from '../../components/ui';
 import { ColdChainBadge } from '../../components/StatusBadge';
 import { Countdown } from '../../components/Countdown';
-import { useAppState, useCurrentOrg } from '../../store/context';
-import { offersForDonor } from '../../store/selectors';
 import { useT, categoryKey } from '../../i18n/useT';
 import { formatKg, formatWhen, mealsFromKg } from '../../lib/format';
 import './OfferPosted.css';
 
+/** `notifiedCount` exists only in the post response, which `PostOffer` passes in route state */
 export function OfferPosted() {
-  const state = useAppState();
-  const org = useCurrentOrg()!;
+  const posted = useLocation().state as PostOfferResponse | null;
   const t = useT();
 
-  const offer = offersForDonor(state, org.id)[0];
-
-  if (!offer) {
-    return (
-      <div className="posted">
-        <p>Nothing posted yet.</p>
-        <Link to="/donor/post" className="btn btn--primary">
-          {t('post.title')}
-        </Link>
-      </div>
-    );
-  }
-
-  /* DISPATCH LOG AS PROOF OF FAN-OUT */
-  const notified = state.notifications.filter(
-    (n) => n.kind === 'offer_posted' && n.href === `/recipient/offers/${offer.id}`,
-  );
-  const notifiedOrgs = new Set(
-    notified.map((n) => state.users.find((u) => u.id === n.userId)?.organisationId).filter(Boolean),
-  );
+  if (!posted) return <Navigate to="/donor" replace />;
+  const { offer, notifiedCount } = posted;
 
   return (
     <div className="posted">
@@ -47,17 +26,17 @@ export function OfferPosted() {
       <h1>{t('post.posted')}</h1>
       <p className="posted__ref">{offer.reference}</p>
 
-      <p className="posted__reach">
-        <strong>{notifiedOrgs.size}</strong> {t('post.notified')}
+      <p className="posted__reach" role="status">
+        <strong>{notifiedCount}</strong> {t('post.notified')}
       </p>
 
       <div className="card posted__card">
-        <FoodPhoto photo={offer.photo} className="posted__photo" />
+        <OfferPhoto photos={offer.photos} alt={offer.title} className="posted__photo" />
         <div className="card__body">
           <h2>{offer.title}</h2>
           <p className="muted">
             {formatKg(offer.offeredQuantityKg)} · {t(categoryKey(offer.category))} ·{' '}
-            {mealsFromKg(offer.offeredQuantityKg).toLocaleString('en-ZA')} meals
+            {mealsFromKg(offer.offeredQuantityKg).toLocaleString('en-ZA')} {t('offer.meals')}
           </p>
           <div className="row row--wrap posted__tags">
             <ColdChainBadge coldChain={offer.coldChain} />
@@ -72,10 +51,7 @@ export function OfferPosted() {
         </div>
       </div>
 
-      <p className="posted__next">
-        You will be notified the moment somebody claims it. Nothing else is needed from you until
-        then.
-      </p>
+      <p className="posted__next">{t('post.whatNext')}</p>
 
       <div className="posted__actions">
         <Link to={`/donor/offers/${offer.id}`} className="btn btn--secondary btn--block">
@@ -88,7 +64,7 @@ export function OfferPosted() {
       </div>
 
       <Link to="/donor" className="btn btn--ghost posted__home">
-        Back to home
+        {t('post.home')}
       </Link>
     </div>
   );
