@@ -140,7 +140,7 @@ export async function startTestApp(
     claimNotifier: notifications,
   });
 
-  const server = createApp({
+  const app = createApp({
     logger: createLogger({ write: () => {} }),
     services: {
       health: new HealthService(new HealthRepository(), 'test-sha'),
@@ -161,10 +161,12 @@ export async function startTestApp(
       store: await createSessionStore(),
     },
     extraRouters,
-  }).listen(0);
+  });
+  const server = app.listen(0);
   await once(server, 'listening');
 
   return {
+    app,
     baseUrl: `http://127.0.0.1:${(server.address() as AddressInfo).port}`,
     close: () => new Promise<void>((resolve) => server.close(() => resolve())),
   };
