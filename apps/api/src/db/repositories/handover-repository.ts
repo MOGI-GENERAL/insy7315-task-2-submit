@@ -1,9 +1,35 @@
-import type { ImpactGroupBy } from '@fedsa/contract';
+import type { FoodCategory, ImpactGroupBy } from '@fedsa/contract';
 import type { ClientSession, PipelineStage, Types } from 'mongoose';
 import { ClaimModel } from '../models/claim.js';
 import { HandoverRecordModel } from '../models/handover-record.js';
 import { OfferModel } from '../models/offer.js';
 import { ORGANISATION_ROWS, type KgRow } from './organisation-rows.js';
+
+/** a handover both sides confirmed, with its offer's category */
+export interface CertifiableHandover {
+  _id: Types.ObjectId;
+  recipientConfirmedAt: Date;
+  collectedQuantityKg: number;
+  category: FoodCategory;
+}
+
+const OFFER_OF: PipelineStage[] = [
+  {
+    $lookup: {
+      from: OfferModel.collection.collectionName,
+      localField: 'offerId',
+      foreignField: '_id',
+      pipeline: [{ $project: { donorOrganisationId: 1, category: 1 } }],
+      as: 'offer',
+    },
+  },
+  { $set: { offer: { $first: '$offer' } } },
+];
+
+const CERTIFIABLE_FIELDS: PipelineStage[] = [
+  { $project: { recipientConfirmedAt: 1, collectedQuantityKg: 1, category: '$offer.category' } },
+  { $sort: { recipientConfirmedAt: 1, _id: 1 } },
+];
 
 /** the organisation each handover is grouped under, found through its offer or its claim */
 const ORGANISATION_OF: Record<Exclude<ImpactGroupBy, 'month'>, PipelineStage[]> = {
@@ -40,6 +66,40 @@ export class HandoverRepository {
 
   findByClaim(claimId: Types.ObjectId | string, session?: ClientSession) {
     return HandoverRecordModel.findOne({ claimId }, null, { session }).exec();
+  }
+
+  /**
+   * the donor's handovers the recipient confirmed within `range`, except `excludeIds`.
+   * a dispute counts only once a coordinator has resolved it
+   */
+  confirmedForDonor(
+    donorOrganisationId: Types.ObjectId,
+    range: { $gte?: Date; $lt?: Date },
+    excludeIds: Types.ObjectId[],
+    session: ClientSession,
+  ) {
+    return HandoverRecordModel.aggregate<CertifiableHandover>([
+      {
+        $match: {
+          recipientConfirmedAt: range,
+          _id: { $nin: excludeIds },
+          $or: [{ conditionOnReceipt: { $ne: 'problem' } }, { resolvedAt: { $ne: null } }],
+        },
+      },
+      ...OFFER_OF,
+      { $match: { 'offer.donorOrganisationId': donorOrganisationId } },
+      ...CERTIFIABLE_FIELDS,
+    ])
+      .session(session)
+      .exec();
+  }
+
+  findCertifiable(ids: Types.ObjectId[]) {
+    return HandoverRecordModel.aggregate<CertifiableHandover>([
+      { $match: { _id: { $in: ids } } },
+      ...OFFER_OF,
+      ...CERTIFIABLE_FIELDS,
+    ]).exec();
   }
 
   /** only handovers both sides have confirmed count as collected */

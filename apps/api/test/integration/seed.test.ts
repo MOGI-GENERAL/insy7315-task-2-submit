@@ -11,6 +11,7 @@ import { afterAll, beforeAll, expect, test } from 'vitest';
 import {
   ClaimModel,
   CollectionModel,
+  CounterModel,
   HandoverRecordModel,
   MANAGED,
   OfferModel,
@@ -248,6 +249,7 @@ test("the demo starts with Ouma's Bakery free to post and both shelters able to 
 
 test('it refuses a database holding records it did not write, and a reset clears them', async () => {
   const stranger = await createOrganisation({ type: 'donor', name: 'Not From The Seed' });
+  await CounterModel.create({ name: 'taxCertificates', year: 2026, seq: 3 });
 
   await expect(runSeed({ password: SEED_TEST_PASSWORD, now: NOW })).rejects.toThrow(
     SeedRefusedError,
@@ -256,6 +258,7 @@ test('it refuses a database holding records it did not write, and a reset clears
 
   await runSeed({ password: SEED_TEST_PASSWORD, now: NOW, reset: true });
   expect(await OrganisationModel.exists({ _id: stranger._id })).toBeNull();
+  expect(await CounterModel.countDocuments()).toBe(0);
   expect(await OrganisationModel.exists({ name: "Ouma's Bakery" })).not.toBeNull();
   expect(await mongoose.connection.collection(SESSIONS_COLLECTION).countDocuments()).toBe(0);
 });

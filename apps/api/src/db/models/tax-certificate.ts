@@ -1,6 +1,6 @@
 import { FoodCategory } from '@fedsa/contract';
 import { Schema, model, type InferSchemaType } from 'mongoose';
-import { date, nullableText, objectId, oneOf, text, timestamps } from '../rules.js';
+import { bool, date, nullableText, objectId, oneOf, text, timestamps } from '../rules.js';
 
 const valuationLineSchema = new Schema(
   {
@@ -8,6 +8,17 @@ const valuationLineSchema = new Schema(
     quantityKg: { type: Number, required: true, min: 0 },
     ratePerKg: { type: Number, required: true, min: 0 },
     value: { type: Number, required: true, min: 0 },
+  },
+  { _id: false },
+);
+
+/** the donor as it stood at issue. a later profile edit never reaches the PDF */
+const donorSnapshotSchema = new Schema(
+  {
+    name: { type: String, required: true, maxlength: 120 },
+    addressLine: { type: String, required: true, maxlength: 120 },
+    suburb: { type: String, required: true, maxlength: 120 },
+    taxReferenceNumber: { type: String, default: null, maxlength: 40 },
   },
   { _id: false },
 );
@@ -33,11 +44,16 @@ const taxCertificateSchema = new Schema(
     certificateNumber: { type: String, required: true, trim: true, maxlength: 40 },
     issuedAt: { type: Date, required: true, default: Date.now },
     documentUrl: { type: String, default: null, maxlength: 2000 },
+    donor: { type: donorSnapshotSchema, required: true },
+    /** true if any line was valued at a rate no administrator had set yet */
+    placeholderRates: { type: Boolean, required: true },
   },
   { collection: 'taxCertificates', timestamps: true, autoCreate: false, autoIndex: false },
 );
 
 taxCertificateSchema.index({ certificateNumber: 1 }, { unique: true });
+/** no handover can appear on two certificates */
+taxCertificateSchema.index({ handoverRecordIds: 1 }, { unique: true });
 
 const amount = { bsonType: 'number', minimum: 0 };
 
@@ -55,6 +71,8 @@ export const taxCertificateValidator = {
       'totalValue',
       'certificateNumber',
       'issuedAt',
+      'donor',
+      'placeholderRates',
       'createdAt',
     ],
     properties: {
@@ -80,6 +98,17 @@ export const taxCertificateValidator = {
       certificateNumber: text(1, 40),
       issuedAt: date,
       documentUrl: nullableText(2000),
+      donor: {
+        bsonType: 'object',
+        required: ['name', 'addressLine', 'suburb'],
+        properties: {
+          name: text(1, 120),
+          addressLine: text(1, 120),
+          suburb: text(1, 120),
+          taxReferenceNumber: nullableText(40),
+        },
+      },
+      placeholderRates: bool,
       ...timestamps,
     },
   },
