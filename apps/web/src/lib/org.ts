@@ -35,7 +35,7 @@ export function distanceKm(a: GeoPoint, b: GeoPoint): number {
   return Math.round(6371 * 2 * Math.asin(Math.sqrt(h)) * 10) / 10;
 }
 
-export function distanceFromOffice(org: Organisation): number {
+export function distanceFromOffice(org: { location: GeoPoint }): number {
   return distanceKm(FEDSA_OFFICE, org.location);
 }
 
@@ -54,6 +54,6 @@ export function nextStatus(
 }
 
 /** `verified` and `active` recipients can claim */
-export function canClaim(org: Organisation): boolean {
+export function canClaim(org: { status: OrganisationStatus }): boolean {
   return org.status === 'verified' || org.status === 'active';
 }
