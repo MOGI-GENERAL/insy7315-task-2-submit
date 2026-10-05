@@ -141,6 +141,24 @@ const untranslated = {
   'verify.done.suspend': 'Organisation suspended',
   'verify.done.reinstate': 'Organisation reinstated',
 
+  'capacity.title': 'Organisations',
+  'capacity.lead': 'What FEDSA knows about each one, written down rather than remembered.',
+  'capacity.choose': 'Choose an organisation',
+  'capacity.donor': 'Donor',
+  'capacity.recipient': 'Recipient',
+  'capacity.offersPosted': 'Offers posted',
+  'capacity.claims': 'Claims made',
+  'capacity.released': 'Claims released',
+  'capacity.collected': 'Collected to date',
+  'capacity.notesLabel': 'What we know about them',
+  'capacity.notesHint':
+    'Visible to every coordinator and administrator, and never to the organisation itself. Nothing here ranks anybody.',
+  'capacity.notesPlaceholder':
+    'Anything that decides whether a match works. Storage quirks, who answers the phone, what they will and will not take.',
+  'capacity.save': 'Save notes',
+  'capacity.saveDone': 'Saved',
+  'capacity.saved': 'Notes saved',
+
 } as const;
 
 const en = {
