@@ -1,172 +1,176 @@
-/* ORG PROFILE — DRIVES FEED ELIGIBILITY FILTER */
-
-import { useState } from 'react';
-import type { FormEvent } from 'react';
+import {
+  UpdateRecipientOrganisationRequest,
+  type ColdChain,
+  type RecipientOrganisation,
+} from '@fedsa/contract';
+import { useAuth } from '../../auth/context';
+import { useData, useLoad } from '../../data';
+import { LoadState, PendingButton, useToast } from '../../components/feedback';
+import { Checkbox, Field, FormError, useForm } from '../../components/forms';
+import type { Validator } from '../../components/forms';
 import { Icon } from '../../components/Icon';
-import { Banner, PageHead } from '../../components/ui';
-import { useApp, useCurrentOrg } from '../../store/context';
-import { checkEligibility } from '../../store/selectors';
+import { SuburbSelect } from '../../components/SuburbSelect';
+import { PageHead } from '../../components/ui';
 import { useT, coldChainKey } from '../../i18n/useT';
-import { useNow } from '../../lib/useNow';
-import type { ColdChain } from '../../store/types';
 import './Recipient.css';
-import { storageFields, storageList } from '../../lib/org';
 
-const storageOptions: ColdChain[] = ['ambient', 'refrigerated', 'frozen'];
+const STORAGE: ColdChain[] = ['ambient', 'refrigerated', 'frozen'];
+const STORAGE_FIELD = {
+  ambient: 'storageAmbient',
+  refrigerated: 'storageRefrigerated',
+  frozen: 'storageFrozen',
+} as const;
+
+interface Values {
+  suburb: string;
+  storageAmbient: boolean;
+  storageRefrigerated: boolean;
+  storageFrozen: boolean;
+  maxCapacityKg: number | undefined;
+  hasTransport: boolean;
+}
+
+/** an empty capacity box means no limit, which the API takes as null */
+const profileSchema: Validator<UpdateRecipientOrganisationRequest> = {
+  safeParse: (v) => {
+    const values = v as Values;
+    return UpdateRecipientOrganisationRequest.safeParse({
+      ...values,
+      maxCapacityKg: values.maxCapacityKg ?? null,
+    });
+  },
+};
+
+function valuesOf(org: RecipientOrganisation): Values {
+  return {
+    suburb: org.suburb,
+    storageAmbient: org.storageAmbient,
+    storageRefrigerated: org.storageRefrigerated,
+    storageFrozen: org.storageFrozen,
+    maxCapacityKg: org.maxCapacityKg ?? undefined,
+    hasTransport: org.hasTransport,
+  };
+}
 
 export function RecipientProfile() {
-  const { state } = useApp();
-  const org = useCurrentOrg()!;
+  const { organisations } = useData();
   const t = useT();
-  const now = useNow();
-
-  const [capacity, setCapacity] = useState(String(org.maxCapacityKg ?? 0));
-  const [storage, setStorage] = useState<ColdChain[]>(storageList(org));
-  const [hasTransport, setHasTransport] = useState(Boolean(org.hasTransport));
-  const [saved, setSaved] = useState(false);
-
-  const kg = Number(capacity);
-
-  /* LIVE PREVIEW OF SETTINGS */
-  const live = state.offers.filter(
-    (o) => o.status === 'open' && new Date(o.collectionDeadline).getTime() > now,
-  );
-  const wouldSee = live.filter(
-    (o) =>
-      checkEligibility({ ...org, maxCapacityKg: kg, ...storageFields(storage), hasTransport }, o)
-        .eligible,
-  ).length;
-
-  function toggleStorage(option: ColdChain) {
-    setSaved(false);
-    setStorage((current) =>
-      current.includes(option) ? current.filter((c) => c !== option) : [...current, option],
-    );
-  }
-
-  function submit(event: FormEvent) {
-    event.preventDefault();
-    /* PROTOTYPE: NOT PERSISTED */
-    setSaved(true);
-  }
+  const mine = useLoad(() => organisations.mine(), [organisations]);
+  const org = mine.data?.organisation;
 
   return (
-    <form className="form-screen" onSubmit={submit}>
-      <PageHead title={t('profile.title')} lead={`${org.name}, ${org.suburb}`} />
+    <div className="form-screen">
+      <PageHead title={t('profile.title')} lead={org ? `${org.name}, ${org.suburb}` : undefined} />
 
+      <LoadState result={mine}>
+        {({ organisation }) =>
+          organisation.type === 'recipient' && (
+            <ProfileForm key={organisation.id} org={organisation} onSaved={mine.reload} />
+          )
+        }
+      </LoadState>
+    </div>
+  );
+}
+
+function ProfileForm({
+  org,
+  onSaved,
+}: {
+  org: RecipientOrganisation;
+  onSaved: () => Promise<void>;
+}) {
+  const { organisations } = useData();
+  const { refresh } = useAuth();
+  const toast = useToast();
+  const t = useT();
+
+  const form = useForm({
+    initial: valuesOf(org),
+    schema: profileSchema,
+    onSubmit: async (body) => {
+      const { organisation } = await organisations.updateMine(body);
+      if (organisation.type === 'recipient') form.reset(valuesOf(organisation));
+      toast.success(t('profile.saved'));
+      // the feed and the claim screen read transport and suburb from the session
+      await Promise.all([onSaved(), refresh()]);
+    },
+  });
+
+  return (
+    <form {...form.formProps}>
       <div className="profile-why">
         <Icon name="shield" size={20} />
         <span>
-          {t('profile.why')} Nothing here is a score, and no organisation is ranked against another.
+          {t('profile.why')} {t('profile.notScore')}
         </span>
       </div>
 
-      {saved && (
-        <Banner tone="good" title={t('profile.saved')} onDismiss={() => setSaved(false)}>
-          In the built system this would be written to your organisation record and applied to the
-          next offer posted.
-        </Banner>
-      )}
+      <FormError form={form} />
 
-      <div className="field">
-        <label className="field__label" htmlFor="cap">
-          {t('profile.capacity')}
-        </label>
-        <div className="qty">
-          <input
-            id="cap"
-            className="input"
-            type="number"
-            inputMode="numeric"
-            min="1"
-            value={capacity}
-            onChange={(e) => {
-              setCapacity(e.target.value);
-              setSaved(false);
-            }}
-            aria-describedby="cap-hint"
-          />
-          <span className="qty__unit">kg</span>
-        </div>
-        <span className="field__hint" id="cap-hint">
-          The most you can take in one collection. Offers larger than this are not shown to you.
-        </span>
-      </div>
+      <Field form={form} name="suburb" label={t('register.suburb')} hint={t('register.suburbHint')}>
+        {(props) => <SuburbSelect {...props} />}
+      </Field>
+
+      <Field
+        form={form}
+        name="maxCapacityKg"
+        label={t('profile.capacity')}
+        hint={`${t('profile.capacityHint')} ${t('register.capacityHint')}`}
+        kind="number"
+        optional
+      >
+        {(props) => (
+          <div className="qty">
+            <input {...props} className="input" type="number" inputMode="decimal" min="1" />
+            <span className="qty__unit">{t('common.kg')}</span>
+          </div>
+        )}
+      </Field>
 
       <fieldset className="field">
         <legend className="field__label">{t('profile.storageWeHave')}</legend>
         <div className="choices">
-          {storageOptions.map((option) => (
-            <label key={option} className="choice">
-              <input
-                type="checkbox"
-                checked={storage.includes(option)}
-                onChange={() => toggleStorage(option)}
-              />
-              <span>{t(coldChainKey(option))}</span>
-            </label>
+          {STORAGE.map((option) => (
+            <Checkbox
+              key={option}
+              form={form}
+              name={STORAGE_FIELD[option]}
+              label={t(coldChainKey(option))}
+            />
           ))}
         </div>
-        <span className="field__hint">
-          Only tick what you can genuinely hold. A shelter with a freezer but no fridge should not
-          be offered chilled dairy.
-        </span>
+        <span className="field__hint">{t('profile.storageHint')}</span>
       </fieldset>
 
       <fieldset className="field">
         <legend className="field__label">{t('profile.transport')}</legend>
         <div className="stack stack--tight">
-          <label className="toggle">
-            <input
-              type="radio"
-              name="transport"
-              checked={hasTransport}
-              onChange={() => {
-                setHasTransport(true);
-                setSaved(false);
-              }}
-            />
-            <span className="toggle__text">
-              {t('profile.hasTransport')}
-              <small>You collect your own claims.</small>
-            </span>
-          </label>
-          <label className="toggle">
-            <input
-              type="radio"
-              name="transport"
-              checked={!hasTransport}
-              onChange={() => {
-                setHasTransport(false);
-                setSaved(false);
-              }}
-            />
-            <span className="toggle__text">
-              {t('profile.noTransport')}
-              <small>FEDSA arranges a driver. This never reduces the offers you are shown.</small>
-            </span>
-          </label>
+          {[true, false].map((has) => (
+            <label key={String(has)} className="toggle">
+              <input
+                type="radio"
+                name="hasTransport"
+                checked={form.values.hasTransport === has}
+                onChange={() => form.set('hasTransport', has)}
+              />
+              <span className="toggle__text">
+                {t(has ? 'profile.hasTransport' : 'profile.noTransport')}
+                <small>{t(has ? 'profile.hasTransportHint' : 'profile.noTransportHint')}</small>
+              </span>
+            </label>
+          ))}
         </div>
       </fieldset>
 
-      <div className="profile-effect" aria-live="polite">
-        <strong>What this means right now</strong>
-        <p>
-          With these settings you would see <strong>{wouldSee}</strong> of the {live.length} offers
-          currently live on the platform.{' '}
-          {hasTransport
-            ? 'You would collect them yourselves.'
-            : 'A driver would be arranged for each one you claim.'}
-        </p>
-      </div>
-
-      <button
+      <PendingButton
         type="submit"
         className="btn btn--primary btn--lg"
+        pending={form.pending}
         style={{ marginTop: 'var(--s-5)' }}
       >
         {t('profile.save')}
-      </button>
+      </PendingButton>
     </form>
   );
 }
