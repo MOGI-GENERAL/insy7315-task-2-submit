@@ -1,15 +1,12 @@
 import { useCallback } from 'react';
 import { useLanguageContext } from './context';
-import { dictionaries } from './strings';
+import { en } from './strings';
 import type { StringKey } from './strings';
 import type { ColdChain, FoodCategory, OfferStatus } from '../store/types';
 
 export function useT() {
-  const { language } = useLanguageContext();
-  return useCallback(
-    (key: StringKey) => dictionaries[language][key] ?? dictionaries.en[key],
-    [language],
-  );
+  const { dictionary } = useLanguageContext();
+  return useCallback((key: StringKey) => dictionary[key] ?? en[key], [dictionary]);
 }
 
 export function useLanguage() {

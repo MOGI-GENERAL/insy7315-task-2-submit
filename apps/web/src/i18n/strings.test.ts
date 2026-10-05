@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { dictionaries } from './strings';
+import { dictionaries } from './dictionaries';
 import type { StringKey } from './strings';
 import { fill } from './useFormat';
 
