@@ -57,6 +57,9 @@ const inRange = (iso: string, from?: string, to?: string) => {
   return (!from || day >= from) && (!to || day <= to);
 };
 
+/** to the gram, as the API rounds */
+const roundKg = (kg: number) => Math.round(kg * 1000) / 1000;
+
 const isStaff = (user: User) => user.role === 'coordinator' || user.role === 'administrator';
 
 /** recipients a new offer would reach, by the same rule the feed uses */
@@ -536,9 +539,10 @@ export function createFakeDataLayer(store: Store, options: FakeOptions): DataLay
           }
           const items = [...rows.values()].map((r) => ({
             ...r,
+            kg: roundKg(r.kg),
             meals: mealsFromKg(r.kg),
           }));
-          const kg = items.reduce((sum, r) => sum + r.kg, 0);
+          const kg = roundKg(items.reduce((sum, r) => sum + r.kg, 0));
           return { rows: items, totals: { kg, meals: mealsFromKg(kg) } };
         }),
       outcomes: (query) =>
@@ -546,7 +550,8 @@ export function createFakeDataLayer(store: Store, options: FakeOptions): DataLay
           const s = state();
           const offers = s.offers.filter((o) => inRange(o.createdAt, query.from, query.to));
           const claimsOf = (o: Offer) => s.claims.filter((c) => c.offerId === o.id);
-          const claimed = offers.filter((o) => claimsOf(o).length > 0).length;
+          const claimed = offers.filter((o) => o.status === 'claimed').length;
+          const collected = offers.filter((o) => o.status === 'collected').length;
           const expiredClaimed = offers.filter(
             (o) => o.status === 'expired' && claimsOf(o).some((c) => c.status === 'expired'),
           ).length;
@@ -558,11 +563,14 @@ export function createFakeDataLayer(store: Store, options: FakeOptions): DataLay
             posted: offers.length,
             open: offers.filter((o) => o.status === 'open').length,
             claimed,
-            collected: offers.filter((o) => o.status === 'collected').length,
+            collected,
             expiredUnclaimed: expired - expiredClaimed,
             expiredClaimed,
             cancelled: offers.filter((o) => o.status === 'cancelled').length,
-            claimedPct: offers.length === 0 ? 0 : Math.round((claimed / offers.length) * 1000) / 10,
+            claimedPct:
+              offers.length === 0
+                ? 0
+                : Math.round(((claimed + collected + expiredClaimed) / offers.length) * 1000) / 10,
             distinctRecipients: new Set(fulfilled.map((c) => c.recipientOrganisationId)).size,
           };
         }),
