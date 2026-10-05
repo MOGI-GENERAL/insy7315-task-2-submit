@@ -6,6 +6,8 @@ export interface UploadedImage {
   secure_url: string;
 }
 
+export type Destroyer = (publicId: string) => Promise<void>;
+
 /** takes the account from `CLOUDINARY_URL`. tests pass a fake */
 export type Uploader = (buffer: Buffer, folder: string) => Promise<UploadedImage>;
 
@@ -25,13 +27,31 @@ export function cloudinaryUploader(): Uploader {
     });
 }
 
+export function cloudinaryDestroyer(): Destroyer {
+  return async (publicId) => {
+    await cloudinary.uploader.destroy(publicId, { resource_type: 'image', invalidate: true });
+  };
+}
+
+/** drops the transformation and version segments and the extension */
+export function publicIdFromUrl(url: string): string | null {
+  const path = url.split('/image/upload/')[1];
+  if (!path) return null;
+  const segments = path.split('/');
+  const version = segments.findIndex((segment) => /^v\d+$/.test(segment));
+  const id = segments.slice(version + 1).join('/');
+  return id.replace(/\.[a-z0-9]+$/i, '') || null;
+}
+
 export class CloudinaryPhotoStore implements PhotoStore {
   private readonly upload: Uploader;
   private readonly folder: string;
+  private readonly destroy: Destroyer;
 
-  constructor(upload: Uploader, folder: string) {
+  constructor(upload: Uploader, folder: string, destroy: Destroyer = async () => {}) {
     this.upload = upload;
     this.folder = folder;
+    this.destroy = destroy;
   }
 
   async put(buffer: Buffer): Promise<StoredPhoto> {
@@ -45,5 +65,10 @@ export class CloudinaryPhotoStore implements PhotoStore {
 
   fullSizeUrl(url: string) {
     return url;
+  }
+
+  async delete(url: string) {
+    const publicId = publicIdFromUrl(url);
+    if (publicId) await this.destroy(publicId);
   }
 }

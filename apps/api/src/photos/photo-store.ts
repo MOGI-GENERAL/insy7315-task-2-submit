@@ -17,4 +17,6 @@ export interface PhotoStore {
   /** small enough for lists, so browsing costs little data */
   thumbnailUrl(url: string): string;
   fullSizeUrl(url: string): string;
+  /** removes the image behind a stored url. a missing image is not an error */
+  delete(url: string): Promise<void>;
 }
