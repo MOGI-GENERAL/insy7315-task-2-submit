@@ -1,4 +1,4 @@
-import { ImpactQuery, ReportRangeQuery } from '@fedsa/contract';
+import { ExportQuery, ImpactQuery, ReportRangeQuery } from '@fedsa/contract';
 import { Router } from 'express';
 import { reportController } from '../controllers/report-controller.js';
 import { requireRole } from '../middleware/guards.js';
@@ -19,6 +19,12 @@ export function reportRouter(reports: ReportingService) {
     requireRole('administrator'),
     validate({ query: ReportRangeQuery }),
     controller.outcomes,
+  );
+  router.get(
+    '/reports/export',
+    requireRole('administrator'),
+    validate({ query: ExportQuery }),
+    controller.exportFile,
   );
   return router;
 }
