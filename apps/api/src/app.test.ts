@@ -30,6 +30,7 @@ import { validate } from './middleware/validate.js';
 import { LocalPhotoStore } from './photos/local-photo-store.js';
 import { AuditService } from './services/audit-service.js';
 import { ClaimService } from './services/claim-service.js';
+import { CollectionService } from './services/collection-service.js';
 import { DEFAULT_RADIUS_KM } from './services/eligibility.js';
 import { HandoverService } from './services/handover-service.js';
 import { HealthService } from './services/health-service.js';
@@ -129,6 +130,15 @@ const server = createApp({
     ),
     offers,
     claims,
+    collections: new CollectionService(
+      new CollectionRepository(),
+      new ClaimRepository(),
+      new OfferRepository(),
+      new OrganisationRepository(),
+      new AuditService(new AuditLogRepository()),
+      notifications,
+      logger,
+    ),
     handovers,
     notifications,
     reports: new ReportingService(
