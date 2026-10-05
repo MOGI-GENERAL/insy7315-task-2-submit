@@ -159,6 +159,40 @@ const untranslated = {
   'capacity.saveDone': 'Saved',
   'capacity.saved': 'Notes saved',
 
+  'disputes.title': 'Disputes',
+  'disputes.lead':
+    '{n} waiting on a decision. Each is a handover the recipient marked as a problem.',
+  'disputes.emptyTitle': 'Nothing in dispute',
+  'disputes.emptyBody': 'No recipient has reported a problem with a handover.',
+  'disputes.queue': 'Dispute queue',
+  'disputes.reported': 'Problem reported',
+  'disputes.reportedAt': 'reported {when}',
+  'disputes.open': 'Open',
+  'disputes.ageUnderHour': 'under an hour old',
+  'disputes.ageHours': '{n} h old',
+  'disputes.ageDays': '{n} d old',
+  'disputes.panelLead':
+    'The handover record stays as both sides confirmed it. Speak to both, then record what happened and what was agreed.',
+  'disputes.offer': 'Offer',
+  'disputes.offered': '{kg} offered',
+  'disputes.donor': 'Donor',
+  'disputes.recipient': 'Recipient',
+  'disputes.evidence': 'What each side recorded',
+  'disputes.donorSide': 'Donor',
+  'disputes.recipientSide': 'Recipient',
+  'disputes.photoAlt': 'Photograph the donor took at handover',
+  'disputes.fullPhoto': 'Open the full photograph',
+  'disputes.confirmed': 'Confirmed {when}',
+  'disputes.conditionPoor': 'condition poor',
+  'disputes.noteLabel': 'What happened, and what you did about it',
+  'disputes.noteHint': 'Saved once, and kept on the audit trail with your name against it.',
+  'disputes.notePlaceholder':
+    'Phoned both sides. Two trays were left behind at the hotel and collected the next morning.',
+  'disputes.record': 'Record the resolution and close',
+  'disputes.confirmTitle': 'Close the dispute on {reference}?',
+  'disputes.confirmRecord': 'Record and close',
+  'disputes.confirmBody': 'This note cannot be changed once it is saved.',
+  'disputes.resolved': 'Dispute resolved',
 } as const;
 
 const en = {
