@@ -60,6 +60,12 @@ textarea {
   color: inherit;
 }
 
+summary {
+  min-height: var(--tap-min);
+  padding-block: var(--s-3);
+  cursor: pointer;
+}
+
 /* GLOBAL FOCUS-VISIBLE TREATMENT */
 :focus-visible {
   outline: var(--focus-ring);
