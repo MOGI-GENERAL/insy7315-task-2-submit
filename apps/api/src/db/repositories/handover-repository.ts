@@ -101,6 +101,26 @@ export class HandoverRepository {
     return new HandoverRecordModel(data).save({ session });
   }
 
+  /** handovers that have a photo due for deletion, oldest first */
+  photosPastRetention(now: Date, limit: number) {
+    return HandoverRecordModel.find(
+      { retainUntil: { $lt: now }, donorPhotoUrl: { $ne: null } },
+      { donorPhotoUrl: 1 },
+    )
+      .sort({ retainUntil: 1 })
+      .limit(limit)
+      .lean<{ _id: Types.ObjectId; donorPhotoUrl: string }[]>()
+      .exec();
+  }
+
+  /** the url in the filter stops a late sweep clearing a photo that was replaced */
+  clearPhoto(id: Types.ObjectId, url: string) {
+    return HandoverRecordModel.updateOne(
+      { _id: id, donorPhotoUrl: url },
+      { $set: { donorPhotoUrl: null } },
+    ).exec();
+  }
+
   offerIdsWithHandover(offerIds: Types.ObjectId[], session: ClientSession) {
     return HandoverRecordModel.distinct('offerId', { offerId: { $in: offerIds } })
       .session(session)
