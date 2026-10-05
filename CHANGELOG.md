@@ -2,6 +2,19 @@
 
 Each release is merged into `main` and tagged, and the deploy workflow then puts it into production.
 
+## 1.0.0 (2026-10-06)
+
+The first complete release.
+Every screen runs on the real API, and the app can be installed from a browser.
+
+- **Screens:** the inbox, releasing a claim, scheduled offers, the organisation profile and tax certificates now read from the API.
+- **Installable app:** a web app manifest, an offline shell, a push opt-in after the first post or claim, and a 500 KB size check on the recipient feed.
+- **Accessibility:** every screen was checked with axe at three widths and at 200% zoom.
+  Contrast, target sizes and focus were fixed, and the results are in `docs/accessibility`.
+- **Security tests:** a test checks every route against every kind of caller, and a missing token on any write.
+- **Dialogs:** the confirmation dialogs are centred on the screen.
+- **Documentation:** a README with the endpoint list and hosting reasons, and a table tracing each requirement to its endpoints, screens and tests.
+
 ## 0.2.0 (2026-10-05)
 
 Handover, dispatch and the coordinator and admin screens are on the real API, and offers now expire on their own.
