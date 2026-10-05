@@ -56,6 +56,20 @@ export class ClaimRepository {
     ).exec();
   }
 
+  activeIdsForOffers(offerIds: Types.ObjectId[], session: ClientSession) {
+    return ClaimModel.distinct('_id', { offerId: { $in: offerIds }, status: 'active' })
+      .session(session)
+      .exec() as Promise<Types.ObjectId[]>;
+  }
+
+  expireActive(ids: Types.ObjectId[], session: ClientSession) {
+    return ClaimModel.updateMany(
+      { _id: { $in: ids }, status: 'active' },
+      { $set: { status: 'expired' } },
+      { runValidators: true, session },
+    ).exec();
+  }
+
   /** newest first */
   list(filter: Record<string, unknown>, limit: number) {
     return ClaimModel.find(filter).sort({ claimedAt: -1, _id: -1 }).limit(limit).exec();

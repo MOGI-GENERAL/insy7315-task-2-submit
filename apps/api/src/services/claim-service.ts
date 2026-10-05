@@ -13,6 +13,7 @@ import type { Logger } from 'pino';
 import {
   runInTransaction,
   type ClaimRepository,
+  type CollectionRepository,
   type HandoverRepository,
   type OfferRepository,
   type OrganisationRepository,
@@ -48,6 +49,7 @@ export class ClaimService {
   private readonly offers: OfferRepository;
   private readonly organisations: OrganisationRepository;
   private readonly handovers: HandoverRepository;
+  private readonly collections: CollectionRepository;
   private readonly offerService: OfferService;
   private readonly offerNotifier: OfferNotifier;
   private readonly claimNotifier: ClaimNotifier;
@@ -58,6 +60,7 @@ export class ClaimService {
     offers: OfferRepository,
     organisations: OrganisationRepository,
     handovers: HandoverRepository,
+    collections: CollectionRepository,
     offerService: OfferService,
     offerNotifier: OfferNotifier,
     claimNotifier: ClaimNotifier,
@@ -67,6 +70,7 @@ export class ClaimService {
     this.offers = offers;
     this.organisations = organisations;
     this.handovers = handovers;
+    this.collections = collections;
     this.offerService = offerService;
     this.offerNotifier = offerNotifier;
     this.claimNotifier = claimNotifier;
@@ -148,7 +152,9 @@ export class ClaimService {
         if (current.status === 'released') return { claim: current, reopened: null };
         throw new InvalidStateError('Only an active claim can be released');
       }
-      const reopened = await this.offers.reopenIfClaimed(released.offerId, session);
+      // a dispatched driver would otherwise still go to the donor
+      await this.collections.cancelDispatchedForClaims([released._id], session);
+      const reopened = await this.offers.reopenIfClaimed(released.offerId, new Date(), session);
       return { claim: released, reopened };
     });
 

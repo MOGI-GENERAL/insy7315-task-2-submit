@@ -7,6 +7,10 @@
     "./db": {
       "types": "./dist/src/db/index.d.ts",
       "default": "./dist/src/db/index.js"
+    },
+    "./expiry": {
+      "types": "./dist/src/services/expiry-service.d.ts",
+      "default": "./dist/src/services/expiry-service.js"
     }
   },
   "scripts": {

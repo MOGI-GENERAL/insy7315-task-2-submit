@@ -93,6 +93,7 @@ const claims = new ClaimService(
   new OfferRepository(),
   new OrganisationRepository(),
   new HandoverRepository(),
+  new CollectionRepository(),
   offers,
   notifications,
   notifications,

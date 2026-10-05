@@ -25,6 +25,7 @@ import { AuditService } from './services/audit-service.js';
 import { ClaimService } from './services/claim-service.js';
 import { CollectionService } from './services/collection-service.js';
 import { DEFAULT_RADIUS_KM } from './services/eligibility.js';
+import { ExpiryService, startExpirySweep } from './services/expiry-service.js';
 import { HandoverService } from './services/handover-service.js';
 import { HealthService } from './services/health-service.js';
 import { NotificationService } from './services/notification-service.js';
@@ -91,6 +92,7 @@ async function start() {
     new OfferRepository(),
     new OrganisationRepository(),
     new HandoverRepository(),
+    new CollectionRepository(),
     offers,
     notifications,
     notifications,
@@ -169,6 +171,16 @@ async function start() {
   createApp({ logger, services, session, twilioWebhooks }).listen(port, () => {
     logger.info(`api listening on ${port}`);
   });
+
+  startExpirySweep(
+    new ExpiryService(
+      new OfferRepository(),
+      new ClaimRepository(),
+      new HandoverRepository(),
+      new CollectionRepository(),
+    ),
+    logger,
+  );
 }
 
 void start();

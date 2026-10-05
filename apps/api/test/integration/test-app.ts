@@ -137,6 +137,7 @@ export function newClaimService(offers: OfferService, options: ClaimTestOptions 
     new OfferRepository(),
     new OrganisationRepository(),
     new HandoverRepository(),
+    new CollectionRepository(),
     offers,
     options.offerNotifier ?? notifications,
     options.claimNotifier ?? notifications,

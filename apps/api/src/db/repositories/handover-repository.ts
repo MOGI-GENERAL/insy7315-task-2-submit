@@ -101,6 +101,12 @@ export class HandoverRepository {
     return new HandoverRecordModel(data).save({ session });
   }
 
+  offerIdsWithHandover(offerIds: Types.ObjectId[], session: ClientSession) {
+    return HandoverRecordModel.distinct('offerId', { offerId: { $in: offerIds } })
+      .session(session)
+      .exec() as Promise<Types.ObjectId[]>;
+  }
+
   /** null if the recipient has already confirmed. the first confirmation stands */
   confirmByRecipient(
     id: Types.ObjectId | string,
