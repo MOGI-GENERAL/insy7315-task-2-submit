@@ -20,7 +20,8 @@
     "test:contract": "npm run test:contract --workspaces --if-present",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "check": "npm run lint && npm run typecheck && npm run test:unit"
+    "budget": "npm run build -w packages/contract && npm run budget -w apps/web",
+    "check": "npm run lint && npm run typecheck && npm run test:unit && npm run budget"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
