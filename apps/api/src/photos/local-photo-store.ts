@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import type { PhotoMime, PhotoStore, StoredPhoto } from './photo-store.js';
 
 /**
@@ -38,5 +38,9 @@ export class LocalPhotoStore implements PhotoStore {
 
   fullSizeUrl(url: string) {
     return url;
+  }
+
+  async delete(url: string) {
+    await rm(join(this.directory, basename(url)), { force: true });
   }
 }

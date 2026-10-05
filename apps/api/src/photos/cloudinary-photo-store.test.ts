@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CloudinaryPhotoStore } from './cloudinary-photo-store.js';
+import { CloudinaryPhotoStore, publicIdFromUrl } from './cloudinary-photo-store.js';
 import { createPhotoStore } from './create-photo-store.js';
 import { LocalPhotoStore } from './local-photo-store.js';
 
@@ -28,6 +28,30 @@ describe('CloudinaryPhotoStore', () => {
   it('passes a plain url through when there is nothing to transform', () => {
     const store = new CloudinaryPhotoStore(async () => ({ public_id: '', secure_url: '' }), 'f');
     expect(store.thumbnailUrl('https://example.com/a.jpg')).toBe('https://example.com/a.jpg');
+  });
+});
+
+describe('deleting', () => {
+  it('destroys the image by the id in its url', async () => {
+    const destroyed: string[] = [];
+    const store = new CloudinaryPhotoStore(
+      async () => ({ public_id: '', secure_url: '' }),
+      'f',
+      async (id) => {
+        destroyed.push(id);
+      },
+    );
+    await store.delete(URL);
+    await store.delete(store.thumbnailUrl(URL));
+    await store.delete('https://example.com/a.jpg');
+    expect(destroyed).toEqual(['fedsa/staging/abc', 'fedsa/staging/abc']);
+  });
+
+  it('finds the public id with or without a version', () => {
+    const base = 'https://res.cloudinary.com/demo/image/upload';
+    expect(publicIdFromUrl(`${base}/v12/fedsa/abc.png`)).toBe('fedsa/abc');
+    expect(publicIdFromUrl(`${base}/c_limit,w_400/v12/abc.webp`)).toBe('abc');
+    expect(publicIdFromUrl(`${base}/abc.jpg`)).toBe('abc');
   });
 });
 
