@@ -73,8 +73,39 @@ describe('fake data layer', () => {
     await data.auth.login({ email: 'beauty@example.org', password: 'x' });
 
     expect((await data.offers.list({ view: 'feed' })).items).toEqual([]);
+    expect((await data.offers.list({ view: 'scheduled' })).items).toEqual([]);
     await expect(data.offers.claim('off-1001', { transportNeeded: true })).rejects.toMatchObject({
       code: 'FORBIDDEN',
+    });
+  });
+
+  test('a release is repeatable, and a claim that is no longer active cannot be released', async () => {
+    const { data } = setup();
+    await data.auth.login({ email: 'peter@example.org', password: 'x' });
+    const { claim } = await data.offers.claim('off-1001', { transportNeeded: false });
+
+    const first = await data.claims.release(claim.id, { reason: 'No transport today' });
+    const again = await data.claims.release(claim.id, {});
+    expect(first.offer.status).toBe('open');
+    expect(again.claim).toEqual(first.claim);
+
+    const { items } = await data.claims.list({ status: 'fulfilled' });
+    await expect(data.claims.release(items[0].id, {})).rejects.toMatchObject({
+      code: 'INVALID_STATE',
+    });
+  });
+
+  test('the inbox lists in-app rows and marks only the signed-in user’s rows as read', async () => {
+    const { data, store } = setup();
+    await data.auth.login({ email: 'peter@example.org', password: 'x' });
+    const peter = store.getState().currentUserId;
+    const other = store.getState().notifications.find((n) => n.userId !== peter)!;
+
+    const { items } = await data.notifications.list();
+    expect(items.length).toBeGreaterThan(0);
+    expect(items.every((n) => n.channel === 'in_app')).toBe(true);
+    await expect(data.notifications.markRead(other.id)).rejects.toMatchObject({
+      code: 'NOT_FOUND',
     });
   });
 
