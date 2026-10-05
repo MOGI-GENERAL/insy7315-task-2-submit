@@ -4,7 +4,24 @@
  * new keys go here first. af and xh show this English until each key moves into their own lists
  * TODO translate anything added here
  */
-const untranslated = {} as const;
+const untranslated = {
+  'donor.greeting': 'Hello, {name}',
+  'donor.liveOffers': 'Live offers',
+  'donor.liveNote': 'Open or claimed',
+  'donor.waitingOnYou': 'Waiting on you',
+  'donor.waitingNote': 'Handovers to confirm',
+  'donor.confirmTitle': 'Confirm a handover',
+  'donor.confirmLead':
+    'The food has been claimed. Confirm what leaves your premises, and the record protects you if anything is questioned later.',
+  'donor.claimedBy': 'Claimed by',
+  'donor.liveTitle': 'Your live offers',
+  'donor.emptyTitle': 'Nothing posted right now',
+  'donor.emptyBody':
+    'When you have surplus, post it here and every organisation that can take it is notified at once.',
+  'donor.waitingForClaim': 'Waiting for a claim',
+  'donor.recentTitle': 'Recently finished',
+  'donor.notTaken': 'Nobody was able to take it',
+} as const;
 
 const en = {
   /* NAV */

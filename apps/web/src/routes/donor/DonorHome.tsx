@@ -1,161 +1,152 @@
-/* DONOR HOME — POST CTA FIRST, THEN STATUS OF EXISTING OFFERS */
-
 import { Link } from 'react-router-dom';
+import { useSession } from '../../auth/context';
+import { useData, useLoad } from '../../data';
+import { LoadState } from '../../components/feedback';
 import { OfferCard } from '../../components/OfferCard';
-import { toOffer } from '../../data/fake/mappers';
-import { EventBanner } from '../../components/EventBanner';
 import { Icon } from '../../components/Icon';
 import { PageHead, Section, StatRow, StatTile, EmptyState } from '../../components/ui';
-import { useAppState, useCurrentOrg, useCurrentUser } from '../../store/context';
-import { claimsForDonor, offersForDonor, orgById } from '../../store/selectors';
-import { formatKg, formatNumber, mealsFromKg } from '../../lib/format';
 import { useT } from '../../i18n/useT';
 
+/** a claim on one of these offers shows up without a reload */
+const REFRESH_MS = 30_000;
+
 export function DonorHome() {
-  const state = useAppState();
-  const user = useCurrentUser()!;
-  const org = useCurrentOrg()!;
+  const { user, organisation } = useSession();
+  const { offers } = useData();
   const t = useT();
 
-  const offers = offersForDonor(state, org.id);
-  const live = offers.filter((o) => o.status === 'open' || o.status === 'claimed');
-  const recent = offers
-    .filter((o) => o.status === 'collected' || o.status === 'expired')
-    .slice(0, 4);
-
-  const claims = claimsForDonor(state, org.id);
-  const awaitingMe = claims.filter((c) => c.stage === 'awaiting-your-confirmation');
-
-  const thisMonth = new Date().toISOString().slice(0, 7);
-  const monthKg = claims
-    .filter((c) => c.handover?.recipientConfirmedAt?.startsWith(thisMonth))
-    .reduce((sum, c) => sum + (c.handover?.collectedQuantityKg ?? 0), 0);
+  const page = useLoad(
+    async () => {
+      const mine = await offers.list({ view: 'mine' });
+      const live = mine.items.filter((o) => o.status === 'open' || o.status === 'claimed');
+      const claimed = live.filter((o) => o.status === 'claimed');
+      const details = await Promise.all(claimed.map((o) => offers.get(o.id)));
+      const claimedBy = new Map(details.map((d) => [d.offer.id, d.claim?.recipient.name ?? null]));
+      const recent = mine.items
+        .filter((o) => o.status === 'collected' || o.status === 'expired')
+        .slice(0, 4);
+      return { live, claimed, claimedBy, recent };
+    },
+    [offers],
+    { refreshMs: REFRESH_MS },
+  );
 
   return (
     <>
       <PageHead
-        title={`Good afternoon, ${user.name.split(' ')[0]}`}
-        lead={`${org.name}, ${org.suburb}`}
+        title={t('donor.greeting').replace('{name}', user.fullName.split(' ')[0])}
+        lead={organisation ? `${organisation.name}, ${organisation.suburb}` : undefined}
       />
-
-      <EventBanner />
 
       <Link to="/donor/post" className="btn btn--primary btn--lg btn--block post-cta">
         <Icon name="plus" size={22} />
         {t('post.title')}
       </Link>
 
-      <StatRow>
-        <StatTile
-          icon="scale"
-          label="This month"
-          value={formatNumber(monthKg)}
-          unit="kg"
-          note={`${formatNumber(mealsFromKg(monthKg))} meals`}
-          tone="good"
-        />
-        <StatTile
-          icon="list"
-          label="Live offers"
-          value={String(live.length)}
-          note="Open or claimed"
-        />
-        <StatTile
-          icon="clock"
-          label="Waiting on you"
-          value={String(awaitingMe.length)}
-          note="Handovers to confirm"
-          tone={awaitingMe.length > 0 ? 'warn' : 'neutral'}
-        />
-      </StatRow>
-
-      {awaitingMe.length > 0 && (
-        <Section
-          title="Confirm a handover"
-          lead="The food has been claimed. Confirm what leaves your premises, and the record protects you if anything is questioned later."
-        >
-          <div className="offer-list">
-            {awaitingMe.map(({ claim, offer, recipientOrg }) => (
-              <OfferCard
-                key={claim.id}
-                offer={toOffer(offer, state)}
-                to={`/donor/offers/${offer.id}`}
-                footer={
-                  <div className="row row--between row--wrap">
-                    <span className="muted">
-                      <Icon name="check-circle" size={15} /> {recipientOrg?.name} is collecting
-                    </span>
-                    <Link to={`/donor/handover/${claim.id}`} className="btn btn--go">
-                      {t('handover.confirm')}
-                    </Link>
-                  </div>
-                }
+      <LoadState result={page}>
+        {({ live, claimed, claimedBy, recent }) => (
+          <>
+            <StatRow>
+              <StatTile
+                icon="list"
+                label={t('donor.liveOffers')}
+                value={String(live.length)}
+                note={t('donor.liveNote')}
               />
-            ))}
-          </div>
-        </Section>
-      )}
+              <StatTile
+                icon="clock"
+                label={t('donor.waitingOnYou')}
+                value={String(claimed.length)}
+                note={t('donor.waitingNote')}
+                tone={claimed.length > 0 ? 'warn' : 'neutral'}
+              />
+            </StatRow>
 
-      <Section title="Your live offers" count={live.length}>
-        {live.length === 0 ? (
-          <EmptyState
-            icon="box"
-            title="Nothing posted right now"
-            body="When you have surplus, post it here and every organisation that can take it is notified at once."
-            action={
-              <Link to="/donor/post" className="btn btn--primary">
-                {t('post.title')}
-              </Link>
-            }
-          />
-        ) : (
-          <div className="offer-list offer-list--wide">
-            {live.map((offer) => {
-              const claim = claims.find((c) => c.offer.id === offer.id && !c.claim.releasedAt);
-              return (
-                <OfferCard
-                  key={offer.id}
-                  offer={toOffer(offer, state)}
-                  to={`/donor/offers/${offer.id}`}
-                  footer={
-                    claim ? (
-                      <span className="muted">
-                        <Icon name="check" size={15} />{' '}
-                        {orgById(state, claim.claim.recipientOrganisationId)?.name} claimed it
-                      </span>
-                    ) : (
-                      <span className="muted">
-                        <Icon name="clock" size={15} /> Waiting for a claim
-                      </span>
-                    )
+            {claimed.length > 0 && (
+              <Section title={t('donor.confirmTitle')} lead={t('donor.confirmLead')}>
+                <div className="offer-list">
+                  {claimed.map((offer) => (
+                    <OfferCard
+                      key={offer.id}
+                      offer={offer}
+                      to={`/donor/offers/${offer.id}`}
+                      footer={
+                        <div className="row row--between row--wrap">
+                          <span className="muted">
+                            <Icon name="check-circle" size={15} /> {t('donor.claimedBy')}{' '}
+                            {claimedBy.get(offer.id)}
+                          </span>
+                          <Link to={`/donor/offers/${offer.id}`} className="btn btn--go">
+                            {t('handover.confirm')}
+                          </Link>
+                        </div>
+                      }
+                    />
+                  ))}
+                </div>
+              </Section>
+            )}
+
+            <Section title={t('donor.liveTitle')} count={live.length}>
+              {live.length === 0 ? (
+                <EmptyState
+                  icon="box"
+                  title={t('donor.emptyTitle')}
+                  body={t('donor.emptyBody')}
+                  action={
+                    <Link to="/donor/post" className="btn btn--primary">
+                      {t('post.title')}
+                    </Link>
                   }
                 />
-              );
-            })}
-          </div>
-        )}
-      </Section>
+              ) : (
+                <div className="offer-list offer-list--wide">
+                  {live.map((offer) => {
+                    const recipient = claimedBy.get(offer.id);
+                    return (
+                      <OfferCard
+                        key={offer.id}
+                        offer={offer}
+                        to={`/donor/offers/${offer.id}`}
+                        footer={
+                          recipient ? (
+                            <span className="muted">
+                              <Icon name="check" size={15} /> {t('donor.claimedBy')} {recipient}
+                            </span>
+                          ) : (
+                            <span className="muted">
+                              <Icon name="clock" size={15} /> {t('donor.waitingForClaim')}
+                            </span>
+                          )
+                        }
+                      />
+                    );
+                  })}
+                </div>
+              )}
+            </Section>
 
-      {recent.length > 0 && (
-        <Section title="Recently finished">
-          <div className="offer-list offer-list--wide">
-            {recent.map((offer) => (
-              <OfferCard
-                key={offer.id}
-                offer={toOffer(offer, state)}
-                to={`/donor/offers/${offer.id}`}
-                footer={
-                  <span className="muted">
-                    {offer.status === 'collected'
-                      ? `${formatKg(offer.offeredQuantityKg)} collected`
-                      : 'Nobody was able to take it'}
-                  </span>
-                }
-              />
-            ))}
-          </div>
-        </Section>
-      )}
+            {recent.length > 0 && (
+              <Section title={t('donor.recentTitle')}>
+                <div className="offer-list offer-list--wide">
+                  {recent.map((offer) => (
+                    <OfferCard
+                      key={offer.id}
+                      offer={offer}
+                      to={`/donor/offers/${offer.id}`}
+                      footer={
+                        offer.status === 'expired' ? (
+                          <span className="muted">{t('donor.notTaken')}</span>
+                        ) : undefined
+                      }
+                    />
+                  ))}
+                </div>
+              </Section>
+            )}
+          </>
+        )}
+      </LoadState>
     </>
   );
 }
