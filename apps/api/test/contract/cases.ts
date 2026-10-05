@@ -365,6 +365,23 @@ export const CONTRACT_CASES: Partial<Record<RouteKey, ContractCase>> = {
         t.request('nadia', 'GET', `/api/reports/outcomes?from=${t.period.from}&to=${t.period.to}`),
     },
   },
+  'GET /api/reports/export': {
+    success: (t) =>
+      t.request(
+        'zanele',
+        'GET',
+        `/api/reports/export?from=${t.period.from}&to=${t.period.to}&format=csv`,
+      ),
+    error: {
+      code: 'VALIDATION_FAILED',
+      send: (t) =>
+        t.request(
+          'zanele',
+          'GET',
+          `/api/reports/export?from=${t.period.from}&to=${t.period.to}&format=pdf`,
+        ),
+    },
+  },
   'GET /api/valuation-rates': {
     success: (t) => t.request('zanele', 'GET', '/api/valuation-rates'),
     error: { code: 'FORBIDDEN', send: (t) => t.request('nadia', 'GET', '/api/valuation-rates') },
@@ -495,5 +512,4 @@ export const NOT_YET_SERVED: RouteKey[] = [
   'GET /api/handovers',
   'POST /api/handovers/:id/resolution',
   'GET /api/handovers/:id/photo',
-  'GET /api/reports/export',
 ];

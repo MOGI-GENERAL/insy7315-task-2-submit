@@ -3,6 +3,7 @@ import {
   ImpactResponse,
   OutcomesResponse,
   type ClaimStatus,
+  type FoodCategory,
   type OfferStatus,
 } from '@fedsa/contract';
 import { Types } from 'mongoose';
@@ -12,8 +13,10 @@ import {
   HandoverRecordModel,
   OfferModel,
   OrganisationModel,
+  TaxCertificateModel,
   UserModel,
 } from '../../src/db/index.js';
+import { roundKg } from '../../src/services/meals.js';
 import { TestClient } from '../test-client.js';
 import {
   createOrganisation,
@@ -45,6 +48,7 @@ async function postOffer(fields: {
   kg: number;
   status: OfferStatus;
   parent?: Offer;
+  category?: FoodCategory;
 }) {
   referenceCount += 1;
   const deadline = new Date(fields.postedAt.getTime() + 6 * HOUR);
@@ -53,7 +57,7 @@ async function postOffer(fields: {
     postedByUserId: new Types.ObjectId(),
     reference: `R${referenceCount.toString().padStart(3, '0')}`,
     title: 'Fixture offer',
-    category: 'bakery',
+    category: fields.category ?? 'bakery',
     offeredQuantityKg: fields.kg,
     coldChain: 'ambient',
     availableFrom: fields.postedAt,
@@ -259,6 +263,7 @@ afterAll(async () => {
     OfferModel.deleteMany({}),
     ClaimModel.deleteMany({}),
     HandoverRecordModel.deleteMany({}),
+    TaxCertificateModel.deleteMany({}),
     UserModel.deleteMany({}),
   ]);
   await closeApp?.();
@@ -425,6 +430,164 @@ describe('offered by donor', () => {
   });
 });
 
+describe('export', () => {
+  const HEADINGS = 'Date;Donor;Recipient;Category;Kilograms;Meals;Certificate number';
+
+  beforeAll(async () => {
+    const a = (await HandoverRecordModel.findOne({ collectedQuantityKg: 20 }))!;
+    await TaxCertificateModel.create({
+      donorOrganisationId: new Types.ObjectId(ids.ouma),
+      periodStart: sa('2026-10-01T00:00:00'),
+      periodEnd: sa('2026-10-31T23:59:59'),
+      handoverRecordIds: [a._id],
+      totalQuantityKg: 20,
+      valuationByCategory: [{ category: 'bakery', quantityKg: 20, ratePerKg: 22, value: 440 }],
+      totalValue: 440,
+      certificateNumber: 'FEDSA-2026-0001',
+      issuedAt: sa('2026-11-02T09:00:00'),
+      donor: { name: "Ouma's Bakery", addressLine: '12 Long Street', suburb: 'Woodstock' },
+      placeholderRates: false,
+    });
+
+    // P: in December, between names a spreadsheet has to quote or guard
+    const formula = await createOrganisation({
+      type: 'donor',
+      name: '=HYPERLINK("https://evil.example","Open")',
+    });
+    const hopeHouse = await createOrganisation({
+      type: 'recipient',
+      name: 'Hope House, "Bo-Kaap"\nSalt River',
+    });
+    const p = await postOffer({
+      donor: formula,
+      postedAt: sa('2026-12-03T08:00:00'),
+      kg: 3.3,
+      status: 'collected',
+      category: 'prepared',
+    });
+    await collect(p, hopeHouse, 3.3, sa('2026-12-03T10:00:00'));
+  });
+
+  /** the lines after the byte order mark. the last is empty, as the file ends with CRLF */
+  async function exportCsv(query: string) {
+    const res = await admin.get(`/api/reports/export?${query}`);
+    expect(res.status).toBe(200);
+    const bytes = Buffer.from(await res.arrayBuffer());
+    return { res, bytes, lines: bytes.toString('utf8').slice(1).split('\r\n') };
+  }
+
+  const fields = (line: string) => line.split(';');
+
+  test('writes the header block, then one row per handover the impact report counts', async () => {
+    const before = Date.now();
+    const { res, bytes, lines } = await exportCsv('from=2026-10-01&to=2026-10-31&format=csv');
+
+    expect(res.headers.get('content-type')).toBe('text/csv; charset=utf-8');
+    expect(res.headers.get('content-disposition')).toBe(
+      'attachment; filename="fedsa-impact-2026-10-01-to-2026-10-31.csv"',
+    );
+    expect(bytes.subarray(0, 3)).toEqual(Buffer.from([0xef, 0xbb, 0xbf]));
+    expect(lines).toEqual([
+      'Period;2026-10-01 to 2026-10-31',
+      expect.stringMatching(/^Generated at;\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/),
+      'Total kilograms;43,7',
+      // the rows' meals add up to 108, but 43.7 kg is 109 meals
+      'Total meals;109',
+      '',
+      HEADINGS,
+      // I, still 30 September in UTC
+      '2026-10-01;Harbour Hotel;Bonteheuwel Soup Kitchen;Bakery;15;37;',
+      "2026-10-02;Ouma's Bakery;Siyakhula Shelter;Bakery;20;50;FEDSA-2026-0001",
+      "2026-10-03;Ouma's Bakery;Bonteheuwel Soup Kitchen;Bakery;7,5;18;",
+      // N, in the last second of October
+      "2026-10-31;Ouma's Bakery;Siyakhula Shelter;Bakery;1,2;3;",
+      '',
+    ]);
+
+    const generatedAt = new Date(`${lines[1]!.slice('Generated at;'.length)}:00+02:00`);
+    expect(generatedAt.getTime()).toBeGreaterThan(before - 60_000);
+    expect(generatedAt.getTime()).toBeLessThanOrEqual(Date.now());
+  });
+
+  test('has the impact report totals for the same period, and rows that add up to them', async () => {
+    for (const [from, to] of [
+      ['2026-10-01', '2026-10-31'],
+      ['2026-08-01', '2026-12-31'],
+      ['2026-10-01', '2026-10-01'],
+      ['2026-10-31', '2026-11-01'],
+      ['2026-09-30', '2026-09-30'],
+    ]) {
+      const report = await impact(`from=${from}&to=${to}`);
+      const { lines } = await exportCsv(`from=${from}&to=${to}`);
+
+      expect(lines[2]).toBe(`Total kilograms;${String(report.totals.kg).replace('.', ',')}`);
+      expect(lines[3]).toBe(`Total meals;${report.totals.meals}`);
+      const rowKg = lines
+        .slice(6, -1)
+        .reduce((sum, line) => sum + Number(fields(line)[4]!.replace(',', '.')), 0);
+      expect(roundKg(rowKg)).toBe(report.totals.kg);
+    }
+  });
+
+  test('has no row for a handover only the donor has confirmed', async () => {
+    // H: the donor confirmed on 9 October and the recipient never did
+    expect(await HandoverRecordModel.countDocuments({ recipientConfirmedAt: null })).toBe(1);
+    const { lines } = await exportCsv('from=2026-10-09&to=2026-10-09');
+
+    expect(lines.slice(2)).toEqual(['Total kilograms;0', 'Total meals;0', '', HEADINGS, '']);
+  });
+
+  test('gives the certificate number of a certified handover and leaves the rest blank', async () => {
+    const { lines } = await exportCsv('from=2026-10-01&to=2026-10-31');
+
+    expect(lines.slice(6, -1).map((line) => fields(line)[6])).toEqual([
+      '',
+      'FEDSA-2026-0001',
+      '',
+      '',
+    ]);
+  });
+
+  test('quotes organisation names and guards one that starts like a formula', async () => {
+    const { lines } = await exportCsv('from=2026-12-01&to=2026-12-31');
+
+    expect(lines.slice(2)).toEqual([
+      'Total kilograms;3,3',
+      'Total meals;8',
+      '',
+      HEADINGS,
+      '2026-12-03;"\'=HYPERLINK(""https://evil.example"",""Open"")";"Hope House, ""Bo-Kaap""\nSalt River";Prepared meals;3,3;8;',
+      '',
+    ]);
+  });
+
+  test('a period with no handovers has the header block and no rows', async () => {
+    const { lines } = await exportCsv('from=2026-07-01&to=2026-07-31');
+
+    expect(lines).toEqual([
+      'Period;2026-07-01 to 2026-07-31',
+      expect.stringMatching(/^Generated at;/),
+      'Total kilograms;0',
+      'Total meals;0',
+      '',
+      HEADINGS,
+      '',
+    ]);
+  });
+
+  test('refuses any format other than CSV', async () => {
+    for (const format of ['pdf', 'xlsx']) {
+      const res = await admin.get(
+        `/api/reports/export?from=2026-10-01&to=2026-10-31&format=${format}`,
+      );
+      expect(res.status).toBe(400);
+      const { error } = ErrorEnvelope.parse(await res.json());
+      expect(error.code).toBe('VALIDATION_FAILED');
+      expect(Object.keys(error.fields ?? {})).toEqual(['format']);
+    }
+  });
+});
+
 describe('access', () => {
   test('only administrators read reports', async () => {
     const coordinator = await signedInClient(
@@ -445,6 +608,7 @@ describe('access', () => {
     for (const path of [
       '/api/reports/impact?from=2026-10-01&to=2026-10-31',
       '/api/reports/outcomes?from=2026-10-01&to=2026-10-31',
+      '/api/reports/export?from=2026-10-01&to=2026-10-31&format=csv',
     ]) {
       for (const client of [coordinator, donor, recipient]) {
         const res = await client.get(path);
@@ -463,6 +627,7 @@ describe('access', () => {
       ['/api/reports/impact?from=2026-10-01&to=2026-10-31&groupBy=week', 'groupBy'],
       ['/api/reports/outcomes?from=2026-10-01&to=31-10-2026', 'to'],
       ['/api/reports/outcomes?from=2026-10-31&to=2026-10-01', 'to'],
+      ['/api/reports/export?from=2026-10-31&to=2026-10-01', 'to'],
     ] as const;
 
     for (const [path, field] of cases) {

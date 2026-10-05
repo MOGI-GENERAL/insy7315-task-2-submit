@@ -10,7 +10,7 @@ const MUTED = '#5b665f';
 const RULE = '#c9d1cb';
 const BRAND = '#244d2e';
 
-const CATEGORY_LABELS: Record<FoodCategory, string> = {
+export const CATEGORY_LABELS: Record<FoodCategory, string> = {
   bakery: 'Bakery',
   produce: 'Fresh produce',
   dairy: 'Dairy',

@@ -2,6 +2,7 @@ import {
   FoodCategory,
   type CertificateListResponse,
   type CertificateResponse,
+  type ExportQuery,
   type ImpactQuery,
   type ImpactResponse,
   type IssueCertificateRequest,
@@ -24,7 +25,8 @@ import {
   type ValuationRateRepository,
 } from '../db/index.js';
 import { InvalidStateError, NotFoundError, ValidationError } from '../errors.js';
-import { renderCertificatePdf } from '../reporting/certificate-pdf.js';
+import { CATEGORY_LABELS, renderCertificatePdf } from '../reporting/certificate-pdf.js';
+import { toCsv, type CsvRow } from '../reporting/csv.js';
 import type { AuditService } from './audit-service.js';
 import { SA_OFFSET, dayRange } from './day-range.js';
 import { roundKg, toMeals } from './meals.js';
@@ -37,6 +39,13 @@ const CERTIFICATE_COUNTER = 'taxCertificates';
 const saYear = new Intl.DateTimeFormat('en-ZA', {
   timeZone: 'Africa/Johannesburg',
   year: 'numeric',
+});
+
+/** Swedish writes `2026-10-05 14:32`, which Excel reads as a date and time */
+const saDateTime = new Intl.DateTimeFormat('sv-SE', {
+  timeZone: 'Africa/Johannesburg',
+  dateStyle: 'short',
+  timeStyle: 'short',
 });
 
 /** one decimal place, and 0 rather than NaN for an empty period */
@@ -122,6 +131,39 @@ export class ReportingService {
   async offeredByDonor(query: ReportRangeQuery): Promise<KgRow[]> {
     const groups = await this.offers.offeredKgByDonor(dayRange(query.from, query.to));
     return groups.map((group) => ({ ...group, kg: roundKg(group.kg) }));
+  }
+
+  /**
+   * header totals come from `monthlyImpact` and match the screen exactly.
+   * the contract lists PDF, but only CSV is built
+   */
+  async exportImpact(query: ExportQuery, now = new Date()) {
+    if (query.format !== 'csv') {
+      throw new ValidationError({ format: 'Only CSV export is available' });
+    }
+    const [impact, handovers] = await Promise.all([
+      this.monthlyImpact({ from: query.from, to: query.to, groupBy: 'month' }),
+      this.handovers.collectedRows(dayRange(query.from, query.to), SA_OFFSET),
+    ]);
+
+    const rows: CsvRow[] = [
+      ['Period', `${query.from} to ${query.to}`],
+      ['Generated at', saDateTime.format(now)],
+      ['Total kilograms', impact.totals.kg],
+      ['Total meals', impact.totals.meals],
+      [],
+      ['Date', 'Donor', 'Recipient', 'Category', 'Kilograms', 'Meals', 'Certificate number'],
+      ...handovers.map((handover) => [
+        handover.day,
+        handover.donor,
+        handover.recipient,
+        CATEGORY_LABELS[handover.category],
+        roundKg(handover.kg),
+        toMeals(handover.kg),
+        handover.certificateNumber ?? '',
+      ]),
+    ];
+    return { filename: `fedsa-impact-${query.from}-to-${query.to}.csv`, csv: toCsv(rows) };
   }
 
   /** a rate with a null `updatedByUserId` is still a placeholder */
