@@ -1,13 +1,13 @@
 import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import type { Condition } from '@fedsa/contract';
+import { Link, useLocation, useParams } from 'react-router-dom';
+import type { Condition, Offer } from '@fedsa/contract';
 import { isApiError, useData, useLoad } from '../../data';
 import { ConfirmDialog, errorKey, LoadState, useToast } from '../../components/feedback';
 import { OfferPhoto } from '../../components/OfferPhoto';
 import { Icon } from '../../components/Icon';
 import { Countdown } from '../../components/Countdown';
 import { ColdChainBadge, StatusBadge } from '../../components/StatusBadge';
-import { Detail, DetailList, PageHead, Section } from '../../components/ui';
+import { Banner, Detail, DetailList, PageHead, Section } from '../../components/ui';
 import type { StringKey } from '../../i18n/strings';
 import { useT, categoryKey } from '../../i18n/useT';
 import { formatDateTime, formatKg, formatWhen, mealsFromKg } from '../../lib/format';
@@ -25,6 +25,9 @@ export function DonorOfferDetail() {
   const t = useT();
   const toast = useToast();
   const detail = useLoad(() => offers.get(offerId), [offers, offerId]);
+  // `DonorHandover` passes the new offer in route state, as no GET returns it
+  const remainder = (useLocation().state as { remainderOffer?: Offer | null } | null)
+    ?.remainderOffer;
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -63,6 +66,15 @@ export function DonorOfferDetail() {
                 actions={<StatusBadge status={offer.status} deadline={offer.collectionDeadline} />}
               />
 
+              {remainder && (
+                <Banner tone="info">
+                  {t('handover.remainderPosted')
+                    .replace('{kg}', formatKg(remainder.offeredQuantityKg))
+                    .replace('{reference}', remainder.reference)}
+                  . <Link to={`/donor/offers/${remainder.id}`}>{t('handover.viewRemainder')}</Link>.
+                </Banner>
+              )}
+
               {claimed && (
                 <div className="claimed-alert">
                   <div className="claimed-alert__icon">
@@ -80,7 +92,10 @@ export function DonorOfferDetail() {
                       {collection ? (
                         <>
                           <Icon name="truck" size={16} />{' '}
-                          {t('donorDetail.driverCollecting').replace('{name}', collection.driverName)}
+                          {t('donorDetail.driverCollecting').replace(
+                            '{name}',
+                            collection.driverName,
+                          )}
                         </>
                       ) : claimed.transportNeeded ? (
                         <>
@@ -98,7 +113,12 @@ export function DonorOfferDetail() {
 
               <div className="detail__grid">
                 <div className="card detail__media">
-                  <OfferPhoto photos={offer.photos} alt={offer.title} full className="detail__photo" />
+                  <OfferPhoto
+                    photos={offer.photos}
+                    alt={offer.title}
+                    full
+                    className="detail__photo"
+                  />
                 </div>
 
                 <div className="panel">
@@ -114,7 +134,9 @@ export function DonorOfferDetail() {
                     <Detail label={t('offer.storage')}>
                       <ColdChainBadge coldChain={offer.coldChain} />
                     </Detail>
-                    <Detail label={t('offer.availableFrom')}>{formatWhen(offer.availableFrom)}</Detail>
+                    <Detail label={t('offer.availableFrom')}>
+                      {formatWhen(offer.availableFrom)}
+                    </Detail>
                     <Detail label={t('offer.collectBy')}>
                       {formatWhen(offer.collectionDeadline)}
                       {offer.status === 'open' && (
@@ -152,7 +174,10 @@ export function DonorOfferDetail() {
                       </DetailList>
                     </div>
 
-                    <div className="handover-side" data-done={Boolean(handover.recipientConfirmedAt)}>
+                    <div
+                      className="handover-side"
+                      data-done={Boolean(handover.recipientConfirmedAt)}
+                    >
                       <h3>
                         <Icon
                           name={handover.recipientConfirmedAt ? 'check-circle' : 'clock'}
@@ -180,6 +205,16 @@ export function DonorOfferDetail() {
                     </div>
                   </div>
                 </Section>
+              )}
+
+              {offer.status === 'claimed' && !handover && (
+                <Link
+                  to={`/donor/offers/${offer.id}/handover`}
+                  className="btn btn--go btn--lg btn--block"
+                >
+                  <Icon name="check" size={20} />
+                  {t('handover.confirm')}
+                </Link>
               )}
 
               {offer.status === 'open' && (

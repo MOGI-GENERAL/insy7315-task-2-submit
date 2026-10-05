@@ -99,7 +99,7 @@ export function App() {
       <Route path="/donor/post" element={<Guard allow="donor"><PostOffer /></Guard>} />
       <Route path="/donor/posted" element={<Guard allow="donor"><OfferPosted /></Guard>} />
       <Route path="/donor/offers/:offerId" element={<Guard allow="donor"><DonorOfferDetail /></Guard>} />
-      <Route path="/donor/handover/:claimId" element={<Guard allow="donor"><DonorHandover /></Guard>} />
+      <Route path="/donor/offers/:offerId/handover" element={<Guard allow="donor"><DonorHandover /></Guard>} />
       <Route path="/donor/certificates" element={<Guard allow="donor"><DonorCertificates /></Guard>} />
 
       {/* RECIPIENT */}
@@ -109,7 +109,7 @@ export function App() {
       <Route path="/recipient/claims" element={<Guard allow="recipient"><MyClaims /></Guard>} />
       <Route path="/recipient/claims/:claimId/release" element={<Guard allow="recipient"><ReleaseClaim /></Guard>} />
       <Route path="/recipient/scheduled" element={<Guard allow="recipient"><ScheduledOffers /></Guard>} />
-      <Route path="/recipient/handover/:claimId" element={<Guard allow="recipient"><RecipientHandover /></Guard>} />
+      <Route path="/recipient/offers/:offerId/handover" element={<Guard allow="recipient"><RecipientHandover /></Guard>} />
       <Route path="/recipient/profile" element={<Guard allow="recipient"><RecipientProfile /></Guard>} />
       <Route path={PENDING_PATH} element={<Guard allow="recipient"><PendingVerification /></Guard>} />
 

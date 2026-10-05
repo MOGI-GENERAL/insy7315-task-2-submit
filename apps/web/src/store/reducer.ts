@@ -362,7 +362,7 @@ export function reducer(state: AppState, action: Action): AppState {
               channel: 'push',
               title: `${offer.reference}: donor confirmed`,
               body: `${action.quantityKg} kg released. Confirm receipt when it reaches you.`,
-              href: `/recipient/handover/${claim.id}`,
+              href: `/recipient/offers/${offer.id}/handover`,
             }),
           ),
           ...state.notifications,
