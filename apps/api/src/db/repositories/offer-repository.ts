@@ -80,6 +80,29 @@ export class OfferRepository {
     ).exec();
   }
 
+  /** a real write. a release at the same moment conflicts with the caller's transaction */
+  holdIfClaimed(id: Types.ObjectId | string, session: ClientSession) {
+    return OfferModel.findOneAndUpdate(
+      { _id: id, status: 'claimed' },
+      { $set: { status: 'claimed' } },
+      { returnDocument: 'after', runValidators: true, session },
+    ).exec();
+  }
+
+  /** null if the offer is no longer claimed */
+  collectIfClaimed(id: Types.ObjectId | string, session: ClientSession) {
+    return OfferModel.findOneAndUpdate(
+      { _id: id, status: 'claimed' },
+      { $set: { status: 'collected' } },
+      { returnDocument: 'after', runValidators: true, session },
+    ).exec();
+  }
+
+  /** the offer created for what was left behind, if any */
+  findRemainderOf(parentOfferId: Types.ObjectId | string) {
+    return OfferModel.findOne({ parentOfferId }).exec();
+  }
+
   findByIds(ids: Types.ObjectId[]) {
     return OfferModel.find({ _id: { $in: ids } }).exec();
   }

@@ -1,4 +1,5 @@
 import type { RouteKey } from '@fedsa/contract';
+import { HandoverRecordModel } from '../../src/db/index.js';
 import { TestClient } from '../test-client.js';
 import { donorRegistration } from '../integration/test-app.js';
 import {
@@ -24,6 +25,36 @@ function offerForm(photo: Buffer) {
   form.append('collectionDeadline', new Date(Date.now() + 3 * 3_600_000).toISOString());
   form.append('photos', new Blob([new Uint8Array(photo)], { type: 'image/jpeg' }), 'bread.jpg');
   return form;
+}
+
+function donorConfirmForm(kg: number) {
+  const form = new FormData();
+  form.append('collectedQuantityKg', String(kg));
+  form.append('photo', new Blob([new Uint8Array(JPEG)], { type: 'image/jpeg' }), 'handover.jpg');
+  return form;
+}
+
+const DAIRY = 'Chilled dairy, short date';
+
+async function claimDairy(t: ContractContext) {
+  const offerId = await t.offerId(DAIRY);
+  // a repeat by the same organisation answers with its claim. safe after the claim case
+  await t.request('peter', 'POST', `/api/offers/${offerId}/claim`, { transportNeeded: false });
+  return offerId;
+}
+
+/** the dairy handover. Kaap Foods confirms it with a photo the first time it is asked for */
+async function dairyHandover(t: ContractContext) {
+  const offerId = await claimDairy(t);
+  if (!(await HandoverRecordModel.exists({ offerId }))) {
+    await t.request(
+      'nomsa',
+      'POST',
+      `/api/offers/${offerId}/handover/donor-confirm`,
+      donorConfirmForm(45),
+    );
+  }
+  return t.handoverId(DAIRY);
 }
 
 const subscription = {
@@ -298,6 +329,80 @@ export const CONTRACT_CASES: Partial<Record<RouteKey, ContractCase>> = {
     },
   },
 
+  'POST /api/offers/:id/handover/donor-confirm': {
+    success: async (t) =>
+      t.request(
+        'nomsa',
+        'POST',
+        `/api/offers/${await claimDairy(t)}/handover/donor-confirm`,
+        donorConfirmForm(45),
+      ),
+    error: {
+      code: 'INVALID_STATE',
+      send: async (t) =>
+        t.request(
+          'nomsa',
+          'POST',
+          `/api/offers/${await t.offerId('Bread and dry goods, tomorrow')}/handover/donor-confirm`,
+          donorConfirmForm(45),
+        ),
+    },
+  },
+  'POST /api/offers/:id/handover/recipient-confirm': {
+    success: async (t) =>
+      t.request(
+        'peter',
+        'POST',
+        `/api/offers/${await t.offerId('Function surplus, cold platters')}/handover/recipient-confirm`,
+        { conditionOnReceipt: 'good' },
+      ),
+    error: {
+      code: 'INVALID_STATE',
+      send: async (t) =>
+        t.request(
+          'nosipho',
+          'POST',
+          `/api/offers/${await t.offerId('Bread, 30 loaves')}/handover/recipient-confirm`,
+          { conditionOnReceipt: 'good' },
+        ),
+    },
+  },
+  'GET /api/handovers': {
+    success: (t) => t.request('nadia', 'GET', '/api/handovers?condition=problem'),
+    error: {
+      code: 'VALIDATION_FAILED',
+      send: (t) => t.request('nadia', 'GET', '/api/handovers?condition=awful'),
+    },
+  },
+  'POST /api/handovers/:id/resolution': {
+    success: async (t) =>
+      t.request(
+        'nadia',
+        'POST',
+        `/api/handovers/${await t.handoverId('Tomatoes and leafy greens')}/resolution`,
+        { resolutionNote: 'The donor agreed to credit the recipient on the next collection' },
+      ),
+    error: {
+      code: 'INVALID_STATE',
+      send: async (t) =>
+        t.request(
+          'nadia',
+          'POST',
+          `/api/handovers/${await t.handoverId('Function surplus, cold platters')}/resolution`,
+          { resolutionNote: 'Nothing was wrong with this one' },
+        ),
+    },
+  },
+  'GET /api/handovers/:id/photo': {
+    success: async (t) =>
+      t.request('nomsa', 'GET', `/api/handovers/${await dairyHandover(t)}/photo`),
+    error: {
+      code: 'NOT_FOUND',
+      send: async (t) =>
+        t.request('riaan', 'GET', `/api/handovers/${await dairyHandover(t)}/photo`),
+    },
+  },
+
   'GET /api/notifications': {
     success: (t) => t.request('peter', 'GET', '/api/notifications'),
     error: {
@@ -507,9 +612,4 @@ export const NOT_YET_SERVED: RouteKey[] = [
   'POST /api/claims/:id/override',
   'POST /api/claims/:id/collection',
   'PATCH /api/collections/:id',
-  'POST /api/offers/:id/handover/donor-confirm',
-  'POST /api/offers/:id/handover/recipient-confirm',
-  'GET /api/handovers',
-  'POST /api/handovers/:id/resolution',
-  'GET /api/handovers/:id/photo',
 ];

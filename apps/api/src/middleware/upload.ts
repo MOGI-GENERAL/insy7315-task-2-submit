@@ -16,7 +16,7 @@ export function acceptPhotos(fieldNames: string[], max: number) {
     limits: { files: max, fileSize: MAX_PHOTO_BYTES, fields: 20, fieldSize: MAX_FIELD_BYTES },
   }).fields(fieldNames.map((name) => ({ name, maxCount: max })));
 
-  const tooMany = `Attach at most ${max} photos, as ${fieldNames[0]}`;
+  const tooMany = `Attach at most ${max} ${max === 1 ? 'photo' : 'photos'}, as ${fieldNames[0]}`;
   const photoErrors: Record<string, string> = {
     LIMIT_FILE_SIZE: 'Each photo must be 5 MB or smaller',
     LIMIT_FILE_COUNT: tooMany,

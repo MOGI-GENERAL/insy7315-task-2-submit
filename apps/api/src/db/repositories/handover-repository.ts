@@ -1,7 +1,7 @@
 import type { FoodCategory, ImpactGroupBy } from '@fedsa/contract';
 import type { ClientSession, PipelineStage, Types } from 'mongoose';
 import { ClaimModel } from '../models/claim.js';
-import { HandoverRecordModel } from '../models/handover-record.js';
+import { HandoverRecordModel, type HandoverRecordDoc } from '../models/handover-record.js';
 import { OfferModel } from '../models/offer.js';
 import { OrganisationModel } from '../models/organisation.js';
 import { TaxCertificateModel } from '../models/tax-certificate.js';
@@ -95,6 +95,44 @@ export class HandoverRepository {
 
   findByClaim(claimId: Types.ObjectId | string, session?: ClientSession) {
     return HandoverRecordModel.findOne({ claimId }, null, { session }).exec();
+  }
+
+  create(data: Partial<HandoverRecordDoc>, session?: ClientSession) {
+    return new HandoverRecordModel(data).save({ session });
+  }
+
+  /** null if the recipient has already confirmed. the first confirmation stands */
+  confirmByRecipient(
+    id: Types.ObjectId | string,
+    fields: Partial<HandoverRecordDoc>,
+    session: ClientSession,
+  ) {
+    return HandoverRecordModel.findOneAndUpdate(
+      { _id: id, recipientConfirmedAt: null },
+      { $set: fields },
+      { returnDocument: 'after', runValidators: true, session },
+    ).exec();
+  }
+
+  /** null unless it is an unresolved problem handover. a resolution is written once */
+  resolveIfOpen(
+    id: Types.ObjectId | string,
+    fields: Partial<HandoverRecordDoc>,
+    session: ClientSession,
+  ) {
+    return HandoverRecordModel.findOneAndUpdate(
+      { _id: id, conditionOnReceipt: 'problem', resolvedAt: null },
+      { $set: fields },
+      { returnDocument: 'after', runValidators: true, session },
+    ).exec();
+  }
+
+  /** newest confirmation first */
+  list(filter: Record<string, unknown>, limit: number) {
+    return HandoverRecordModel.find(filter)
+      .sort({ recipientConfirmedAt: -1, _id: -1 })
+      .limit(limit)
+      .exec();
   }
 
   /**
