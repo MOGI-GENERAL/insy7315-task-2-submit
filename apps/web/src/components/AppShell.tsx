@@ -8,8 +8,7 @@ import type { IconName } from './Icon';
 import { LogoMark } from './Logo';
 import type { Language, Role } from '@fedsa/contract';
 import { useAuth, useSession } from '../auth/context';
-import { useAppState } from '../store/context';
-import { unreadCount } from '../store/selectors';
+import { useData, useLoad } from '../data';
 import { useLanguage, useT } from '../i18n/useT';
 import { languageNames } from '../i18n/strings';
 import type { StringKey } from '../i18n/strings';
@@ -57,8 +56,8 @@ const roleLabel: Record<Role, StringKey> = {
 };
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const state = useAppState();
   const { user, organisation: org } = useSession();
+  const { notifications } = useData();
   const { logout, setLanguage } = useAuth();
   const language = useLanguage();
   const t = useT();
@@ -70,8 +69,14 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [location.pathname]);
 
   const items = navByRole[user.role];
-  // TODO: read from the notifications repository once the inbox is wired
-  const unread = unreadCount(state, user.id);
+  const inbox = useLoad(
+    () => notifications.list(),
+    // rereads on each navigation, which the inbox makes after marking one read
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [notifications, location.key],
+    { refreshMs: 60_000 },
+  );
+  const unread = inbox.data?.unread ?? 0;
 
   return (
     <div className="shell" data-role={user.role}>

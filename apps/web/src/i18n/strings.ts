@@ -398,6 +398,18 @@ const untranslated = {
   'acert.ratesConfirmBody': 'Certificates issued from now on use these rates.',
   'acert.ratesSaved': 'Rates saved',
   'acert.rateFor': 'Rate per kg for {category}',
+
+  /* remaining recipient and donor screens, and the inbox */
+  'release.notActive': 'Only a claim that is waiting for collection can be released.',
+  'release.doneClosed': 'Claim released.',
+  'notif.unreadCount': '{count} unread',
+  'notif.allRead': 'Everything here has been read.',
+  'notif.unread': 'Unread',
+  'notif.markRead': 'Mark as read',
+  'scheduled.window': 'Collect between {from} and {to}',
+  'dcert.lead': 'Issued to {name} from the handover records both parties confirmed.',
+  'dcert.noneBody':
+    'FEDSA issues a certificate for a period once handovers in it are confirmed by both sides.',
 } as const;
 
 const en = {
