@@ -52,9 +52,10 @@ async function toApiError(res: Response): Promise<ApiError> {
   return new ApiError('INTERNAL', `The server answered ${res.status}`);
 }
 
+/** a 201 can come back empty too, as adding a push subscription does */
 async function read<T>(res: Response): Promise<T> {
-  if (res.status === 204) return undefined as T;
-  return (await res.json()) as T;
+  const text = await res.text();
+  return (text ? JSON.parse(text) : undefined) as T;
 }
 
 /** same-origin. the session cookie goes with every request and to no other site */
