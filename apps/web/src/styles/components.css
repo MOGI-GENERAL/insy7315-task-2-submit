@@ -496,6 +496,8 @@
 /* DIALOG */
 
 .dialog {
+  /* the reset zeroes the margin that centres a modal dialog */
+  margin: auto;
   border: 0;
   padding: 0;
   border-radius: var(--r-lg);
