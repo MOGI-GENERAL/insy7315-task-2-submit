@@ -13,6 +13,7 @@ import type {
   CollectionResponse,
   CreateUserRequest,
   CreateUserResponse,
+  DeletePushSubscriptionRequest,
   DispatchRequest,
   DonorConfirmFields,
   DonorConfirmResponse,
@@ -38,6 +39,7 @@ import type {
   OutcomesResponse,
   PostOfferFields,
   PostOfferResponse,
+  PushSubscriptionRequest,
   RecipientConfirmRequest,
   RecipientConfirmResponse,
   RegisterRequest,
@@ -116,6 +118,10 @@ export interface HandoversRepository {
 export interface NotificationsRepository {
   list(): Promise<NotificationListResponse>;
   markRead(id: string): Promise<void>;
+  /** null when the API has push switched off */
+  pushKey(): Promise<string | null>;
+  subscribePush(body: PushSubscriptionRequest): Promise<void>;
+  unsubscribePush(body: DeletePushSubscriptionRequest): Promise<void>;
 }
 
 export interface ReportsRepository {

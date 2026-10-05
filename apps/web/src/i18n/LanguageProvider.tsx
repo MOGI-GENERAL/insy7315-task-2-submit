@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { Language } from '@fedsa/contract';
 import { LanguageContext } from './context';
-import { languageNames } from './strings';
+import { en, languageNames, loadDictionary, type Dictionary } from './strings';
 
 const STORAGE_KEY = 'fedsa.language';
 
@@ -21,9 +21,23 @@ function readStored(): Language {
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [language, setState] = useState<Language>(readStored);
+  // null until a remembered Afrikaans or isiXhosa arrives. rendering nothing meanwhile avoids a flash of English
+  const [dictionary, setDictionary] = useState<Dictionary | null>(() =>
+    language === 'en' ? en : null,
+  );
 
   useEffect(() => {
     document.documentElement.lang = language;
+    let current = true;
+    loadDictionary(language)
+      // offline with the file never cached, English beats a blank screen
+      .catch(() => en)
+      .then((loaded) => {
+        if (current) setDictionary(loaded);
+      });
+    return () => {
+      current = false;
+    };
   }, [language]);
 
   const setLanguage = useCallback((next: Language) => {
@@ -35,6 +49,10 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const value = useMemo(() => ({ language, setLanguage }), [language, setLanguage]);
+  const value = useMemo(
+    () => (dictionary ? { language, dictionary, setLanguage } : null),
+    [language, dictionary, setLanguage],
+  );
+  if (!value) return null;
   return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
 }

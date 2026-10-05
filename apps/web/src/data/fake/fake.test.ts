@@ -95,6 +95,25 @@ describe('fake data layer', () => {
     });
   });
 
+  test('push has a key the browser accepts, and subscribing needs someone signed in', async () => {
+    const { data } = setup();
+    const body = { endpoint: 'https://push.example.org/1', keys: { p256dh: 'p', auth: 'a' } };
+
+    const key = await data.notifications.pushKey();
+    const bytes = atob(key!.replace(/-/g, '+').replace(/_/g, '/'));
+    expect(bytes).toHaveLength(65);
+    expect(bytes.charCodeAt(0)).toBe(4);
+
+    await expect(data.notifications.subscribePush(body)).rejects.toMatchObject({
+      code: 'UNAUTHENTICATED',
+    });
+    await data.auth.login({ email: 'peter@example.org', password: 'x' });
+    await expect(data.notifications.subscribePush(body)).resolves.toBeUndefined();
+    await expect(
+      data.notifications.unsubscribePush({ endpoint: body.endpoint }),
+    ).resolves.toBeUndefined();
+  });
+
   test('the inbox lists in-app rows and marks only the signed-in user’s rows as read', async () => {
     const { data, store } = setup();
     await data.auth.login({ email: 'peter@example.org', password: 'x' });

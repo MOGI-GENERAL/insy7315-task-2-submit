@@ -123,6 +123,16 @@ export function createHttpDataLayer(api: ApiClient = createApiClient()): DataLay
       list: () => api.get('/api/notifications'),
       markRead: (notificationId) =>
         api.send('POST', `/api/notifications/${id(notificationId)}/read`),
+      async pushKey() {
+        try {
+          return (await api.get<C.VapidKeyResponse>('/api/push/public-key')).vapidPublicKey;
+        } catch (error) {
+          if (isApiError(error, 'NOT_FOUND')) return null;
+          throw error;
+        }
+      },
+      subscribePush: (body) => api.send('POST', '/api/me/push-subscriptions', { json: body }),
+      unsubscribePush: (body) => api.send('DELETE', '/api/me/push-subscriptions', { json: body }),
     },
 
     reports: {

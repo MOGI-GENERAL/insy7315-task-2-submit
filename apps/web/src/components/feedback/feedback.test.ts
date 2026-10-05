@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { ErrorCode } from '@fedsa/contract';
 import { ApiError } from '../../data/ApiError';
-import { dictionaries } from '../../i18n/strings';
+import { dictionaries } from '../../i18n/dictionaries';
 import { errorKey } from './errorKey';
 import { MAX_TOASTS, addToast, autoDismissMs, removeToast } from './toasts';
 import type { Toast } from './toasts';

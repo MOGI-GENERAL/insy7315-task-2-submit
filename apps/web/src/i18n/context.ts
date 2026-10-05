@@ -1,8 +1,10 @@
 import { createContext, useContext } from 'react';
 import type { Language } from '@fedsa/contract';
+import type { Dictionary } from './strings';
 
 export interface LanguageContextValue {
   language: Language;
+  dictionary: Dictionary;
   setLanguage: (language: Language) => void;
 }
 

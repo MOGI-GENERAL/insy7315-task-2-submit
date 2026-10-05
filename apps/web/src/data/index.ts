@@ -1,11 +1,9 @@
-import type { Store } from '../store/store';
-import { createFakeDataLayer } from './fake';
+import type { DemoAccount } from './fake/demoAccounts';
 import { createHttpDataLayer } from './http';
 import type { DataLayer } from './repositories';
 
 export { ApiError, isApiError } from './ApiError';
 export { photoKeyFromUrl } from './fake/mappers';
-export { demoAccounts } from './fake/demoAccounts';
 export type { DemoAccount } from './fake/demoAccounts';
 export { useData } from './context';
 export { useLoad } from './useLoad';
@@ -24,9 +22,19 @@ function failOnFromUrl(): Set<string> {
   return new Set(fail ? fail.split(',').map((s) => s.trim()) : []);
 }
 
-export function createDataLayer(store: Store): DataLayer {
-  if (dataMode() === 'http') return createHttpDataLayer();
-  return createFakeDataLayer(store, {
+/** filled before the first render in fake mode, and left empty in HTTP mode */
+export const demoAccounts: DemoAccount[] = [];
+
+/** reading the variable here, not through `dataMode()`, lets the HTTP build drop the fake and its demo data */
+export async function createDataLayer(): Promise<DataLayer> {
+  if (import.meta.env.VITE_DATA === 'http') return createHttpDataLayer();
+  const [{ createFakeDataLayer }, { createStore }, demo] = await Promise.all([
+    import('./fake'),
+    import('../store/store'),
+    import('./fake/demoAccounts'),
+  ]);
+  demoAccounts.push(...demo.demoAccounts);
+  return createFakeDataLayer(createStore(), {
     delayMs: Number(import.meta.env.VITE_FAKE_DELAY_MS ?? 400),
     failOn: failOnFromUrl(),
   });
