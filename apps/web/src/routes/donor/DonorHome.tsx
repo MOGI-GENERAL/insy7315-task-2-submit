@@ -19,8 +19,10 @@ export function DonorHome() {
     async () => {
       const mine = await offers.list({ view: 'mine' });
       const live = mine.items.filter((o) => o.status === 'open' || o.status === 'claimed');
-      const claimed = live.filter((o) => o.status === 'claimed');
-      const details = await Promise.all(claimed.map((o) => offers.get(o.id)));
+      const details = await Promise.all(
+        live.filter((o) => o.status === 'claimed').map((o) => offers.get(o.id)),
+      );
+      const claimed = details.filter((d) => !d.handover).map((d) => d.offer);
       const claimedBy = new Map(details.map((d) => [d.offer.id, d.claim?.recipient.name ?? null]));
       const recent = mine.items
         .filter((o) => o.status === 'collected' || o.status === 'expired')
@@ -76,7 +78,7 @@ export function DonorHome() {
                             <Icon name="check-circle" size={15} /> {t('donor.claimedBy')}{' '}
                             {claimedBy.get(offer.id)}
                           </span>
-                          <Link to={`/donor/offers/${offer.id}`} className="btn btn--go">
+                          <Link to={`/donor/offers/${offer.id}/handover`} className="btn btn--go">
                             {t('handover.confirm')}
                           </Link>
                         </div>

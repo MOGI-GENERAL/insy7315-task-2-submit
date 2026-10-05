@@ -33,6 +33,28 @@ const untranslated = {
     'Both confirmations and the photograph are what protect your business if the food is ever questioned.',
   'donorDetail.weight': 'Weight',
   'donorDetail.time': 'Time',
+
+  /* HANDOVER SCREENS */
+  'handover.notReady': 'This offer is not ready for a handover',
+  'handover.notReadyBody': 'A handover can be recorded once the offer has been claimed.',
+  'handover.donorHint':
+    'Change it if less is going than you posted. The rest is posted again as a new offer, and this figure is the one reports and your tax certificate use.',
+  'handover.donorAsk': 'Confirm what left your premises?',
+  'handover.donorAskBody':
+    'You are recording {kg} as handed over. It cannot be changed afterwards.',
+  'handover.recipientAsk': 'Confirm what arrived?',
+  'handover.recipientAskBody':
+    'You are confirming receipt of {kg}. It cannot be changed afterwards.',
+  'handover.donorDone': 'You confirmed {kg} leaving your premises.',
+  'handover.recordComplete': 'The recipient has confirmed receipt, so the record is complete.',
+  'handover.viewRecord': 'View the record',
+  'handover.recorded': 'Handover recorded',
+  'handover.receiptRecorded': 'Receipt confirmed',
+  'handover.receiptDone': 'You confirmed receipt of {kg} on {when}.',
+  'handover.remainderPosted': '{kg} were posted again as {reference}',
+  'handover.viewRemainder': 'View the new offer',
+  'handover.donorRecordedAt': 'Donor recorded {kg} at {when}',
+  'handover.donorPhoto': 'Photograph from the donor',
 } as const;
 
 const en = {

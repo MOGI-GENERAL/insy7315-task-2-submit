@@ -145,7 +145,7 @@ export function OfferDetail() {
               )}
 
               {ours && awaitingUs && (
-                <Link to={`/recipient/handover/${ours.id}`} className="btn btn--go btn--lg btn--block">
+                <Link to={`/recipient/offers/${offer.id}/handover`} className="btn btn--go btn--lg btn--block">
                   {t('handover.confirmReceipt')}
                 </Link>
               )}
