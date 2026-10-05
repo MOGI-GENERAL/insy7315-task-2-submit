@@ -1,45 +1,48 @@
-/* DONOR OFFER DETAIL — CLAIM STATUS + LIVE HANDOVER RECORD */
-
+import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { FoodPhoto } from '../../components/FoodPhoto';
+import type { Condition } from '@fedsa/contract';
+import { isApiError, useData, useLoad } from '../../data';
+import { ConfirmDialog, errorKey, LoadState, useToast } from '../../components/feedback';
+import { OfferPhoto } from '../../components/OfferPhoto';
 import { Icon } from '../../components/Icon';
 import { Countdown } from '../../components/Countdown';
 import { ColdChainBadge, StatusBadge } from '../../components/StatusBadge';
-import { EventBanner } from '../../components/EventBanner';
-import { Banner, Detail, DetailList, PageHead, Section } from '../../components/ui';
-import { useApp, useCurrentOrg } from '../../store/context';
-import {
-  activeClaimForOffer,
-  collectionForClaim,
-  handoverForClaim,
-  offerById,
-  orgById,
-} from '../../store/selectors';
+import { Detail, DetailList, PageHead, Section } from '../../components/ui';
+import type { StringKey } from '../../i18n/strings';
 import { useT, categoryKey } from '../../i18n/useT';
 import { formatDateTime, formatKg, formatWhen, mealsFromKg } from '../../lib/format';
 import '../shared/Detail.css';
 
+const conditionKey: Record<Condition, StringKey> = {
+  good: 'handover.conditionGood',
+  acceptable: 'handover.conditionAcceptable',
+  problem: 'handover.conditionPoor',
+};
+
 export function DonorOfferDetail() {
-  const { offerId } = useParams();
-  const { state, dispatch } = useApp();
-  const org = useCurrentOrg()!;
+  const { offerId = '' } = useParams();
+  const { offers } = useData();
   const t = useT();
+  const toast = useToast();
+  const detail = useLoad(() => offers.get(offerId), [offers, offerId]);
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
 
-  const offer = offerById(state, offerId);
-
-  if (!offer || offer.donorOrganisationId !== org.id) {
-    return (
-      <Banner tone="bad" title="Offer not found">
-        That offer does not belong to {org.name}. <Link to="/donor">Back to your offers</Link>.
-      </Banner>
-    );
+  async function cancel() {
+    setBusy(true);
+    try {
+      await offers.cancel(offerId, {});
+      toast.success(t('offer.cancelled'));
+    } catch (error) {
+      toast.error(t(errorKey(error)));
+      // invalid state means a claim landed first. reload shows it
+      if (!isApiError(error, 'INVALID_STATE')) return;
+    } finally {
+      setBusy(false);
+      setConfirming(false);
+    }
+    await detail.reload();
   }
-
-  const claim = activeClaimForOffer(state, offer.id);
-  const recipient = orgById(state, claim?.recipientOrganisationId);
-  const handover = claim ? handoverForClaim(state, claim.id) : undefined;
-  const collection = claim ? collectionForClaim(state, claim.id) : undefined;
-  const needsMyConfirmation = Boolean(claim && handover && !handover.donorConfirmedAt);
 
   return (
     <>
@@ -48,142 +51,162 @@ export function DonorOfferDetail() {
         {t('common.back')}
       </Link>
 
-      <EventBanner />
+      <LoadState result={detail}>
+        {({ offer, claim, collection, handover }) => {
+          const claimed = claim?.status === 'active' ? claim : null;
 
-      <PageHead
-        title={offer.title}
-        lead={`${offer.reference} · ${org.name}, ${org.suburb}`}
-        actions={<StatusBadge status={offer.status} deadline={offer.collectionDeadline} />}
-      />
+          return (
+            <>
+              <PageHead
+                title={offer.title}
+                lead={`${offer.reference} · ${offer.donor.name}, ${offer.donor.suburb}`}
+                actions={<StatusBadge status={offer.status} deadline={offer.collectionDeadline} />}
+              />
 
-      {claim && recipient && (
-        <div className="claimed-alert">
-          <div className="claimed-alert__icon">
-            <Icon name="check-circle" size={28} />
-          </div>
-          <div className="claimed-alert__body">
-            <strong>{recipient.name} claimed this offer</strong>
-            <span>
-              {recipient.suburb} · claimed {formatWhen(claim.claimedAt)}
-            </span>
-            <span className="claimed-alert__transport">
-              {claim.transportNeeded ? (
-                collection ? (
-                  <>
-                    <Icon name="truck" size={16} /> {collection.driverName} is collecting on their
-                    behalf
-                  </>
-                ) : (
-                  <>
-                    <Icon name="clock" size={16} /> FEDSA is arranging a driver
-                  </>
-                )
-              ) : (
-                <>
-                  <Icon name="truck" size={16} /> They are collecting themselves
-                </>
-              )}
-            </span>
-          </div>
-        </div>
-      )}
-
-      {needsMyConfirmation && (
-        <Link to={`/donor/handover/${claim!.id}`} className="btn btn--go btn--lg btn--block">
-          <Icon name="camera" size={20} />
-          {t('handover.confirm')}
-        </Link>
-      )}
-
-      <div className="detail__grid">
-        <div className="card detail__media">
-          <FoodPhoto photo={offer.photo} className="detail__photo" />
-        </div>
-
-        <div className="panel">
-          <DetailList>
-            <Detail label={t('offer.quantity')}>
-              {formatKg(offer.offeredQuantityKg)}
-              <div className="muted">
-                {mealsFromKg(offer.offeredQuantityKg).toLocaleString('en-ZA')} meals
-              </div>
-            </Detail>
-            <Detail label={t('offer.category')}>{t(categoryKey(offer.category))}</Detail>
-            <Detail label={t('offer.storage')}>
-              <ColdChainBadge coldChain={offer.coldChain} />
-            </Detail>
-            <Detail label={t('offer.availableFrom')}>{formatWhen(offer.availableFrom)}</Detail>
-            <Detail label={t('offer.collectBy')}>
-              {formatWhen(offer.collectionDeadline)}
-              {offer.status === 'open' && (
-                <div>
-                  <Countdown deadline={offer.collectionDeadline} showClock={false} />
+              {claimed && (
+                <div className="claimed-alert">
+                  <div className="claimed-alert__icon">
+                    <Icon name="check-circle" size={28} />
+                  </div>
+                  <div className="claimed-alert__body">
+                    <strong>
+                      {t('donorDetail.claimedThis').replace('{name}', claimed.recipient.name)}
+                    </strong>
+                    <span>
+                      {claimed.recipient.suburb} · {t('donorDetail.claimedAt')}{' '}
+                      {formatWhen(claimed.claimedAt)}
+                    </span>
+                    <span className="claimed-alert__transport">
+                      {collection ? (
+                        <>
+                          <Icon name="truck" size={16} />{' '}
+                          {t('donorDetail.driverCollecting').replace('{name}', collection.driverName)}
+                        </>
+                      ) : claimed.transportNeeded ? (
+                        <>
+                          <Icon name="clock" size={16} /> {t('donorDetail.arrangingDriver')}
+                        </>
+                      ) : (
+                        <>
+                          <Icon name="truck" size={16} /> {t('donorDetail.selfCollect')}
+                        </>
+                      )}
+                    </span>
+                  </div>
                 </div>
               )}
-            </Detail>
-          </DetailList>
 
-          {offer.description && (
-            <>
-              <hr className="divider" />
-              <p className="detail__desc">{offer.description}</p>
+              <div className="detail__grid">
+                <div className="card detail__media">
+                  <OfferPhoto photos={offer.photos} alt={offer.title} full className="detail__photo" />
+                </div>
+
+                <div className="panel">
+                  <DetailList>
+                    <Detail label={t('offer.quantity')}>
+                      {formatKg(offer.offeredQuantityKg)}
+                      <div className="muted">
+                        {mealsFromKg(offer.offeredQuantityKg).toLocaleString('en-ZA')}{' '}
+                        {t('offer.meals')}
+                      </div>
+                    </Detail>
+                    <Detail label={t('offer.category')}>{t(categoryKey(offer.category))}</Detail>
+                    <Detail label={t('offer.storage')}>
+                      <ColdChainBadge coldChain={offer.coldChain} />
+                    </Detail>
+                    <Detail label={t('offer.availableFrom')}>{formatWhen(offer.availableFrom)}</Detail>
+                    <Detail label={t('offer.collectBy')}>
+                      {formatWhen(offer.collectionDeadline)}
+                      {offer.status === 'open' && (
+                        <div>
+                          <Countdown deadline={offer.collectionDeadline} showClock={false} />
+                        </div>
+                      )}
+                    </Detail>
+                  </DetailList>
+
+                  {offer.description && (
+                    <>
+                      <hr className="divider" />
+                      <p className="detail__desc">{offer.description}</p>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {handover && (
+                <Section title={t('donorDetail.recordTitle')} lead={t('donorDetail.recordLead')}>
+                  <div className="handover-pair">
+                    <div className="handover-side" data-done="true">
+                      <h3>
+                        <Icon name="check-circle" size={18} />
+                        {t('handover.donorConfirmed')}
+                      </h3>
+                      <DetailList>
+                        <Detail label={t('donorDetail.weight')}>
+                          {formatKg(handover.collectedQuantityKg)}
+                        </Detail>
+                        <Detail label={t('donorDetail.time')}>
+                          {formatDateTime(handover.donorConfirmedAt)}
+                        </Detail>
+                      </DetailList>
+                    </div>
+
+                    <div className="handover-side" data-done={Boolean(handover.recipientConfirmedAt)}>
+                      <h3>
+                        <Icon
+                          name={handover.recipientConfirmedAt ? 'check-circle' : 'clock'}
+                          size={18}
+                        />
+                        {t('handover.recipientConfirmed')}
+                      </h3>
+                      {handover.recipientConfirmedAt ? (
+                        <DetailList>
+                          {handover.conditionOnReceipt && (
+                            <Detail label={t('handover.condition')}>
+                              {t(conditionKey[handover.conditionOnReceipt])}
+                              {handover.conditionNotes && (
+                                <div className="muted">{handover.conditionNotes}</div>
+                              )}
+                            </Detail>
+                          )}
+                          <Detail label={t('donorDetail.time')}>
+                            {formatDateTime(handover.recipientConfirmedAt)}
+                          </Detail>
+                        </DetailList>
+                      ) : (
+                        <p className="muted">{t('handover.waitingOther')}</p>
+                      )}
+                    </div>
+                  </div>
+                </Section>
+              )}
+
+              {offer.status === 'open' && (
+                <button
+                  type="button"
+                  className="btn btn--secondary"
+                  onClick={() => setConfirming(true)}
+                >
+                  {t('offer.cancel')}
+                </button>
+              )}
             </>
-          )}
-        </div>
-      </div>
+          );
+        }}
+      </LoadState>
 
-      {handover && (handover.donorConfirmedAt || handover.recipientConfirmedAt) && (
-        <Section
-          title="Handover record"
-          lead="Both confirmations and the photograph are what protect your business if the food is ever questioned."
-        >
-          <div className="handover-pair">
-            <div className="handover-side" data-done={Boolean(handover.donorConfirmedAt)}>
-              <h3>
-                <Icon name={handover.donorConfirmedAt ? 'check-circle' : 'clock'} size={18} />
-                {t('handover.donorConfirmed')}
-              </h3>
-              {handover.donorConfirmedAt ? (
-                <DetailList>
-                  <Detail label="Weight">{formatKg(handover.collectedQuantityKg)}</Detail>
-                  <Detail label="Time">{formatDateTime(handover.donorConfirmedAt)}</Detail>
-                </DetailList>
-              ) : (
-                <p className="muted">Not yet confirmed.</p>
-              )}
-            </div>
-
-            <div className="handover-side" data-done={Boolean(handover.recipientConfirmedAt)}>
-              <h3>
-                <Icon name={handover.recipientConfirmedAt ? 'check-circle' : 'clock'} size={18} />
-                {t('handover.recipientConfirmed')}
-              </h3>
-              {handover.recipientConfirmedAt ? (
-                <DetailList>
-                  <Detail label="Condition">
-                    {handover.conditionOnReceipt === 'problem'
-                      ? 'Problem reported'
-                      : handover.conditionOnReceipt}
-                  </Detail>
-                  <Detail label="Time">{formatDateTime(handover.recipientConfirmedAt)}</Detail>
-                </DetailList>
-              ) : (
-                <p className="muted">{t('handover.waitingOther')}</p>
-              )}
-            </div>
-          </div>
-        </Section>
-      )}
-
-      {offer.status === 'open' && (
-        <button
-          type="button"
-          className="btn btn--secondary"
-          onClick={() => dispatch({ type: 'CANCEL_OFFER', offerId: offer.id })}
-        >
-          Cancel this offer
-        </button>
-      )}
+      <ConfirmDialog
+        open={confirming}
+        title={t('offer.cancelTitle')}
+        confirmLabel={t('offer.cancelConfirm')}
+        tone="danger"
+        busy={busy}
+        onConfirm={cancel}
+        onCancel={() => setConfirming(false)}
+      >
+        {t('offer.cancelWhy')}
+      </ConfirmDialog>
     </>
   );
 }
