@@ -33,6 +33,38 @@ const untranslated = {
     'Both confirmations and the photograph are what protect your business if the food is ever questioned.',
   'donorDetail.weight': 'Weight',
   'donorDetail.time': 'Time',
+
+  /* DISPATCH */
+  'dispatch.lead':
+    'Recipients who claimed food they cannot fetch themselves. Each driver is sent only the collection they are doing.',
+  'dispatch.waitingTitle': 'Waiting for transport',
+  'dispatch.arrangedTitle': 'Arranged',
+  'dispatch.noneWaitingTitle': 'Every collection has transport',
+  'dispatch.noneWaitingBody': 'Nothing is waiting on a driver right now.',
+  'dispatch.driverHint':
+    'Drivers hold no account on the platform. They receive one text message per collection and nothing else.',
+  'dispatch.smsTo': 'SMS to {phone}',
+  'dispatch.smsToDriver': 'SMS to the driver',
+  'dispatch.confirmTitle': 'Send the details to {name}?',
+  'dispatch.confirmBody': '{name} gets this text on {phone}. It holds this collection only.',
+  'dispatch.confirmSend': 'Send text',
+  'dispatch.tableCaption': 'Collections with a driver dispatched',
+  'dispatch.colOffer': 'Offer',
+  'dispatch.colDriver': 'Driver',
+  'dispatch.colRoute': 'Route',
+  'dispatch.colPickup': 'Pickup time',
+  'dispatch.colActions': 'Actions',
+  'dispatch.markCollected': 'Mark collected',
+  'dispatch.markCollectedTitle': 'Mark {reference} as collected?',
+  'dispatch.markCollectedBody': 'Do this once {name} has delivered the food.',
+  'dispatch.collected': 'Marked as collected',
+  'dispatch.cancelDriver': 'Cancel driver',
+  'dispatch.cancelDriverTitle': 'Cancel the driver for {reference}?',
+  'dispatch.cancelDriverBody':
+    '{name} is not told. This claim cannot be given another driver afterwards.',
+  'dispatch.keepDriver': 'Keep driver',
+  'dispatch.driverCancelled': 'Driver cancelled',
+  'dispatch.routeTo': '{from} to {to}',
 } as const;
 
 const en = {

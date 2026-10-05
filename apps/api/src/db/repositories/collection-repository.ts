@@ -1,8 +1,30 @@
-import type { Types } from 'mongoose';
-import { CollectionModel } from '../models/collection.js';
+import type { CollectionStatus } from '@fedsa/contract';
+import type { ClientSession, Types } from 'mongoose';
+import { CollectionModel, type CollectionDoc } from '../models/collection.js';
 
 export class CollectionRepository {
-  findByClaim(claimId: Types.ObjectId | string) {
-    return CollectionModel.findOne({ claimId }).exec();
+  findById(id: Types.ObjectId | string, session?: ClientSession) {
+    return CollectionModel.findById(id, null, { session }).exec();
+  }
+
+  findByClaim(claimId: Types.ObjectId | string, session?: ClientSession) {
+    return CollectionModel.findOne({ claimId }, null, { session }).exec();
+  }
+
+  create(data: Partial<CollectionDoc>, session?: ClientSession) {
+    return new CollectionModel(data).save({ session });
+  }
+
+  /** null if the collection has already left `dispatched` */
+  updateIfDispatched(
+    id: Types.ObjectId | string,
+    status: Exclude<CollectionStatus, 'dispatched'>,
+    session: ClientSession,
+  ) {
+    return CollectionModel.findOneAndUpdate(
+      { _id: id, status: 'dispatched' },
+      { $set: { status } },
+      { returnDocument: 'after', runValidators: true, session },
+    ).exec();
   }
 }

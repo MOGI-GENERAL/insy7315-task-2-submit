@@ -2,6 +2,7 @@ import { request as httpRequest } from 'node:http';
 import type { CertificateResponse, ErrorCode } from '@fedsa/contract';
 import {
   ClaimModel,
+  CollectionModel,
   HandoverRecordModel,
   NotificationModel,
   OfferModel,
@@ -114,6 +115,13 @@ export class ContractContext {
     });
     if (!claim) throw new Error(`no claim on ${offerTitle}`);
     return claim._id.toHexString();
+  }
+
+  /** the collection on the latest claim on the offer with this title */
+  async collectionId(offerTitle: string) {
+    const collection = await CollectionModel.findOne({ claimId: await this.claimId(offerTitle) });
+    if (!collection) throw new Error(`no collection on ${offerTitle}`);
+    return collection._id.toHexString();
   }
 
   /** the handover on the offer with this title */
