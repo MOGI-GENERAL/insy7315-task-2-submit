@@ -250,13 +250,17 @@
 .stat[data-tone='good'] .stat__icon {
   color: var(--c-green);
 }
-.stat[data-tone='warn'] .stat__icon,
-.stat[data-tone='warn'] .stat__value {
+.stat[data-tone='warn'] .stat__icon {
   color: var(--c-amber);
 }
-.stat[data-tone='bad'] .stat__icon,
-.stat[data-tone='bad'] .stat__value {
+.stat[data-tone='warn'] .stat__value {
+  color: var(--c-amber-text);
+}
+.stat[data-tone='bad'] .stat__icon {
   color: var(--c-red);
+}
+.stat[data-tone='bad'] .stat__value {
+  color: var(--c-red-text);
 }
 
 .stat__text {
