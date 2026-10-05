@@ -73,7 +73,7 @@ export interface OfferSettings {
   newReference?: () => string;
 }
 
-function isDuplicate(err: unknown, field: string) {
+export function isDuplicate(err: unknown, field: string) {
   return (
     err instanceof mongo.MongoServerError &&
     err.code === DUPLICATE_KEY &&
@@ -169,6 +169,43 @@ export class OfferService {
       recipients.map((recipient) => recipient._id.toString()),
     );
     return { offer: view, notifiedCount: recipients.length };
+  }
+
+  /**
+   * offers what was left behind, open until the parent's deadline. null once that
+   * deadline has passed
+   */
+  async splitRemainder(
+    parent: StoredOffer,
+    user: SessionUser,
+    remainderKg: number,
+  ): Promise<Offer | null> {
+    const now = new Date();
+    if (parent.collectionDeadline <= now) return null;
+
+    const donor = await this.findOrganisation(parent.donorOrganisationId);
+    const child = await this.createWithReference({
+      donorOrganisationId: parent.donorOrganisationId,
+      postedByUserId: new Types.ObjectId(user.id),
+      title: parent.title,
+      description: parent.description ?? null,
+      category: parent.category,
+      offeredQuantityKg: remainderKg,
+      coldChain: parent.coldChain,
+      photoUrls: parent.photoUrls,
+      availableFrom: now,
+      collectionDeadline: parent.collectionDeadline,
+      status: 'open',
+      parentOfferId: parent._id,
+    });
+
+    const view = this.view(child, donor, false);
+    const recipients = await this.eligibleRecipients(child, donor);
+    this.notifyInBackground(
+      view,
+      recipients.map((recipient) => recipient._id.toString()),
+    );
+    return view;
   }
 
   /** recipient organisations the offer goes to, in name order */
