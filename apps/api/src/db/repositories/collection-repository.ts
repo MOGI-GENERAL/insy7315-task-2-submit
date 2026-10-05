@@ -15,6 +15,14 @@ export class CollectionRepository {
     return new CollectionModel(data).save({ session });
   }
 
+  cancelDispatchedForClaims(claimIds: Types.ObjectId[], session: ClientSession) {
+    return CollectionModel.updateMany(
+      { claimId: { $in: claimIds }, status: 'dispatched' },
+      { $set: { status: 'cancelled' } },
+      { runValidators: true, session },
+    ).exec();
+  }
+
   /** null if the collection has already left `dispatched` */
   updateIfDispatched(
     id: Types.ObjectId | string,
