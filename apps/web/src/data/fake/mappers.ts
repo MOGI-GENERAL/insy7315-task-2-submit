@@ -174,6 +174,8 @@ const AUDIT_ACTIONS: [RegExp, C.AuditAction][] = [
   [/^Organisation suspended/, 'suspend_organisation'],
   [/^Organisation reinstated/, 'reinstate_organisation'],
   [/^Updated capacity notes/, 'update_capacity_notes'],
+  [/^Created account/, 'create_user'],
+  [/^Changed role/, 'change_role'],
   [/^Disabled account/, 'disable_user'],
   [/^Enabled account/, 'enable_user'],
   [/^Issued tax certificate/, 'issue_certificate'],

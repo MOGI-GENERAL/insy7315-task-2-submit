@@ -642,7 +642,7 @@ export function createFakeDataLayer(store: Store, options: FakeOptions): DataLay
             active: true,
             personaNote: '',
           };
-          store.dispatch({ type: 'FAKE_ADD_USER', user });
+          store.dispatch({ type: 'FAKE_ADD_USER', user, actorUserId: me().id });
           return {
             user: { ...toUser(user, state()), mustChangePassword: true },
             tempPassword: 'Demo-Temp-1234',
@@ -652,11 +652,20 @@ export function createFakeDataLayer(store: Store, options: FakeOptions): DataLay
         call('users', 'update', () => {
           const actor = me();
           if (!state().users.some((u) => u.id === id)) throw notFound();
-          if (id === actor.id && body.status === 'disabled') {
-            throw invalidState('You cannot disable your own account.');
+          const target = state().users.find((u) => u.id === id)!;
+          if (id === actor.id && (body.status === 'disabled' || body.role !== undefined)) {
+            throw invalidState(
+              'You cannot disable your own account or remove your own administrator role.',
+            );
+          }
+          if (body.role && !isStaff(target)) {
+            throw new ApiError('VALIDATION_FAILED', 'Check the highlighted fields.', {
+              role: 'A role can only change between coordinator and administrator',
+            });
           }
           store.dispatch({
             type: 'FAKE_UPDATE_USER',
+            actorUserId: actor.id,
             targetUserId: id,
             role: body.role,
             active: body.status === undefined ? undefined : body.status === 'active',
