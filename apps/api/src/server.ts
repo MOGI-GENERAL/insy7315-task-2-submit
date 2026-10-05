@@ -20,7 +20,7 @@ import { createLogger } from './logger.js';
 import { createSessionStore } from './middleware/session.js';
 import { twilioWebhookSettings } from './middleware/twilio-signature.js';
 import { channelSettings } from './notifications/channel-settings.js';
-import { LocalPhotoStore } from './photos/local-photo-store.js';
+import { createPhotoStore } from './photos/create-photo-store.js';
 import { AuditService } from './services/audit-service.js';
 import { ClaimService } from './services/claim-service.js';
 import { CollectionService } from './services/collection-service.js';
@@ -68,7 +68,13 @@ async function start() {
     new UserRepository(),
     { ...channelSettings(process.env, logger), logger },
   );
-  const photos = new LocalPhotoStore();
+  let photos;
+  try {
+    photos = createPhotoStore(process.env);
+  } catch (err) {
+    logger.fatal({ err }, 'could not set up photo storage');
+    process.exit(1);
+  }
   const offers = new OfferService(
     new OfferRepository(),
     new OrganisationRepository(),
