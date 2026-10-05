@@ -21,6 +21,18 @@ const untranslated = {
   'donor.waitingForClaim': 'Waiting for a claim',
   'donor.recentTitle': 'Recently finished',
   'donor.notTaken': 'Nobody was able to take it',
+
+  /* DONOR OFFER DETAIL */
+  'donorDetail.claimedThis': '{name} claimed this offer',
+  'donorDetail.claimedAt': 'claimed',
+  'donorDetail.driverCollecting': '{name} is collecting on their behalf',
+  'donorDetail.arrangingDriver': 'FEDSA is arranging a driver',
+  'donorDetail.selfCollect': 'They are collecting themselves',
+  'donorDetail.recordTitle': 'Handover record',
+  'donorDetail.recordLead':
+    'Both confirmations and the photograph are what protect your business if the food is ever questioned.',
+  'donorDetail.weight': 'Weight',
+  'donorDetail.time': 'Time',
 } as const;
 
 const en = {
