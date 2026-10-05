@@ -2,6 +2,7 @@ import { request as httpRequest } from 'node:http';
 import type { CertificateResponse, ErrorCode } from '@fedsa/contract';
 import {
   ClaimModel,
+  HandoverRecordModel,
   NotificationModel,
   OfferModel,
   OrganisationModel,
@@ -113,6 +114,13 @@ export class ContractContext {
     });
     if (!claim) throw new Error(`no claim on ${offerTitle}`);
     return claim._id.toHexString();
+  }
+
+  /** the handover on the offer with this title */
+  async handoverId(offerTitle: string) {
+    const handover = await HandoverRecordModel.findOne({ offerId: await this.offerId(offerTitle) });
+    if (!handover) throw new Error(`no handover on ${offerTitle}`);
+    return handover._id.toHexString();
   }
 
   /** the seed writes no certificates. Zanele issues one over the seeded period the first time */
