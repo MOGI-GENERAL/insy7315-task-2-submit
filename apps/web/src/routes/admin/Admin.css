@@ -155,8 +155,21 @@
   min-width: 0;
 }
 
-.account-card__action {
-  align-self: flex-start;
+.account-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+
+.temp-password {
+  display: inline-block;
+  padding: var(--s-1) var(--s-3);
+  background: var(--c-surface);
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-sm);
+  font-size: var(--t-lg);
+  user-select: all;
+  overflow-wrap: anywhere;
 }
 
 /* AUDIT LIST: SAME CARD-ROW REASONING (5 COLS DOESN'T FIT MOBILE) */
