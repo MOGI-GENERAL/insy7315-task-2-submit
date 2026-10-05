@@ -24,6 +24,7 @@ import { LocalPhotoStore } from './photos/local-photo-store.js';
 import { AuditService } from './services/audit-service.js';
 import { ClaimService } from './services/claim-service.js';
 import { DEFAULT_RADIUS_KM } from './services/eligibility.js';
+import { HandoverService } from './services/handover-service.js';
 import { HealthService } from './services/health-service.js';
 import { NotificationService } from './services/notification-service.js';
 import { OfferService } from './services/offer-service.js';
@@ -66,6 +67,7 @@ async function start() {
     new UserRepository(),
     { ...channelSettings(process.env, logger), logger },
   );
+  const photos = new LocalPhotoStore();
   const offers = new OfferService(
     new OfferRepository(),
     new OrganisationRepository(),
@@ -73,7 +75,7 @@ async function start() {
     new CollectionRepository(),
     new HandoverRepository(),
     new AuditService(new AuditLogRepository()),
-    new LocalPhotoStore(),
+    photos,
     notifications,
     { radiusKm, logger },
   );
@@ -84,6 +86,17 @@ async function start() {
     new HandoverRepository(),
     offers,
     notifications,
+    notifications,
+    logger,
+  );
+  const handovers = new HandoverService(
+    new HandoverRepository(),
+    new ClaimRepository(),
+    new OfferRepository(),
+    new OrganisationRepository(),
+    offers,
+    new AuditService(new AuditLogRepository()),
+    photos,
     notifications,
     logger,
   );
@@ -105,6 +118,7 @@ async function start() {
     ),
     offers,
     claims,
+    handovers,
     notifications,
     reports: new ReportingService(
       new HandoverRepository(),

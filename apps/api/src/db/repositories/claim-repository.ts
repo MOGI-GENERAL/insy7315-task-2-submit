@@ -43,6 +43,19 @@ export class ClaimRepository {
     ).exec();
   }
 
+  findActiveForOffer(offerId: Types.ObjectId | string, session?: ClientSession) {
+    return ClaimModel.findOne({ offerId, status: 'active' }, null, { session }).exec();
+  }
+
+  /** null if the claim is no longer active */
+  fulfilIfActive(id: Types.ObjectId | string, session: ClientSession) {
+    return ClaimModel.findOneAndUpdate(
+      { _id: id, status: 'active' },
+      { $set: { status: 'fulfilled' } },
+      { returnDocument: 'after', runValidators: true, session },
+    ).exec();
+  }
+
   /** newest first */
   list(filter: Record<string, unknown>, limit: number) {
     return ClaimModel.find(filter).sort({ claimedAt: -1, _id: -1 }).limit(limit).exec();
