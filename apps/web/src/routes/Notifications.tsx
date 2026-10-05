@@ -4,6 +4,7 @@ import type { Notification, NotificationKind } from '@fedsa/contract';
 import { useData, useLoad } from '../data';
 import { Empty, errorKey, LoadState, PendingButton, useToast } from '../components/feedback';
 import { PageHead } from '../components/ui';
+import { PushOptIn } from '../components/PushOptIn';
 import { Icon } from '../components/Icon';
 import type { IconName } from '../components/Icon';
 import { useT } from '../i18n/useT';
@@ -63,6 +64,8 @@ export function Notifications() {
               : t('notif.allRead')
         }
       />
+
+      <PushOptIn />
 
       <LoadState result={inbox}>
         {({ items }) =>

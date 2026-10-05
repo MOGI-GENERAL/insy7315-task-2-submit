@@ -62,6 +62,22 @@ const roundKg = (kg: number) => Math.round(kg * 1000) / 1000;
 
 const isStaff = (user: User) => user.role === 'coordinator' || user.role === 'administrator';
 
+let pushKeyPromise: Promise<string> | null = null;
+
+/** a real P-256 key, which the browser accepts. nothing keeps the private half or sends anything to it */
+function fakePushKey() {
+  pushKeyPromise ??= crypto.subtle
+    .generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify'])
+    .then((pair) => crypto.subtle.exportKey('raw', pair.publicKey))
+    .then((raw) =>
+      btoa(String.fromCharCode(...new Uint8Array(raw)))
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, ''),
+    );
+  return pushKeyPromise;
+}
+
 /** recipients a new offer would reach, by the same rule the feed uses */
 function eligibleRecipientIds(
   state: AppState,
@@ -75,6 +91,8 @@ function eligibleRecipientIds(
 export function createFakeDataLayer(store: Store, options: FakeOptions): DataLayer {
   const state = () => store.getState();
   const idempotency = new Map<string, string>();
+  /** endpoint to user ID */
+  const pushEndpoints = new Map<string, string>();
   let rates = (['bakery', 'produce', 'dairy', 'prepared', 'dry', 'other'] as const).map(
     (category, i) => ({
       category,
@@ -531,6 +549,16 @@ export function createFakeDataLayer(store: Store, options: FakeOptions): DataLay
             throw notFound();
           }
           store.dispatch({ type: 'MARK_NOTIFICATION_READ', notificationId: id });
+        }),
+      pushKey: () => call('notifications', 'pushKey', () => null).then(() => fakePushKey()),
+      subscribePush: (body) =>
+        call('notifications', 'subscribePush', () => {
+          // as in the API, a shared phone's subscription moves to whoever subscribed last
+          pushEndpoints.set(body.endpoint, me().id);
+        }),
+      unsubscribePush: (body) =>
+        call('notifications', 'unsubscribePush', () => {
+          if (pushEndpoints.get(body.endpoint) === me().id) pushEndpoints.delete(body.endpoint);
         }),
     },
 

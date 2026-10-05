@@ -2,6 +2,7 @@ import { Link, Navigate, useLocation } from 'react-router-dom';
 import type { PostOfferResponse } from '@fedsa/contract';
 import { Icon } from '../../components/Icon';
 import { OfferPhoto } from '../../components/OfferPhoto';
+import { PushOptIn } from '../../components/PushOptIn';
 import { Detail, DetailList } from '../../components/ui';
 import { ColdChainBadge } from '../../components/StatusBadge';
 import { Countdown } from '../../components/Countdown';
@@ -52,6 +53,8 @@ export function OfferPosted() {
       </div>
 
       <p className="posted__next">{t('post.whatNext')}</p>
+
+      <PushOptIn afterAction />
 
       <div className="posted__actions">
         <Link to={`/donor/offers/${offer.id}`} className="btn btn--secondary btn--block">
