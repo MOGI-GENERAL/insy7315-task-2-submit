@@ -126,7 +126,7 @@ export function toClaim(claim: Claim, state: AppState): C.Claim {
 }
 
 export function toCollection(collection: Collection): C.Collection {
-  return { ...collection, scheduledFor: null };
+  return { ...collection, scheduledFor: collection.scheduledFor ?? null };
 }
 
 export function toHandover(handover: HandoverRecord, state: AppState): C.Handover {

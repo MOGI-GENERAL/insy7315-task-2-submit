@@ -382,6 +382,10 @@ export function createFakeDataLayer(store: Store, options: FakeOptions): DataLay
         call('claims', 'dispatch', () => {
           const claim = state().claims.find((c) => c.id === id);
           if (!claim) throw notFound();
+          // a repeat gets the first collection back, as the API does
+          if (collectionForClaim(state(), id)) {
+            return { collection: toCollection(collectionForClaim(state(), id)!) };
+          }
           if (claim.status !== 'active' || !claim.transportNeeded) {
             throw invalidState('Only an active claim that needs transport can be dispatched.');
           }
@@ -391,12 +395,17 @@ export function createFakeDataLayer(store: Store, options: FakeOptions): DataLay
             userId: me().id,
             driverName: body.driverName,
             driverPhone: body.driverPhone,
+            scheduledFor: body.scheduledFor,
           });
           return { collection: toCollection(collectionForClaim(state(), id)!) };
         }),
       updateCollection: (id, body) =>
         call('claims', 'updateCollection', () => {
-          if (!state().collections.some((c) => c.id === id)) throw notFound();
+          const collection = state().collections.find((c) => c.id === id);
+          if (!collection) throw notFound();
+          if (collection.status !== 'dispatched') {
+            throw invalidState('This collection is already closed.');
+          }
           store.dispatch({ type: 'FAKE_UPDATE_COLLECTION', collectionId: id, status: body.status });
           return { collection: toCollection(state().collections.find((c) => c.id === id)!) };
         }),
