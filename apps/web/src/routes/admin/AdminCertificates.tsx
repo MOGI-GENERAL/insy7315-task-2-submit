@@ -1,138 +1,345 @@
-/* TAX CERTIFICATES: AUTO-PREPARED, MANUALLY ISSUED (REVIEW GATE BEFORE RELEASE) */
-
+import { useState } from 'react';
+import {
+  FoodCategory,
+  IssueCertificateRequest,
+  UpdateValuationRatesRequest,
+} from '@fedsa/contract';
+import type { Organisation, TaxCertificate, ValuationRate } from '@fedsa/contract';
+import { ConfirmDialog, Empty, errorKey, LoadState, useToast } from '../../components/feedback';
+import { Field, FormError, useForm } from '../../components/forms';
+import type { Validator } from '../../components/forms';
 import { Icon } from '../../components/Icon';
-import { EventBanner } from '../../components/EventBanner';
-import { PageHead, Section } from '../../components/ui';
-import { useApp, useCurrentUser } from '../../store/context';
-import { orgById } from '../../store/selectors';
-import { useT, categoryKey } from '../../i18n/useT';
+import { Banner, PageHead, Section } from '../../components/ui';
+import { dataMode, isApiError, useData, useLoad } from '../../data';
+import { fill } from '../../i18n/useFormat';
+import { categoryKey, useT } from '../../i18n/useT';
 import { formatDateFull, formatKg, formatNumber, formatZar, mealsFromKg } from '../../lib/format';
-import '../donor/Certificates.css';
+import { ReportTable } from './ReportTable';
 import './Admin.css';
 
-export function AdminCertificates() {
-  const { state, dispatch } = useApp();
-  const user = useCurrentUser()!;
-  const t = useT();
+const saDay = (date: Date) => date.toLocaleDateString('en-CA', { timeZone: 'Africa/Johannesburg' });
 
-  const pending = state.certificates.filter((c) => c.status === 'pending');
-  const issued = state.certificates.filter((c) => c.status === 'issued');
+/** a period ends at 23:59 in South African time, which is the next day anywhere further east */
+const saDate = (iso: string) =>
+  new Date(iso).toLocaleDateString('en-ZA', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'Africa/Johannesburg',
+  });
+
+/** the previous calendar month, which is the period a monthly certificate covers */
+function lastMonth() {
+  const now = new Date();
+  return {
+    periodStart: saDay(new Date(now.getFullYear(), now.getMonth() - 1, 1, 12)),
+    periodEnd: saDay(new Date(now.getFullYear(), now.getMonth(), 0, 12)),
+  };
+}
+
+/** the rates form is keyed by category, the request is a list */
+const ratesRequest: Validator<UpdateValuationRatesRequest> = {
+  safeParse: (values) => {
+    const rates = (values as { rates: Record<string, number | undefined> }).rates;
+    const parsed = UpdateValuationRatesRequest.safeParse({
+      items: FoodCategory.options.map((category) => ({ category, ratePerKg: rates[category] })),
+    });
+    if (parsed.success) return parsed;
+    return {
+      success: false,
+      error: {
+        issues: parsed.error.issues.map((issue) => {
+          const index = issue.path[1];
+          return issue.path[0] === 'items' && typeof index === 'number'
+            ? { ...issue, path: ['rates', FoodCategory.options[index]] }
+            : issue;
+        }),
+      },
+    };
+  },
+};
+
+function IssueForm({
+  donors,
+  onIssued,
+}: {
+  donors: Organisation[];
+  onIssued: () => Promise<void>;
+}) {
+  const { certificates } = useData();
+  const t = useT();
+  const toast = useToast();
+  const [pending, setPending] = useState<IssueCertificateRequest | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [nothing, setNothing] = useState(false);
+
+  const form = useForm({
+    initial: { donorOrganisationId: '', ...lastMonth() },
+    schema: IssueCertificateRequest,
+    onSubmit: (body) => {
+      setNothing(false);
+      setPending(body);
+    },
+  });
+
+  async function issue() {
+    if (!pending) return;
+    setBusy(true);
+    try {
+      const { certificate } = await certificates.issue(pending);
+      toast.success(fill(t('acert.issued'), { number: certificate.certificateNumber }));
+      setNothing(false);
+    } catch (error) {
+      if (isApiError(error, 'INVALID_STATE')) setNothing(true);
+      else toast.error(t(errorKey(error)));
+    } finally {
+      setBusy(false);
+      setPending(null);
+    }
+    await onIssued();
+  }
+
+  const donor = donors.find((org) => org.id === pending?.donorOrganisationId);
 
   return (
     <>
-      <PageHead
-        title="Tax certificates"
-        lead="Built automatically from confirmed handovers. Nothing reaches a donor until you review and issue it."
-      />
+      <form {...form.formProps} className="stack panel">
+        <FormError form={form} />
+        {nothing && <Banner tone="warn">{t('acert.nothingToIssue')}</Banner>}
+        <Field form={form} name="donorOrganisationId" label={t('acert.donor')}>
+          {(props) => (
+            <select {...props} className="select">
+              <option value="">{t('acert.chooseDonor')}</option>
+              {donors.map((org) => (
+                <option key={org.id} value={org.id}>
+                  {org.name}
+                </option>
+              ))}
+            </select>
+          )}
+        </Field>
+        <div className="range-picker__inputs">
+          <Field form={form} name="periodStart" label={t('acert.periodStart')}>
+            {(props) => <input {...props} className="input" type="date" />}
+          </Field>
+          <Field form={form} name="periodEnd" label={t('acert.periodEnd')}>
+            {(props) => <input {...props} className="input" type="date" />}
+          </Field>
+        </div>
+        <p className="muted">{t('acert.periodHint')}</p>
+        <button type="submit" className="btn btn--primary">
+          <Icon name="check" size={18} />
+          {t('acert.issue')}
+        </button>
+      </form>
 
-      <EventBanner />
+      <ConfirmDialog
+        open={pending !== null}
+        title={fill(t('acert.confirmTitle'), { name: donor?.name ?? '' })}
+        confirmLabel={t('acert.issue')}
+        tone="go"
+        busy={busy}
+        onConfirm={() => void issue()}
+        onCancel={() => setPending(null)}
+      >
+        <p>{t('acert.confirmBody')}</p>
+      </ConfirmDialog>
+    </>
+  );
+}
 
-      <Section title="Ready to issue" count={pending.length}>
-        {pending.length === 0 ? (
-          <p className="muted">Nothing waiting. Certificates are prepared once a month closes.</p>
-        ) : (
-          <ul className="cert-list">
-            {pending.map((cert) => {
-              const org = orgById(state, cert.donorOrganisationId);
-              const value = cert.valuationByCategory.reduce((s, v) => s + v.valueZar, 0);
-              return (
-                <li key={cert.id} className="cert">
-                  <div className="cert__body" style={{ paddingTop: 'var(--s-4)' }}>
-                    <div className="row row--between row--wrap">
-                      <div>
-                        <strong style={{ fontFamily: 'var(--font-head)', fontSize: 'var(--t-lg)' }}>
-                          {cert.reference}
-                        </strong>
-                        <p className="muted">
-                          {org?.name} · {formatDateFull(cert.periodStart)} to{' '}
-                          {formatDateFull(cert.periodEnd)}
-                        </p>
-                      </div>
-                      <span className="badge" data-tone="expiring">
-                        Pending
-                      </span>
-                    </div>
+function RatesForm({ rates, onSaved }: { rates: ValuationRate[]; onSaved: () => Promise<void> }) {
+  const { certificates } = useData();
+  const t = useT();
+  const toast = useToast();
+  const [pending, setPending] = useState<UpdateValuationRatesRequest | null>(null);
+  const [busy, setBusy] = useState(false);
 
-                    <ul
-                      className="valuation-list"
-                      aria-label={`Valuation breakdown for ${cert.reference}`}
-                    >
-                      {cert.valuationByCategory.map((line) => (
-                        <li className="valuation-row" key={line.category}>
-                          <span className="valuation-row__label">
-                            <span className="valuation-row__cat">{t(categoryKey(line.category))}</span>
-                            <span className="valuation-row__note">
-                              {formatNumber(mealsFromKg(line.kg))} meals · {formatZar(line.valueZar)}
-                            </span>
-                          </span>
-                          <span className="valuation-row__value num">{formatKg(line.kg)}</span>
-                        </li>
-                      ))}
-                      <li className="valuation-row">
-                        <span className="valuation-row__label">
-                          <span className="valuation-row__cat">Total</span>
-                          <span className="valuation-row__note">
-                            {formatNumber(cert.mealEquivalents)} meals · {formatZar(value)}
-                          </span>
-                        </span>
-                        <span className="valuation-row__value num">{formatKg(cert.totalKg)}</span>
-                      </li>
-                    </ul>
+  const byCategory = new Map(rates.map((rate) => [rate.category, rate]));
+  const form = useForm({
+    initial: {
+      rates: Object.fromEntries(
+        FoodCategory.options.map((category) => [category, byCategory.get(category)?.ratePerKg]),
+      ),
+    },
+    schema: ratesRequest,
+    onSubmit: (body) => setPending(body),
+  });
 
-                    <p className="cert__trace">
-                      <Icon name="shield" size={16} />
-                      Traceable to {cert.handoverRecordIds.length} handover records, each confirmed
-                      by both parties.
-                    </p>
+  async function save() {
+    if (!pending) return;
+    setBusy(true);
+    try {
+      await certificates.updateRates(pending);
+      toast.success(t('acert.ratesSaved'));
+    } catch (error) {
+      toast.error(t(errorKey(error)));
+    } finally {
+      setBusy(false);
+      setPending(null);
+    }
+    await onSaved();
+  }
 
-                    <button
-                      type="button"
-                      className="btn btn--go"
-                      onClick={() =>
-                        dispatch({
-                          type: 'ISSUE_CERTIFICATE',
-                          certificateId: cert.id,
-                          userId: user.id,
-                        })
-                      }
-                    >
-                      <Icon name="check" size={18} />
-                      Issue to {org?.name}
-                    </button>
-                  </div>
-                </li>
-              );
+  return (
+    <>
+      <form {...form.formProps} className="stack panel">
+        <FormError form={form} />
+        {FoodCategory.options.map((category) => {
+          const rate = byCategory.get(category);
+          return (
+            <Field
+              key={category}
+              form={form}
+              kind="number"
+              name={`rates.${category}`}
+              label={t(categoryKey(category))}
+              hint={
+                !rate || rate.updatedByUserId === null
+                  ? t('acert.ratesPlaceholder')
+                  : fill(t('acert.ratesUpdated'), { date: formatDateFull(rate.updatedAt) })
+              }
+            >
+              {(props) => (
+                <input
+                  {...props}
+                  className="input"
+                  type="number"
+                  inputMode="decimal"
+                  step="0.01"
+                  min="0"
+                />
+              )}
+            </Field>
+          );
+        })}
+        <button type="submit" className="btn btn--primary">
+          {t('acert.ratesSave')}
+        </button>
+      </form>
+
+      <ConfirmDialog
+        open={pending !== null}
+        title={t('acert.ratesConfirmTitle')}
+        confirmLabel={t('acert.ratesSave')}
+        busy={busy}
+        onConfirm={() => void save()}
+        onCancel={() => setPending(null)}
+      >
+        <p>{t('acert.ratesConfirmBody')}</p>
+      </ConfirmDialog>
+    </>
+  );
+}
+
+function CertificateCard({ cert, donor }: { cert: TaxCertificate; donor: string }) {
+  const t = useT();
+  return (
+    <li className="rank-row">
+      <div className="rank-row__head">
+        <span className="rank-row__label">
+          <strong>{cert.certificateNumber}</strong>
+          <span className="muted">
+            {donor} ·{' '}
+            {fill(t('acert.period'), {
+              from: saDate(cert.periodStart),
+              to: saDate(cert.periodEnd),
             })}
-          </ul>
-        )}
-      </Section>
+          </span>
+          <span className="muted">
+            {fill(t('acert.issuedOn'), { date: formatDateFull(cert.issuedAt) })} ·{' '}
+            {fill(t('acert.handovers'), { count: cert.handoverRecordIds.length })}
+          </span>
+        </span>
+        <span className="rank-row__value">
+          <span className="num">{formatKg(cert.totalQuantityKg)}</span>
+          <span className="muted">
+            {fill(t('acert.meals'), { count: formatNumber(mealsFromKg(cert.totalQuantityKg)) })} ·{' '}
+            {formatZar(cert.totalValue)}
+          </span>
+        </span>
+      </div>
+      <details>
+        <summary>{t('acert.breakdown')}</summary>
+        <ReportTable
+          caption={`${t('acert.breakdown')}: ${cert.certificateNumber}`}
+          head={[t('acert.colCategory'), t('acert.colKg'), t('acert.colRate'), t('acert.colValue')]}
+          rows={cert.valuationByCategory.map((line) => [
+            t(categoryKey(line.category)),
+            formatKg(line.quantityKg),
+            formatZar(line.ratePerKg),
+            formatZar(line.value),
+          ])}
+          foot={[t('acert.total'), formatKg(cert.totalQuantityKg), '', formatZar(cert.totalValue)]}
+        />
+      </details>
+      {dataMode() === 'fake' ? (
+        <p className="muted">{t('acert.pdfFake')}</p>
+      ) : (
+        <a
+          className="btn btn--secondary"
+          href={`/api/tax-certificates/${cert.id}/pdf`}
+          target="_blank"
+          rel="noopener"
+        >
+          <Icon name="download" size={18} />
+          {t('acert.pdf')}
+        </a>
+      )}
+    </li>
+  );
+}
 
-      <Section title="Issued" count={issued.length}>
-        <ul className="rank-list" aria-label="Certificates already issued to donors">
-          {issued.map((cert) => {
-            const org = orgById(state, cert.donorOrganisationId);
-            return (
-              <li className="rank-row" key={cert.id}>
-                <div className="rank-row__head">
-                  <span className="rank-row__label">
-                    <strong>{cert.reference}</strong>
-                    <span className="muted">
-                      {org?.name} · {formatDateFull(cert.periodStart)} – {formatDateFull(cert.periodEnd)}
-                    </span>
-                    <span className="muted">
-                      Issued {cert.issuedAt && formatDateFull(cert.issuedAt)}
-                    </span>
-                  </span>
-                  <span className="rank-row__value">
-                    <span className="num">{formatNumber(cert.totalKg)} kg</span>
-                    <span className="muted">{formatNumber(cert.mealEquivalents)} meals</span>
-                  </span>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      </Section>
+export function AdminCertificates() {
+  const { certificates, organisations } = useData();
+  const t = useT();
+
+  const page = useLoad(async () => {
+    const [issued, donors, rates] = await Promise.all([
+      certificates.list({}),
+      organisations.list({ type: 'donor' }),
+      certificates.rates(),
+    ]);
+    return { issued: issued.items, donors: donors.items, rates: rates.items };
+  }, [certificates, organisations]);
+
+  return (
+    <>
+      <PageHead title={t('acert.title')} lead={t('acert.lead')} />
+
+      <LoadState result={page}>
+        {({ issued, donors, rates }) => {
+          const donorName = new Map(donors.map((org) => [org.id, org.name]));
+          const newestFirst = [...issued].sort((a, b) => b.issuedAt.localeCompare(a.issuedAt));
+          return (
+            <>
+              <Section title={t('acert.issueTitle')}>
+                <IssueForm donors={donors} onIssued={page.reload} />
+              </Section>
+
+              <Section title={t('acert.issuedTitle')} count={issued.length}>
+                {issued.length === 0 ? (
+                  <Empty icon="shield" title={t('acert.none')} body={t('acert.noneBody')} />
+                ) : (
+                  <ul className="rank-list" aria-label={t('acert.issuedTitle')}>
+                    {newestFirst.map((cert) => (
+                      <CertificateCard
+                        key={cert.id}
+                        cert={cert}
+                        donor={donorName.get(cert.donorOrganisationId) ?? ''}
+                      />
+                    ))}
+                  </ul>
+                )}
+              </Section>
+
+              <Section title={t('acert.ratesTitle')} lead={t('acert.ratesLead')}>
+                <RatesForm rates={rates} onSaved={page.reload} />
+              </Section>
+            </>
+          );
+        }}
+      </LoadState>
     </>
   );
 }
