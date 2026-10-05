@@ -1,4 +1,4 @@
-import { type ImpactRow, type ListOffersQuery } from '@fedsa/contract';
+import { suburbLocation, type ImpactRow, type ListOffersQuery } from '@fedsa/contract';
 import { mealsFromKg } from '../../lib/format';
 import { canClaim, nextStatus, storageFields } from '../../lib/org';
 import {
@@ -62,6 +62,22 @@ const roundKg = (kg: number) => Math.round(kg * 1000) / 1000;
 
 const isStaff = (user: User) => user.role === 'coordinator' || user.role === 'administrator';
 
+let pushKeyPromise: Promise<string> | null = null;
+
+/** a real P-256 key, which the browser accepts. nothing keeps the private half or sends anything to it */
+function fakePushKey() {
+  pushKeyPromise ??= crypto.subtle
+    .generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify'])
+    .then((pair) => crypto.subtle.exportKey('raw', pair.publicKey))
+    .then((raw) =>
+      btoa(String.fromCharCode(...new Uint8Array(raw)))
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, ''),
+    );
+  return pushKeyPromise;
+}
+
 /** recipients a new offer would reach, by the same rule the feed uses */
 function eligibleRecipientIds(
   state: AppState,
@@ -75,6 +91,8 @@ function eligibleRecipientIds(
 export function createFakeDataLayer(store: Store, options: FakeOptions): DataLayer {
   const state = () => store.getState();
   const idempotency = new Map<string, string>();
+  /** endpoint to user ID */
+  const pushEndpoints = new Map<string, string>();
   let rates = (['bakery', 'produce', 'dairy', 'prepared', 'dry', 'other'] as const).map(
     (category, i) => ({
       category,
@@ -133,8 +151,10 @@ export function createFakeDataLayer(store: Store, options: FakeOptions): DataLay
         const org = myOrg();
         return canClaim(org) ? eligibleOffers(s, org) : [];
       }
-      case 'scheduled':
-        return scheduledOffers(s, myOrg());
+      case 'scheduled': {
+        const org = myOrg();
+        return canClaim(org) ? scheduledOffers(s, org) : [];
+      }
       case 'mine':
         return offersForDonor(s, myOrg().id);
       case 'all':
@@ -200,10 +220,11 @@ export function createFakeDataLayer(store: Store, options: FakeOptions): DataLay
                   ),
                 )
               : {};
+          const place = body.suburb ? { location: suburbLocation(body.suburb) } : {};
           store.dispatch({
             type: 'FAKE_UPDATE_ORGANISATION',
             organisationId: org.id,
-            changes: { ...(rest as Partial<Organisation>), ...storage },
+            changes: { ...(rest as Partial<Organisation>), ...storage, ...place },
           });
           return { organisation: toOrganisation(orgById(state(), org.id)!, false) };
         }),
@@ -376,6 +397,12 @@ export function createFakeDataLayer(store: Store, options: FakeOptions): DataLay
         call('claims', 'release', () => {
           const claim = state().claims.find((c) => c.id === id);
           if (!claim || claim.recipientOrganisationId !== myOrg().id) throw notFound();
+          if (handoverForClaim(state(), id)) {
+            throw invalidState('This claim has a handover and can no longer be released.');
+          }
+          if (claim.status !== 'active' && claim.status !== 'released') {
+            throw invalidState('Only an active claim can be released.');
+          }
           store.dispatch({ type: 'RELEASE_CLAIM', claimId: id, reason: body.reason ?? '' });
           const s = state();
           const released = s.claims.find((c) => c.id === id)!;
@@ -504,16 +531,34 @@ export function createFakeDataLayer(store: Store, options: FakeOptions): DataLay
       list: () =>
         call('notifications', 'list', () => {
           const user = me();
-          const mine = state().notifications.filter((n) => n.userId === user.id);
+          const mine = state()
+            .notifications.filter((n) => n.userId === user.id)
+            .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+          // each stored notification stands for its inbox row, the only channel the API lists
           return {
-            items: mine.map(toNotification),
+            items: mine
+              .slice(0, 50)
+              .map((n) => ({ ...toNotification(n), channel: 'in_app' as const })),
             unread: mine.filter((n) => !n.readAt).length,
           };
         }),
       markRead: (id) =>
         call('notifications', 'markRead', () => {
-          me();
+          const user = me();
+          if (!state().notifications.some((n) => n.id === id && n.userId === user.id)) {
+            throw notFound();
+          }
           store.dispatch({ type: 'MARK_NOTIFICATION_READ', notificationId: id });
+        }),
+      pushKey: () => call('notifications', 'pushKey', () => null).then(() => fakePushKey()),
+      subscribePush: (body) =>
+        call('notifications', 'subscribePush', () => {
+          // as in the API, a shared phone's subscription moves to whoever subscribed last
+          pushEndpoints.set(body.endpoint, me().id);
+        }),
+      unsubscribePush: (body) =>
+        call('notifications', 'unsubscribePush', () => {
+          if (pushEndpoints.get(body.endpoint) === me().id) pushEndpoints.delete(body.endpoint);
         }),
     },
 

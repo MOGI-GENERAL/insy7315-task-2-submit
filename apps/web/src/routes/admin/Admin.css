@@ -137,8 +137,10 @@
   border-radius: var(--r-md);
 }
 
+/* the status badge says disabled, and fading the text would fail contrast */
 .account-card[data-disabled='true'] {
-  opacity: 0.55;
+  background: var(--c-surface-sunk);
+  border-style: dashed;
 }
 
 .account-card__top {

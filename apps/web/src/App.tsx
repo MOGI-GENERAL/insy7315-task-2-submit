@@ -1,54 +1,69 @@
 /* ROUTE TABLE — CLIENT-SIDE ROLE GUARDS (NOT A SUBSTITUTE FOR SERVER AUTH) */
 
 import { Route, Routes } from 'react-router-dom';
-import type { ReactElement } from 'react';
+import { lazy, Suspense } from 'react';
+import type { ComponentType, ReactElement } from 'react';
 import type { Role } from '@fedsa/contract';
 
 import { CHANGE_PASSWORD_PATH } from './auth/context';
 import { Landing, RequireRole, SignedOutOnly } from './auth/guards';
 import { AppShell } from './components/AppShell';
+import { Loading } from './components/feedback';
 
 import { Login } from './routes/Login';
-import { Notifications } from './routes/Notifications';
-import { ChangePassword } from './routes/account/ChangePassword';
-import { PendingVerification } from './routes/account/PendingVerification';
-import { PrivacyNotice } from './routes/account/PrivacyNotice';
-import { Register } from './routes/account/Register';
 import { PENDING_PATH, PRIVACY_PATH, REGISTER_PATH } from './routes/account/paths';
 
-import { DonorHome } from './routes/donor/DonorHome';
-import { PostOffer } from './routes/donor/PostOffer';
-import { OfferPosted } from './routes/donor/OfferPosted';
-import { DonorOfferDetail } from './routes/donor/DonorOfferDetail';
-import { DonorHandover } from './routes/donor/DonorHandover';
-import { DonorCertificates } from './routes/donor/DonorCertificates';
+/** each role's screens come from one module and download as one chunk */
+function lazyScreen<M>(load: () => Promise<M>, name: keyof M) {
+  return lazy(async () => ({ default: (await load())[name] as ComponentType }));
+}
 
-import { OfferFeed } from './routes/recipient/OfferFeed';
-import { OfferDetail } from './routes/recipient/OfferDetail';
-import { ClaimConfirm } from './routes/recipient/ClaimConfirm';
-import { MyClaims } from './routes/recipient/MyClaims';
-import { ReleaseClaim } from './routes/recipient/ReleaseClaim';
-import { ScheduledOffers } from './routes/recipient/ScheduledOffers';
-import { RecipientHandover } from './routes/recipient/RecipientHandover';
-import { RecipientProfile } from './routes/recipient/RecipientProfile';
+const common = () => import('./routes/screens');
+const Notifications = lazyScreen(common, 'Notifications');
+const ChangePassword = lazyScreen(common, 'ChangePassword');
+const PendingVerification = lazyScreen(common, 'PendingVerification');
+const PrivacyNotice = lazyScreen(common, 'PrivacyNotice');
+const Register = lazyScreen(common, 'Register');
 
-import { Dashboard } from './routes/coordinator/Dashboard';
-import { Dispatch } from './routes/coordinator/Dispatch';
-import { VerifyOrganisations } from './routes/coordinator/VerifyOrganisations';
-import { CapacityNotes } from './routes/coordinator/CapacityNotes';
-import { ResolveDisputes } from './routes/coordinator/ResolveDisputes';
+const donor = () => import('./routes/donor/screens');
+const DonorHome = lazyScreen(donor, 'DonorHome');
+const PostOffer = lazyScreen(donor, 'PostOffer');
+const OfferPosted = lazyScreen(donor, 'OfferPosted');
+const DonorOfferDetail = lazyScreen(donor, 'DonorOfferDetail');
+const DonorHandover = lazyScreen(donor, 'DonorHandover');
+const DonorCertificates = lazyScreen(donor, 'DonorCertificates');
 
-import { ReportsHome } from './routes/admin/ReportsHome';
-import { KgMealReport } from './routes/admin/KgMealReport';
-import { ClaimedExpired } from './routes/admin/ClaimedExpired';
-import { ExportReport } from './routes/admin/ExportReport';
-import { AdminCertificates } from './routes/admin/AdminCertificates';
-import { ManageAccounts } from './routes/admin/ManageAccounts';
+const recipient = () => import('./routes/recipient/screens');
+const OfferFeed = lazyScreen(recipient, 'OfferFeed');
+const OfferDetail = lazyScreen(recipient, 'OfferDetail');
+const ClaimConfirm = lazyScreen(recipient, 'ClaimConfirm');
+const MyClaims = lazyScreen(recipient, 'MyClaims');
+const ReleaseClaim = lazyScreen(recipient, 'ReleaseClaim');
+const ScheduledOffers = lazyScreen(recipient, 'ScheduledOffers');
+const RecipientHandover = lazyScreen(recipient, 'RecipientHandover');
+const RecipientProfile = lazyScreen(recipient, 'RecipientProfile');
+
+const coordinator = () => import('./routes/coordinator/screens');
+const Dashboard = lazyScreen(coordinator, 'Dashboard');
+const Dispatch = lazyScreen(coordinator, 'Dispatch');
+const VerifyOrganisations = lazyScreen(coordinator, 'VerifyOrganisations');
+const CapacityNotes = lazyScreen(coordinator, 'CapacityNotes');
+const ResolveDisputes = lazyScreen(coordinator, 'ResolveDisputes');
+
+const admin = () => import('./routes/admin/screens');
+const ReportsHome = lazyScreen(admin, 'ReportsHome');
+const KgMealReport = lazyScreen(admin, 'KgMealReport');
+const ClaimedExpired = lazyScreen(admin, 'ClaimedExpired');
+const ExportReport = lazyScreen(admin, 'ExportReport');
+const AdminCertificates = lazyScreen(admin, 'AdminCertificates');
+const ManageAccounts = lazyScreen(admin, 'ManageAccounts');
 
 function Guard({ allow, children }: { allow: Role; children: ReactElement }) {
   return (
     <RequireRole allow={allow}>
-      <AppShell>{children}</AppShell>
+      <AppShell>
+        <Suspense fallback={<Loading />}>{children}</Suspense>
+      </AppShell>
     </RequireRole>
   );
 }
@@ -56,9 +71,16 @@ function Guard({ allow, children }: { allow: Role; children: ReactElement }) {
 function AnyRole({ children }: { children: ReactElement }) {
   return (
     <RequireRole>
-      <AppShell>{children}</AppShell>
+      <AppShell>
+        <Suspense fallback={<Loading />}>{children}</Suspense>
+      </AppShell>
     </RequireRole>
   );
+}
+
+/** for the signed-out screens, which have no shell around them */
+function Lazy({ children }: { children: ReactElement }) {
+  return <Suspense fallback={<Loading />}>{children}</Suspense>;
 }
 
 export function App() {
@@ -74,8 +96,8 @@ export function App() {
         }
       />
       {/* not behind SignedOutOnly, which would send a new recipient past the waiting screen */}
-      <Route path={REGISTER_PATH} element={<Register />} />
-      <Route path={PRIVACY_PATH} element={<PrivacyNotice />} />
+      <Route path={REGISTER_PATH} element={<Lazy><Register /></Lazy>} />
+      <Route path={PRIVACY_PATH} element={<Lazy><PrivacyNotice /></Lazy>} />
       <Route
         path={CHANGE_PASSWORD_PATH}
         element={

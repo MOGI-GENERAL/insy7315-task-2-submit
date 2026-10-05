@@ -5,6 +5,7 @@ import { useSession } from '../../auth/context';
 import { useData, useLoad } from '../../data';
 import { Empty, LoadState } from '../../components/feedback';
 import { OfferPhoto } from '../../components/OfferPhoto';
+import { PushOptIn } from '../../components/PushOptIn';
 import { Icon } from '../../components/Icon';
 import { Banner, PageHead } from '../../components/ui';
 import { useT } from '../../i18n/useT';
@@ -52,6 +53,7 @@ export function MyClaims() {
           <a href={`tel:${justClaimed.donorContact.phone}`}>{justClaimed.donorContact.phone}</a>.
         </Banner>
       )}
+      {justClaimed && <PushOptIn afterAction />}
 
       <LoadState result={list}>
         {({ items }) => {

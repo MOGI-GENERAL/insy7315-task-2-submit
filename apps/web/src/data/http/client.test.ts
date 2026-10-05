@@ -111,6 +111,11 @@ describe('API client', () => {
     await expect(createApiClient(server.fetchFn).send('POST', '/api/x')).resolves.toBeUndefined();
   });
 
+  test('an empty 201 resolves with nothing', async () => {
+    const server = fakeServer([new Response(null, { status: 201 })]);
+    await expect(createApiClient(server.fetchFn).send('POST', '/api/x')).resolves.toBeUndefined();
+  });
+
   test('query strings leave out unset values', () => {
     expect(withQuery('/api/offers', { view: 'feed', status: undefined, cursor: 'abc' })).toBe(
       '/api/offers?view=feed&cursor=abc',

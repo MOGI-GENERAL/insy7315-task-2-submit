@@ -76,6 +76,12 @@
   text-align: center;
 }
 
+.login__help a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap-min);
+}
+
 .login__subtitle {
   font-size: var(--t-base);
   color: var(--c-muted);

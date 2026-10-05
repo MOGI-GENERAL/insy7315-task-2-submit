@@ -54,7 +54,8 @@ export function checkEligibility(
   offer: Pick<Offer, 'coldChain' | 'offeredQuantityKg'>,
 ): Eligibility {
   const reasons: string[] = [];
-  const capacity = org.maxCapacityKg ?? 0;
+  // an empty capacity means no limit, as it does in the API
+  const capacity = org.maxCapacityKg;
 
   if (!canStore(org, offer.coldChain)) {
     reasons.push(
@@ -66,7 +67,7 @@ export function checkEligibility(
     );
   }
 
-  if (offer.offeredQuantityKg > capacity) {
+  if (capacity != null && offer.offeredQuantityKg > capacity) {
     reasons.push(`${offer.offeredQuantityKg} kg is more than your ${capacity} kg limit`);
   }
 
