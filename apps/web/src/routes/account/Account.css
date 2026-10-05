@@ -1,0 +1,60 @@
+.register__title,
+.privacy h1 {
+  font-size: var(--t-2xl);
+  margin: 0 0 var(--s-2);
+}
+
+.register__lead {
+  color: var(--c-muted);
+  margin: 0 0 var(--s-5);
+}
+
+.register__section {
+  border: 0;
+  border-top: 1px solid var(--c-line);
+  margin: var(--s-5) 0 0;
+  padding: var(--s-4) 0 0;
+  min-width: 0;
+}
+
+.register__heading {
+  font-family: var(--font-head);
+  font-size: var(--t-lg);
+  font-weight: var(--w-bold);
+  padding: 0;
+  margin-bottom: var(--s-3);
+}
+
+.register__privacy {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin: 0 0 var(--s-5);
+  font-size: var(--t-sm);
+}
+
+.privacy {
+  padding: var(--s-5) var(--s-4);
+  background: var(--c-surface);
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-md);
+  margin-bottom: var(--s-5);
+}
+
+.privacy h2 {
+  font-size: var(--t-lg);
+  margin: var(--s-5) 0 var(--s-2);
+}
+
+.privacy p {
+  margin: 0;
+  line-height: 1.55;
+}
+
+.account {
+  max-width: 34rem;
+}
+
+.account .banner {
+  margin-bottom: var(--s-4);
+}
