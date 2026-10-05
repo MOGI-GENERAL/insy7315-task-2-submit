@@ -78,6 +78,50 @@ describe('fake data layer', () => {
     });
   });
 
+  describe('dispatch', () => {
+    async function claimWithoutDriver() {
+      const { data } = setup();
+      await data.auth.login({ email: 'nadia@example.org', password: 'x' });
+      const { items } = await data.claims.list({ status: 'active' });
+      for (const claim of items.filter((c) => c.transportNeeded)) {
+        if (!(await data.offers.get(claim.offerId)).collection) return { data, claim };
+      }
+      throw new Error('the seed has no claim waiting for a driver');
+    }
+
+    const scheduledFor = deadline();
+    const request = (driverName: string) => ({
+      driverName,
+      driverPhone: '+27821112222',
+      scheduledFor,
+    });
+
+    test('a repeat dispatch returns the first collection unchanged', async () => {
+      const { data, claim } = await claimWithoutDriver();
+
+      const first = await data.claims.dispatch(claim.id, request('Themba Mokoena'));
+      const repeat = await data.claims.dispatch(claim.id, request('Someone Else'));
+
+      expect(repeat).toEqual(first);
+      expect(first.collection).toMatchObject({
+        status: 'dispatched',
+        driverName: 'Themba Mokoena',
+        scheduledFor,
+      });
+    });
+
+    test('a collection can be closed once and then stays closed', async () => {
+      const { data, claim } = await claimWithoutDriver();
+      const { collection } = await data.claims.dispatch(claim.id, request('Themba Mokoena'));
+
+      const done = await data.claims.updateCollection(collection.id, { status: 'completed' });
+      expect(done.collection.status).toBe('completed');
+      await expect(
+        data.claims.updateCollection(collection.id, { status: 'cancelled' }),
+      ).rejects.toMatchObject({ code: 'INVALID_STATE', status: 409 });
+    });
+  });
+
   test('a method named in failOn rejects with INTERNAL', async () => {
     const { data } = setup(['claim']);
     await data.auth.login({ email: 'peter@example.org', password: 'x' });

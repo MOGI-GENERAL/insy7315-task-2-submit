@@ -10,9 +10,18 @@ export type FakeAction =
       organisationId: string;
       changes: Partial<Omit<Organisation, 'id' | 'type' | 'status'>>;
     }
-  | { type: 'FAKE_ADD_USER'; user: User }
-  | { type: 'FAKE_UPDATE_USER'; targetUserId: string; role?: Role; active?: boolean }
+  | { type: 'FAKE_ADD_USER'; user: User; actorUserId: string }
+  | {
+      type: 'FAKE_UPDATE_USER';
+      targetUserId: string;
+      actorUserId: string;
+      role?: Role;
+      active?: boolean;
+    }
   | { type: 'FAKE_UPDATE_COLLECTION'; collectionId: string; status: 'completed' | 'cancelled' };
+
+let sequence = 0;
+const auditId = () => `aud-fake${(++sequence).toString(36)}`;
 
 export function isFakeAction(action: Action | FakeAction): action is FakeAction {
   return action.type.startsWith('FAKE_');
@@ -73,13 +82,46 @@ export function fakeReducer(state: AppState, action: FakeAction): AppState {
       };
 
     case 'FAKE_ADD_USER':
-      return { ...state, users: [...state.users, action.user] };
+      return {
+        ...state,
+        users: [...state.users, action.user],
+        audit: [
+          {
+            id: auditId(),
+            actorUserId: action.actorUserId,
+            action: 'Created account',
+            target: action.user.name,
+            detail: '',
+            at: new Date().toISOString(),
+          },
+          ...state.audit,
+        ],
+      };
 
-    case 'FAKE_UPDATE_USER':
+    case 'FAKE_UPDATE_USER': {
+      const target = state.users.find((u) => u.id === action.targetUserId);
+      if (!target) return state;
+      const at = new Date().toISOString();
+      const entry = (name: string, detail: string) => ({
+        id: auditId(),
+        actorUserId: action.actorUserId,
+        action: name,
+        target: target.name,
+        detail,
+        at,
+      });
+      const entries = [
+        ...(action.active !== undefined && action.active !== target.active
+          ? [entry(action.active ? 'Enabled account' : 'Disabled account', '')]
+          : []),
+        ...(action.role && action.role !== target.role
+          ? [entry('Changed role', `${target.role} to ${action.role}`)]
+          : []),
+      ];
       return {
         ...state,
         users: state.users.map((u) =>
-          u.id === action.targetUserId
+          u.id === target.id
             ? {
                 ...u,
                 ...(action.role ? { role: action.role } : {}),
@@ -87,7 +129,9 @@ export function fakeReducer(state: AppState, action: FakeAction): AppState {
               }
             : u,
         ),
+        audit: [...entries, ...state.audit],
       };
+    }
 
     case 'FAKE_UPDATE_COLLECTION':
       return {

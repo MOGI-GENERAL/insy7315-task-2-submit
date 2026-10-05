@@ -3,7 +3,9 @@ import type { ColdChain, Organisation, OrganisationStatus } from '../store/types
 
 const FEDSA_OFFICE = suburbLocation('Salt River');
 
-export function storageList(org: Organisation): ColdChain[] {
+export function storageList(
+  org: Pick<Organisation, 'storageAmbient' | 'storageRefrigerated' | 'storageFrozen'>,
+): ColdChain[] {
   const list: ColdChain[] = [];
   if (org.storageAmbient) list.push('ambient');
   if (org.storageRefrigerated) list.push('refrigerated');

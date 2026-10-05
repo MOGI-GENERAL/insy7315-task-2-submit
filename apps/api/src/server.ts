@@ -23,6 +23,7 @@ import { channelSettings } from './notifications/channel-settings.js';
 import { LocalPhotoStore } from './photos/local-photo-store.js';
 import { AuditService } from './services/audit-service.js';
 import { ClaimService } from './services/claim-service.js';
+import { CollectionService } from './services/collection-service.js';
 import { DEFAULT_RADIUS_KM } from './services/eligibility.js';
 import { HandoverService } from './services/handover-service.js';
 import { HealthService } from './services/health-service.js';
@@ -100,6 +101,15 @@ async function start() {
     notifications,
     logger,
   );
+  const collections = new CollectionService(
+    new CollectionRepository(),
+    new ClaimRepository(),
+    new OfferRepository(),
+    new OrganisationRepository(),
+    new AuditService(new AuditLogRepository()),
+    notifications,
+    logger,
+  );
   const services = {
     // Render sets RENDER_GIT_COMMIT on every deploy
     health: new HealthService(new HealthRepository(), process.env.RENDER_GIT_COMMIT || 'dev'),
@@ -118,6 +128,7 @@ async function start() {
     ),
     offers,
     claims,
+    collections,
     handovers,
     notifications,
     reports: new ReportingService(

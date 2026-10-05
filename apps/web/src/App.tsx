@@ -11,6 +11,10 @@ import { AppShell } from './components/AppShell';
 import { Login } from './routes/Login';
 import { Notifications } from './routes/Notifications';
 import { ChangePassword } from './routes/account/ChangePassword';
+import { PendingVerification } from './routes/account/PendingVerification';
+import { PrivacyNotice } from './routes/account/PrivacyNotice';
+import { Register } from './routes/account/Register';
+import { PENDING_PATH, PRIVACY_PATH, REGISTER_PATH } from './routes/account/paths';
 
 import { DonorHome } from './routes/donor/DonorHome';
 import { PostOffer } from './routes/donor/PostOffer';
@@ -69,6 +73,9 @@ export function App() {
           </SignedOutOnly>
         }
       />
+      {/* not behind SignedOutOnly, which would send a new recipient past the waiting screen */}
+      <Route path={REGISTER_PATH} element={<Register />} />
+      <Route path={PRIVACY_PATH} element={<PrivacyNotice />} />
       <Route
         path={CHANGE_PASSWORD_PATH}
         element={
@@ -104,6 +111,7 @@ export function App() {
       <Route path="/recipient/scheduled" element={<Guard allow="recipient"><ScheduledOffers /></Guard>} />
       <Route path="/recipient/offers/:offerId/handover" element={<Guard allow="recipient"><RecipientHandover /></Guard>} />
       <Route path="/recipient/profile" element={<Guard allow="recipient"><RecipientProfile /></Guard>} />
+      <Route path={PENDING_PATH} element={<Guard allow="recipient"><PendingVerification /></Guard>} />
 
       {/* COORDINATOR */}
       <Route path="/coordinator" element={<Guard allow="coordinator"><Dashboard /></Guard>} />

@@ -1,116 +1,140 @@
-/* ADMIN REPORTS HOME: HEADLINE STATS + LINKS INTO DETAILED REPORTS */
-
 import { Link } from 'react-router-dom';
+import type { ReportRangeQuery } from '@fedsa/contract';
+import { BarChart } from '../../components/charts/BarChart';
+import { Empty, LoadState } from '../../components/feedback';
 import { Icon } from '../../components/Icon';
 import { PageHead, Section, StatRow, StatTile } from '../../components/ui';
-import { SplitBar } from '../../components/charts/SplitBar';
-import { useAppState } from '../../store/context';
-import { byMonth, headline } from '../../store/selectors';
-import { formatNumber, formatPercent } from '../../lib/format';
+import { useData, useLoad } from '../../data';
+import { fill } from '../../i18n/useFormat';
+import { useT } from '../../i18n/useT';
+import { formatNumber } from '../../lib/format';
+import { byMonthAscending, formatPct, monthLabel } from './figures';
+import { RangePicker } from './RangePicker';
+import { ReportTable } from './ReportTable';
+import { useRange } from './useRange';
 import './Admin.css';
 
+function Summary({ range, search }: { range: ReportRangeQuery; search: string }) {
+  const { reports } = useData();
+  const t = useT();
+  const report = useLoad(async () => {
+    const [impact, outcomes] = await Promise.all([
+      reports.impact({ ...range, groupBy: 'month' }),
+      reports.outcomes(range),
+    ]);
+    return { impact, outcomes };
+  }, [reports, range]);
+
+  return (
+    <LoadState result={report}>
+      {({ impact, outcomes }) => {
+        const months = byMonthAscending(impact.rows);
+        return (
+          <>
+            <StatRow>
+              <StatTile
+                icon="scale"
+                label={t('rep.moved')}
+                value={formatNumber(impact.totals.kg)}
+                unit="kg"
+                note={fill(t('rep.mealsNote'), { meals: formatNumber(impact.totals.meals) })}
+                tone="good"
+              />
+              <StatTile
+                icon="chart"
+                label={t('rep.claimedPct')}
+                value={formatPct(outcomes.claimedPct)}
+                note={t('rep.claimedTarget')}
+                tone={outcomes.claimedPct >= 75 ? 'good' : 'warn'}
+              />
+              <StatTile
+                icon="people"
+                label={t('rep.served')}
+                value={formatNumber(outcomes.distinctRecipients)}
+                note={t('rep.servedNote')}
+              />
+              <StatTile
+                icon="list"
+                label={t('rep.posted')}
+                value={formatNumber(outcomes.posted)}
+                note={t('rep.postedNote')}
+              />
+            </StatRow>
+
+            <Section
+              title={t('rep.monthsTitle')}
+              lead={t('rep.monthsLead')}
+              actions={
+                <Link to={`/admin/kg-meals${search}`} className="btn btn--ghost">
+                  {t('rep.fullReport')}
+                </Link>
+              }
+            >
+              {months.length === 0 ? (
+                <Empty icon="chart" title={t('rep.noHandovers')} body={t('rep.noHandoversBody')} />
+              ) : (
+                <>
+                  <div className="panel">
+                    <BarChart
+                      data={months.map((row) => ({ label: monthLabel(row.key), value: row.kg }))}
+                      valueLabel="kg"
+                    />
+                  </div>
+                  <ReportTable
+                    srOnly
+                    caption={t('rep.monthsChart')}
+                    head={[t('rep.colMonth'), t('rep.colKg'), t('rep.colMeals')]}
+                    rows={months.map((row) => [
+                      monthLabel(row.key),
+                      formatNumber(row.kg),
+                      formatNumber(row.meals),
+                    ])}
+                  />
+                </>
+              )}
+              <p className="muted">{t('rep.mealsRule')}</p>
+            </Section>
+          </>
+        );
+      }}
+    </LoadState>
+  );
+}
+
 export function ReportsHome() {
-  const state = useAppState();
-  const stats = headline(state);
-  const months = byMonth(state, 3);
+  const t = useT();
+  const range = useRange();
 
   return (
     <>
-      <PageHead
-        title="Reports"
-        lead="Every figure below is drawn from handover records both parties confirmed, not from an estimate."
-      />
-
-      <StatRow>
-        <StatTile
-          icon="scale"
-          label="Moved this month"
-          value={formatNumber(stats.thisMonthKg)}
-          unit="kg"
-          note={`${formatNumber(stats.thisMonthMeals)} meal equivalents`}
-          tone="good"
-        />
-        <StatTile
-          icon="chart"
-          label="Claimed vs expired"
-          value={formatPercent(stats.claimRate)}
-          note="Target is above 75%"
-          tone={stats.claimRate >= 0.75 ? 'good' : 'warn'}
-        />
-        <StatTile
-          icon="people"
-          label="Recipient organisations served"
-          value={String(stats.distinctRecipients)}
-          note={`${stats.activeDonors} active donors`}
-        />
-        <StatTile
-          icon="clock"
-          label="Median time to claim"
-          value={stats.medianMinutesToClaim === null ? '-' : String(stats.medianMinutesToClaim)}
-          unit="min"
-          note="Target is under 20"
-          tone={
-            stats.medianMinutesToClaim !== null && stats.medianMinutesToClaim <= 20
-              ? 'good'
-              : 'warn'
-          }
-        />
-      </StatRow>
+      <PageHead title={t('rep.title')} lead={t('rep.lead')} />
+      <RangePicker range={range} />
+      {range.range && <Summary range={range.range} search={range.search} />}
 
       <Section
-        title="Claimed vs expired, all time"
-        lead="The funder's own measure of whether matching is working."
+        title={t('rep.nextTitle')}
         actions={
-          <Link to="/admin/claimed-expired" className="btn btn--ghost">
-            Full breakdown
+          <Link to={`/admin/claimed-expired${range.search}`} className="btn btn--ghost">
+            {t('rep.fullBreakdown')}
           </Link>
         }
       >
-        <div className="panel">
-          <SplitBar claimed={stats.collected} expired={stats.expired} />
-        </div>
-      </Section>
-
-      <Section
-        title="Recent months"
-        lead="Kilograms moved, from confirmed handovers only."
-        actions={
-          <Link to="/admin/kg-meals" className="btn btn--ghost">
-            Full report
-          </Link>
-        }
-      >
-        <StatRow>
-          {months.map((m) => (
-            <StatTile
-              key={m.key}
-              icon="clock"
-              label={m.label}
-              value={formatNumber(m.kg)}
-              unit="kg"
-              note={`${formatNumber(m.meals)} meals`}
-            />
-          ))}
-        </StatRow>
-      </Section>
-
-      <Section title="Where to go next">
         <div className="admin-nav-grid">
-          <Link to="/admin/kg-meals" className="admin-nav-card">
+          <Link to={`/admin/kg-meals${range.search}`} className="admin-nav-card">
             <Icon name="chart" size={24} />
-            <span>Kg and meals by donor and recipient</span>
+            <span>{t('rep.navKg')}</span>
           </Link>
-          <Link to="/admin/claimed-expired" className="admin-nav-card">
+          <Link to={`/admin/claimed-expired${range.search}`} className="admin-nav-card">
             <Icon name="scale" size={24} />
-            <span>Claimed vs expired detail</span>
+            <span>{t('rep.navOutcomes')}</span>
           </Link>
-          <Link to="/admin/export" className="admin-nav-card">
+          <Link to={`/admin/export${range.search}`} className="admin-nav-card">
             <Icon name="download" size={24} />
-            <span>Export a funder-ready report</span>
+            <span>{t('rep.navExport')}</span>
           </Link>
           <Link to="/admin/certificates" className="admin-nav-card">
             <Icon name="file" size={24} />
-            <span>Tax certificates</span>
+            <span>{t('rep.navCertificates')}</span>
           </Link>
         </div>
       </Section>

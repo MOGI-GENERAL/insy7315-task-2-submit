@@ -43,6 +43,7 @@ import type { PhotoStore } from '../../src/photos/photo-store.js';
 import { AuditService } from '../../src/services/audit-service.js';
 import type { ClaimNotifier } from '../../src/services/claim-notifier.js';
 import { ClaimService } from '../../src/services/claim-service.js';
+import { CollectionService } from '../../src/services/collection-service.js';
 import { DEFAULT_RADIUS_KM } from '../../src/services/eligibility.js';
 import { HandoverService } from '../../src/services/handover-service.js';
 import { HealthService } from '../../src/services/health-service.js';
@@ -143,6 +144,21 @@ export function newClaimService(offers: OfferService, options: ClaimTestOptions 
   );
 }
 
+/** a test passes its own notification service to read what was texted */
+export function newCollectionService(
+  notifications: Pick<NotificationService, 'sendSms'> = newNotificationService(),
+) {
+  return new CollectionService(
+    new CollectionRepository(),
+    new ClaimRepository(),
+    new OfferRepository(),
+    new OrganisationRepository(),
+    new AuditService(new AuditLogRepository()),
+    notifications,
+    createLogger({ write: () => {} }),
+  );
+}
+
 export interface HandoverTestOptions {
   photos?: PhotoStore;
   notifications?: Pick<NotificationService, 'notifyOrganisations'>;
@@ -209,6 +225,7 @@ export async function startTestApp(
   claims?: ClaimService,
   twilioWebhooks: TwilioWebhookSettings | null = TEST_TWILIO_WEBHOOKS,
   handovers?: HandoverService,
+  collections?: CollectionService,
 ) {
   // a default parameter cannot see a later one, and offers has to share the notification service
   notifications ??= newNotificationService();
@@ -218,6 +235,7 @@ export async function startTestApp(
     claimNotifier: notifications,
   });
   handovers ??= newHandoverService(offers, { notifications });
+  collections ??= newCollectionService(notifications);
 
   const app = createApp({
     logger: createLogger({ write: () => {} }),
@@ -232,6 +250,7 @@ export async function startTestApp(
       organisations: newOrganisationService(),
       offers,
       claims,
+      collections,
       handovers,
       notifications,
       reports: newReportingService(),

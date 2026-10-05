@@ -126,7 +126,7 @@ export function toClaim(claim: Claim, state: AppState): C.Claim {
 }
 
 export function toCollection(collection: Collection): C.Collection {
-  return { ...collection, scheduledFor: null };
+  return { ...collection, scheduledFor: collection.scheduledFor ?? null };
 }
 
 export function toHandover(handover: HandoverRecord, state: AppState): C.Handover {
@@ -174,6 +174,8 @@ const AUDIT_ACTIONS: [RegExp, C.AuditAction][] = [
   [/^Organisation suspended/, 'suspend_organisation'],
   [/^Organisation reinstated/, 'reinstate_organisation'],
   [/^Updated capacity notes/, 'update_capacity_notes'],
+  [/^Created account/, 'create_user'],
+  [/^Changed role/, 'change_role'],
   [/^Disabled account/, 'disable_user'],
   [/^Enabled account/, 'enable_user'],
   [/^Issued tax certificate/, 'issue_certificate'],
