@@ -2,6 +2,19 @@
 
 Each release is merged into `main` and tagged, and the deploy workflow then puts it into production.
 
+## 0.2.0 (2026-10-05)
+
+Handover, dispatch and the coordinator and admin screens are on the real API, and offers now expire on their own.
+
+- **Photos:** stored in Cloudinary when `PHOTO_STORE=cloudinary`, with small thumbnails in lists, and deleted once their retention period ends.
+- **Expiry:** an overdue offer and its claim expire every five minutes while the API is awake, and an expired claim cancels its dispatched driver.
+  A released claim after the deadline no longer reopens the offer.
+- **Handover:** both sides confirm a collection, a short collection offers the remainder, and either side can raise a dispute for a coordinator to resolve.
+- **Dispatch:** a coordinator sends one collection's details to one driver.
+- **Screens on the real API:** donor home and offer detail, both handover screens, the coordinator board, verification, capacity notes and disputes, the admin reports, account management with the audit log, tax certificates with valuation rates, registration with consent, and password changes.
+- **Reports:** a CSV export of the impact report, written to open correctly in Excel with South African settings.
+- **Twilio:** a recipient can claim by replying to an SMS or WhatsApp message, and delivery reports update the notification.
+
 ## 0.1.0 (2026-10-05)
 
 The first production release.
