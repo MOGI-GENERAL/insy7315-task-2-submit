@@ -36,8 +36,9 @@ The browser only talks to the Netlify origin. Netlify rewrites `/api/*` to the R
 | `SESSION_SECRET` | ✓ | ✓ | ✓ | A long random string, different in every environment |
 | `PORT` | set by Render | set by Render | default `3000` | |
 | `RENDER_GIT_COMMIT` | set by Render | set by Render | – | Reported as `version` by `/api/health` |
-| `PHOTO_STORE` | *planned* `cloudinary` | *planned* `cloudinary` | *planned* `local` | |
-| `CLOUDINARY_URL` | *planned* | *planned* | – | |
+| `PHOTO_STORE` | ✓ `cloudinary` | ✓ `cloudinary` | `local` | `local` when empty |
+| `CLOUDINARY_URL` | ✓ | ✓ | optional | `cloudinary://KEY:SECRET@CLOUD_NAME`. Needed when `PHOTO_STORE=cloudinary` |
+| `CLOUDINARY_FOLDER` | ✓ `fedsa/production` | ✓ `fedsa/staging` | – | Defaults to `fedsa` |
 | `NOTIFY_CHANNELS` | ✓ `push,sms` | ✓ `push,sms` | `console` | Channels besides the in-app inbox. A listed channel with a missing setting stays off |
 | `NOTIFY_MIRROR` | optional | optional | optional | `false` stops copying offer notifications to WhatsApp or SMS. On when empty |
 | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` | ✓ | ✓ | optional | The webhooks refuse every request without the auth token |

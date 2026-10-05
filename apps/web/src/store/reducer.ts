@@ -64,6 +64,7 @@ export type Action =
       userId: string;
       driverName: string;
       driverPhone: string;
+      scheduledFor?: string;
     }
   | {
       type: 'SET_VERIFICATION';
@@ -361,7 +362,7 @@ export function reducer(state: AppState, action: Action): AppState {
               channel: 'push',
               title: `${offer.reference}: donor confirmed`,
               body: `${action.quantityKg} kg released. Confirm receipt when it reaches you.`,
-              href: `/recipient/handover/${claim.id}`,
+              href: `/recipient/offers/${offer.id}/handover`,
             }),
           ),
           ...state.notifications,
@@ -462,35 +463,19 @@ export function reducer(state: AppState, action: Action): AppState {
         driverName: action.driverName,
         driverPhone: action.driverPhone,
         dispatchedAt: nowIso(),
+        scheduledFor: action.scheduledFor ?? null,
         status: 'dispatched' as const,
       };
-
-      const recipientUsers = state.users.filter(
-        (u) => u.organisationId === claim.recipientOrganisationId && u.active,
-      );
 
       return {
         ...state,
         collections: existing
           ? state.collections.map((c) => (c.id === existing.id ? collection : c))
           : [...state.collections, collection],
-        notifications: [
-          ...recipientUsers.map((u) =>
-            notify({
-              userId: u.id,
-              kind: 'driver_dispatched',
-              channel: 'whatsapp',
-              title: `Driver arranged for ${offer.reference}`,
-              body: `${action.driverName} is collecting on your behalf.`,
-              href: `/recipient/claims`,
-            }),
-          ),
-          ...state.notifications,
-        ],
         lastEvent: {
           kind: 'driver-dispatched',
           id: claim.id,
-          message: `${action.driverName} sent the details for ${offer.reference} on WhatsApp.`,
+          message: `${action.driverName} sent the details for ${offer.reference} by SMS.`,
         },
       };
     }

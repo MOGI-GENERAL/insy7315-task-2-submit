@@ -107,6 +107,7 @@ export interface Collection {
   driverName: string;
   driverPhone: string;
   dispatchedAt: string;
+  scheduledFor?: string | null;
   status: 'dispatched' | 'completed' | 'cancelled';
 }
 

@@ -22,11 +22,9 @@ export class ClaimRepository {
     recipientOrganisationId: Types.ObjectId | string,
     session?: ClientSession,
   ) {
-    return ClaimModel.findOne(
-      { offerId, recipientOrganisationId, status: 'active' },
-      null,
-      { session },
-    ).exec();
+    return ClaimModel.findOne({ offerId, recipientOrganisationId, status: 'active' }, null, {
+      session,
+    }).exec();
   }
 
   /** null if the claim is not active. a repeated release changes nothing */
@@ -40,6 +38,33 @@ export class ClaimRepository {
       { _id: id, status: 'active' },
       { $set: { status: 'released', releasedAt: at, releaseReason: reason } },
       { returnDocument: 'after', runValidators: true, session },
+    ).exec();
+  }
+
+  findActiveForOffer(offerId: Types.ObjectId | string, session?: ClientSession) {
+    return ClaimModel.findOne({ offerId, status: 'active' }, null, { session }).exec();
+  }
+
+  /** null if the claim is no longer active */
+  fulfilIfActive(id: Types.ObjectId | string, session: ClientSession) {
+    return ClaimModel.findOneAndUpdate(
+      { _id: id, status: 'active' },
+      { $set: { status: 'fulfilled' } },
+      { returnDocument: 'after', runValidators: true, session },
+    ).exec();
+  }
+
+  activeIdsForOffers(offerIds: Types.ObjectId[], session: ClientSession) {
+    return ClaimModel.distinct('_id', { offerId: { $in: offerIds }, status: 'active' })
+      .session(session)
+      .exec() as Promise<Types.ObjectId[]>;
+  }
+
+  expireActive(ids: Types.ObjectId[], session: ClientSession) {
+    return ClaimModel.updateMany(
+      { _id: { $in: ids }, status: 'active' },
+      { $set: { status: 'expired' } },
+      { runValidators: true, session },
     ).exec();
   }
 

@@ -57,6 +57,9 @@ const inRange = (iso: string, from?: string, to?: string) => {
   return (!from || day >= from) && (!to || day <= to);
 };
 
+/** to the gram, as the API rounds */
+const roundKg = (kg: number) => Math.round(kg * 1000) / 1000;
+
 const isStaff = (user: User) => user.role === 'coordinator' || user.role === 'administrator';
 
 /** recipients a new offer would reach, by the same rule the feed uses */
@@ -382,6 +385,10 @@ export function createFakeDataLayer(store: Store, options: FakeOptions): DataLay
         call('claims', 'dispatch', () => {
           const claim = state().claims.find((c) => c.id === id);
           if (!claim) throw notFound();
+          // a repeat gets the first collection back, as the API does
+          if (collectionForClaim(state(), id)) {
+            return { collection: toCollection(collectionForClaim(state(), id)!) };
+          }
           if (claim.status !== 'active' || !claim.transportNeeded) {
             throw invalidState('Only an active claim that needs transport can be dispatched.');
           }
@@ -391,12 +398,17 @@ export function createFakeDataLayer(store: Store, options: FakeOptions): DataLay
             userId: me().id,
             driverName: body.driverName,
             driverPhone: body.driverPhone,
+            scheduledFor: body.scheduledFor,
           });
           return { collection: toCollection(collectionForClaim(state(), id)!) };
         }),
       updateCollection: (id, body) =>
         call('claims', 'updateCollection', () => {
-          if (!state().collections.some((c) => c.id === id)) throw notFound();
+          const collection = state().collections.find((c) => c.id === id);
+          if (!collection) throw notFound();
+          if (collection.status !== 'dispatched') {
+            throw invalidState('This collection is already closed.');
+          }
           store.dispatch({ type: 'FAKE_UPDATE_COLLECTION', collectionId: id, status: body.status });
           return { collection: toCollection(state().collections.find((c) => c.id === id)!) };
         }),
@@ -527,9 +539,10 @@ export function createFakeDataLayer(store: Store, options: FakeOptions): DataLay
           }
           const items = [...rows.values()].map((r) => ({
             ...r,
+            kg: roundKg(r.kg),
             meals: mealsFromKg(r.kg),
           }));
-          const kg = items.reduce((sum, r) => sum + r.kg, 0);
+          const kg = roundKg(items.reduce((sum, r) => sum + r.kg, 0));
           return { rows: items, totals: { kg, meals: mealsFromKg(kg) } };
         }),
       outcomes: (query) =>
@@ -537,7 +550,8 @@ export function createFakeDataLayer(store: Store, options: FakeOptions): DataLay
           const s = state();
           const offers = s.offers.filter((o) => inRange(o.createdAt, query.from, query.to));
           const claimsOf = (o: Offer) => s.claims.filter((c) => c.offerId === o.id);
-          const claimed = offers.filter((o) => claimsOf(o).length > 0).length;
+          const claimed = offers.filter((o) => o.status === 'claimed').length;
+          const collected = offers.filter((o) => o.status === 'collected').length;
           const expiredClaimed = offers.filter(
             (o) => o.status === 'expired' && claimsOf(o).some((c) => c.status === 'expired'),
           ).length;
@@ -549,11 +563,14 @@ export function createFakeDataLayer(store: Store, options: FakeOptions): DataLay
             posted: offers.length,
             open: offers.filter((o) => o.status === 'open').length,
             claimed,
-            collected: offers.filter((o) => o.status === 'collected').length,
+            collected,
             expiredUnclaimed: expired - expiredClaimed,
             expiredClaimed,
             cancelled: offers.filter((o) => o.status === 'cancelled').length,
-            claimedPct: offers.length === 0 ? 0 : Math.round((claimed / offers.length) * 1000) / 10,
+            claimedPct:
+              offers.length === 0
+                ? 0
+                : Math.round(((claimed + collected + expiredClaimed) / offers.length) * 1000) / 10,
             distinctRecipients: new Set(fulfilled.map((c) => c.recipientOrganisationId)).size,
           };
         }),
@@ -625,7 +642,7 @@ export function createFakeDataLayer(store: Store, options: FakeOptions): DataLay
             active: true,
             personaNote: '',
           };
-          store.dispatch({ type: 'FAKE_ADD_USER', user });
+          store.dispatch({ type: 'FAKE_ADD_USER', user, actorUserId: me().id });
           return {
             user: { ...toUser(user, state()), mustChangePassword: true },
             tempPassword: 'Demo-Temp-1234',
@@ -635,11 +652,20 @@ export function createFakeDataLayer(store: Store, options: FakeOptions): DataLay
         call('users', 'update', () => {
           const actor = me();
           if (!state().users.some((u) => u.id === id)) throw notFound();
-          if (id === actor.id && body.status === 'disabled') {
-            throw invalidState('You cannot disable your own account.');
+          const target = state().users.find((u) => u.id === id)!;
+          if (id === actor.id && (body.status === 'disabled' || body.role !== undefined)) {
+            throw invalidState(
+              'You cannot disable your own account or remove your own administrator role.',
+            );
+          }
+          if (body.role && !isStaff(target)) {
+            throw new ApiError('VALIDATION_FAILED', 'Check the highlighted fields.', {
+              role: 'A role can only change between coordinator and administrator',
+            });
           }
           store.dispatch({
             type: 'FAKE_UPDATE_USER',
+            actorUserId: actor.id,
             targetUserId: id,
             role: body.role,
             active: body.status === undefined ? undefined : body.status === 'active',

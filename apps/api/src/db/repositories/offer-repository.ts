@@ -71,13 +71,62 @@ export class OfferRepository {
     ).exec();
   }
 
-  /** null if the offer is no longer claimed, as after expiry */
-  reopenIfClaimed(id: Types.ObjectId | string, session: ClientSession) {
+  /**
+   * null if the offer is no longer claimed or its deadline has passed. an overdue
+   * offer stays claimed for the expiry sweep, since nobody could claim it again
+   */
+  reopenIfClaimed(id: Types.ObjectId | string, now: Date, session: ClientSession) {
     return OfferModel.findOneAndUpdate(
-      { _id: id, status: 'claimed' },
+      { _id: id, status: 'claimed', collectionDeadline: { $gt: now } },
       { $set: { status: 'open' } },
       { returnDocument: 'after', runValidators: true, session },
     ).exec();
+  }
+
+  /** the status filter makes a second sweep match nothing */
+  expireOpen(now: Date, session: ClientSession) {
+    return OfferModel.updateMany(
+      { status: 'open', collectionDeadline: { $lte: now } },
+      { $set: { status: 'expired', expiredAt: now } },
+      { runValidators: true, session },
+    ).exec();
+  }
+
+  overdueClaimedIds(now: Date, session: ClientSession) {
+    return OfferModel.distinct('_id', { status: 'claimed', collectionDeadline: { $lte: now } })
+      .session(session)
+      .exec() as Promise<Types.ObjectId[]>;
+  }
+
+  expireClaimed(ids: Types.ObjectId[], now: Date, session: ClientSession) {
+    return OfferModel.updateMany(
+      { _id: { $in: ids }, status: 'claimed' },
+      { $set: { status: 'expired', expiredAt: now } },
+      { runValidators: true, session },
+    ).exec();
+  }
+
+  /** a real write. a release at the same moment conflicts with the caller's transaction */
+  holdIfClaimed(id: Types.ObjectId | string, session: ClientSession) {
+    return OfferModel.findOneAndUpdate(
+      { _id: id, status: 'claimed' },
+      { $set: { status: 'claimed' } },
+      { returnDocument: 'after', runValidators: true, session },
+    ).exec();
+  }
+
+  /** null if the offer is no longer claimed */
+  collectIfClaimed(id: Types.ObjectId | string, session: ClientSession) {
+    return OfferModel.findOneAndUpdate(
+      { _id: id, status: 'claimed' },
+      { $set: { status: 'collected' } },
+      { returnDocument: 'after', runValidators: true, session },
+    ).exec();
+  }
+
+  /** the offer created for what was left behind, if any */
+  findRemainderOf(parentOfferId: Types.ObjectId | string) {
+    return OfferModel.findOne({ parentOfferId }).exec();
   }
 
   findByIds(ids: Types.ObjectId[]) {

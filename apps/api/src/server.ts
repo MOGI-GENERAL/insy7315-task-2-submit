@@ -20,10 +20,14 @@ import { createLogger } from './logger.js';
 import { createSessionStore } from './middleware/session.js';
 import { twilioWebhookSettings } from './middleware/twilio-signature.js';
 import { channelSettings } from './notifications/channel-settings.js';
-import { LocalPhotoStore } from './photos/local-photo-store.js';
+import { createPhotoStore } from './photos/create-photo-store.js';
 import { AuditService } from './services/audit-service.js';
 import { ClaimService } from './services/claim-service.js';
+import { CollectionService } from './services/collection-service.js';
 import { DEFAULT_RADIUS_KM } from './services/eligibility.js';
+import { ExpiryService, startExpirySweep } from './services/expiry-service.js';
+import { RetentionService, startRetentionSweep } from './services/retention-service.js';
+import { HandoverService } from './services/handover-service.js';
 import { HealthService } from './services/health-service.js';
 import { NotificationService } from './services/notification-service.js';
 import { OfferService } from './services/offer-service.js';
@@ -66,6 +70,13 @@ async function start() {
     new UserRepository(),
     { ...channelSettings(process.env, logger), logger },
   );
+  let photos;
+  try {
+    photos = createPhotoStore(process.env);
+  } catch (err) {
+    logger.fatal({ err }, 'could not set up photo storage');
+    process.exit(1);
+  }
   const offers = new OfferService(
     new OfferRepository(),
     new OrganisationRepository(),
@@ -73,7 +84,7 @@ async function start() {
     new CollectionRepository(),
     new HandoverRepository(),
     new AuditService(new AuditLogRepository()),
-    new LocalPhotoStore(),
+    photos,
     notifications,
     { radiusKm, logger },
   );
@@ -82,8 +93,29 @@ async function start() {
     new OfferRepository(),
     new OrganisationRepository(),
     new HandoverRepository(),
+    new CollectionRepository(),
     offers,
     notifications,
+    notifications,
+    logger,
+  );
+  const handovers = new HandoverService(
+    new HandoverRepository(),
+    new ClaimRepository(),
+    new OfferRepository(),
+    new OrganisationRepository(),
+    offers,
+    new AuditService(new AuditLogRepository()),
+    photos,
+    notifications,
+    logger,
+  );
+  const collections = new CollectionService(
+    new CollectionRepository(),
+    new ClaimRepository(),
+    new OfferRepository(),
+    new OrganisationRepository(),
+    new AuditService(new AuditLogRepository()),
     notifications,
     logger,
   );
@@ -105,6 +137,8 @@ async function start() {
     ),
     offers,
     claims,
+    collections,
+    handovers,
     notifications,
     reports: new ReportingService(
       new HandoverRepository(),
@@ -138,6 +172,17 @@ async function start() {
   createApp({ logger, services, session, twilioWebhooks }).listen(port, () => {
     logger.info(`api listening on ${port}`);
   });
+
+  startExpirySweep(
+    new ExpiryService(
+      new OfferRepository(),
+      new ClaimRepository(),
+      new HandoverRepository(),
+      new CollectionRepository(),
+    ),
+    logger,
+  );
+  startRetentionSweep(new RetentionService(new HandoverRepository(), photos), logger);
 }
 
 void start();

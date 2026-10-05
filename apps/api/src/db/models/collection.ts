@@ -19,6 +19,8 @@ const collectionSchema = new Schema(
   { collection: 'collections', timestamps: true, autoCreate: false, autoIndex: false },
 );
 
+collectionSchema.index({ claimId: 1 }, { unique: true });
+
 export const collectionValidator = {
   $jsonSchema: {
     bsonType: 'object',

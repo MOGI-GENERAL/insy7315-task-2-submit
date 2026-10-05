@@ -1,8 +1,10 @@
 import type { FoodCategory, ImpactGroupBy } from '@fedsa/contract';
 import type { ClientSession, PipelineStage, Types } from 'mongoose';
 import { ClaimModel } from '../models/claim.js';
-import { HandoverRecordModel } from '../models/handover-record.js';
+import { HandoverRecordModel, type HandoverRecordDoc } from '../models/handover-record.js';
 import { OfferModel } from '../models/offer.js';
+import { OrganisationModel } from '../models/organisation.js';
+import { TaxCertificateModel } from '../models/tax-certificate.js';
 import { ORGANISATION_ROWS, type KgRow } from './organisation-rows.js';
 
 /** a handover both sides confirmed, with its offer's category */
@@ -11,6 +13,33 @@ export interface CertifiableHandover {
   recipientConfirmedAt: Date;
   collectedQuantityKg: number;
   category: FoodCategory;
+}
+
+/** `day` is the day the recipient confirmed, as `YYYY-MM-DD` in the given timezone */
+export interface ExportHandoverRow {
+  day: string;
+  donor: string;
+  recipient: string;
+  category: FoodCategory;
+  kg: number;
+  certificateNumber: string | null;
+}
+
+/** the impact report and the export both start here and always count the same handovers */
+function collectedIn(range: { $gte?: Date; $lt?: Date }): PipelineStage {
+  return { $match: { recipientConfirmedAt: range } };
+}
+
+function organisationName(localField: string, as: string): PipelineStage {
+  return {
+    $lookup: {
+      from: OrganisationModel.collection.collectionName,
+      localField,
+      foreignField: '_id',
+      pipeline: [{ $project: { name: 1 } }],
+      as,
+    },
+  };
 }
 
 const OFFER_OF: PipelineStage[] = [
@@ -68,6 +97,70 @@ export class HandoverRepository {
     return HandoverRecordModel.findOne({ claimId }, null, { session }).exec();
   }
 
+  create(data: Partial<HandoverRecordDoc>, session?: ClientSession) {
+    return new HandoverRecordModel(data).save({ session });
+  }
+
+  /** handovers that have a photo due for deletion, oldest first */
+  photosPastRetention(now: Date, limit: number) {
+    return HandoverRecordModel.find(
+      { retainUntil: { $lt: now }, donorPhotoUrl: { $ne: null } },
+      { donorPhotoUrl: 1 },
+    )
+      .sort({ retainUntil: 1 })
+      .limit(limit)
+      .lean<{ _id: Types.ObjectId; donorPhotoUrl: string }[]>()
+      .exec();
+  }
+
+  /** the url in the filter stops a late sweep clearing a photo that was replaced */
+  clearPhoto(id: Types.ObjectId, url: string) {
+    return HandoverRecordModel.updateOne(
+      { _id: id, donorPhotoUrl: url },
+      { $set: { donorPhotoUrl: null } },
+    ).exec();
+  }
+
+  offerIdsWithHandover(offerIds: Types.ObjectId[], session: ClientSession) {
+    return HandoverRecordModel.distinct('offerId', { offerId: { $in: offerIds } })
+      .session(session)
+      .exec() as Promise<Types.ObjectId[]>;
+  }
+
+  /** null if the recipient has already confirmed. the first confirmation stands */
+  confirmByRecipient(
+    id: Types.ObjectId | string,
+    fields: Partial<HandoverRecordDoc>,
+    session: ClientSession,
+  ) {
+    return HandoverRecordModel.findOneAndUpdate(
+      { _id: id, recipientConfirmedAt: null },
+      { $set: fields },
+      { returnDocument: 'after', runValidators: true, session },
+    ).exec();
+  }
+
+  /** null unless it is an unresolved problem handover. a resolution is written once */
+  resolveIfOpen(
+    id: Types.ObjectId | string,
+    fields: Partial<HandoverRecordDoc>,
+    session: ClientSession,
+  ) {
+    return HandoverRecordModel.findOneAndUpdate(
+      { _id: id, conditionOnReceipt: 'problem', resolvedAt: null },
+      { $set: fields },
+      { returnDocument: 'after', runValidators: true, session },
+    ).exec();
+  }
+
+  /** newest confirmation first */
+  list(filter: Record<string, unknown>, limit: number) {
+    return HandoverRecordModel.find(filter)
+      .sort({ recipientConfirmedAt: -1, _id: -1 })
+      .limit(limit)
+      .exec();
+  }
+
   /**
    * the donor's handovers the recipient confirmed within `range`, except `excludeIds`.
    * a dispute counts only once a coordinator has resolved it
@@ -120,7 +213,7 @@ export class HandoverRepository {
     range: { $gte?: Date; $lt?: Date },
     timezone: string,
   ): Promise<KgRow[]> {
-    const match: PipelineStage = { $match: { recipientConfirmedAt: range } };
+    const match = collectedIn(range);
 
     if (groupBy === 'month') {
       return HandoverRecordModel.aggregate<KgRow>([
@@ -143,6 +236,41 @@ export class HandoverRepository {
       ...ORGANISATION_OF[groupBy],
       { $group: { _id: '$organisationId', kg: { $sum: '$collectedQuantityKg' } } },
       ...ORGANISATION_ROWS,
+    ]).exec();
+  }
+
+  /** each handover `collectedKgBy` adds up, oldest first. no handover is on two certificates */
+  collectedRows(
+    range: { $gte?: Date; $lt?: Date },
+    timezone: string,
+  ): Promise<ExportHandoverRow[]> {
+    return HandoverRecordModel.aggregate<ExportHandoverRow>([
+      collectedIn(range),
+      { $sort: { recipientConfirmedAt: 1, _id: 1 } },
+      ...OFFER_OF,
+      ...ORGANISATION_OF.recipient,
+      organisationName('offer.donorOrganisationId', 'donor'),
+      organisationName('organisationId', 'recipient'),
+      {
+        $lookup: {
+          from: TaxCertificateModel.collection.collectionName,
+          localField: '_id',
+          foreignField: 'handoverRecordIds',
+          pipeline: [{ $project: { certificateNumber: 1 } }],
+          as: 'certificate',
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          day: { $dateToString: { format: '%Y-%m-%d', date: '$recipientConfirmedAt', timezone } },
+          donor: { $ifNull: [{ $first: '$donor.name' }, ''] },
+          recipient: { $ifNull: [{ $first: '$recipient.name' }, ''] },
+          category: '$offer.category',
+          kg: '$collectedQuantityKg',
+          certificateNumber: { $ifNull: [{ $first: '$certificate.certificateNumber' }, null] },
+        },
+      },
     ]).exec();
   }
 }

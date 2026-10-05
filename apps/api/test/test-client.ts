@@ -29,6 +29,7 @@ export class TestClient {
     const isForm = body instanceof FormData || body instanceof URLSearchParams;
     const res = await fetch(`${this.baseUrl}${path}`, {
       method,
+      redirect: 'manual',
       headers: {
         'x-forwarded-for': this.ip,
         ...(body === undefined || isForm ? {} : { 'content-type': 'application/json' }),

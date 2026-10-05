@@ -43,7 +43,9 @@ import type { PhotoStore } from '../../src/photos/photo-store.js';
 import { AuditService } from '../../src/services/audit-service.js';
 import type { ClaimNotifier } from '../../src/services/claim-notifier.js';
 import { ClaimService } from '../../src/services/claim-service.js';
+import { CollectionService } from '../../src/services/collection-service.js';
 import { DEFAULT_RADIUS_KM } from '../../src/services/eligibility.js';
+import { HandoverService } from '../../src/services/handover-service.js';
 import { HealthService } from '../../src/services/health-service.js';
 import { NotificationService } from '../../src/services/notification-service.js';
 import type { OfferNotifier } from '../../src/services/offer-notifier.js';
@@ -135,10 +137,46 @@ export function newClaimService(offers: OfferService, options: ClaimTestOptions 
     new OfferRepository(),
     new OrganisationRepository(),
     new HandoverRepository(),
+    new CollectionRepository(),
     offers,
     options.offerNotifier ?? notifications,
     options.claimNotifier ?? notifications,
     logger,
+  );
+}
+
+/** a test passes its own notification service to read what was texted */
+export function newCollectionService(
+  notifications: Pick<NotificationService, 'sendSms'> = newNotificationService(),
+) {
+  return new CollectionService(
+    new CollectionRepository(),
+    new ClaimRepository(),
+    new OfferRepository(),
+    new OrganisationRepository(),
+    new AuditService(new AuditLogRepository()),
+    notifications,
+    createLogger({ write: () => {} }),
+  );
+}
+
+export interface HandoverTestOptions {
+  photos?: PhotoStore;
+  notifications?: Pick<NotificationService, 'notifyOrganisations'>;
+}
+
+/** built on the offer service the app uses. share its photo store so thumbnails agree */
+export function newHandoverService(offers: OfferService, options: HandoverTestOptions = {}) {
+  return new HandoverService(
+    new HandoverRepository(),
+    new ClaimRepository(),
+    new OfferRepository(),
+    new OrganisationRepository(),
+    offers,
+    new AuditService(new AuditLogRepository()),
+    options.photos ?? new LocalPhotoStore(),
+    options.notifications ?? newNotificationService(),
+    createLogger({ write: () => {} }),
   );
 }
 
@@ -187,6 +225,8 @@ export async function startTestApp(
   notifications?: NotificationService,
   claims?: ClaimService,
   twilioWebhooks: TwilioWebhookSettings | null = TEST_TWILIO_WEBHOOKS,
+  handovers?: HandoverService,
+  collections?: CollectionService,
 ) {
   // a default parameter cannot see a later one, and offers has to share the notification service
   notifications ??= newNotificationService();
@@ -195,6 +235,8 @@ export async function startTestApp(
     offerNotifier: notifications,
     claimNotifier: notifications,
   });
+  handovers ??= newHandoverService(offers, { notifications });
+  collections ??= newCollectionService(notifications);
 
   const app = createApp({
     logger: createLogger({ write: () => {} }),
@@ -209,6 +251,8 @@ export async function startTestApp(
       organisations: newOrganisationService(),
       offers,
       claims,
+      collections,
+      handovers,
       notifications,
       reports: newReportingService(),
       webhooks: newWebhookService(claims),

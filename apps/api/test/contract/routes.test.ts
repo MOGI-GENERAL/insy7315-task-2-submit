@@ -15,7 +15,12 @@ import type { z } from 'zod';
 import { OfferModel, OrganisationModel } from '../../src/db/index.js';
 import { LocalPhotoStore } from '../../src/photos/local-photo-store.js';
 import { runSeed } from '../../src/seed/seed.js';
-import { newNotificationService, newOfferService, startTestApp } from '../integration/test-app.js';
+import {
+  newHandoverService,
+  newNotificationService,
+  newOfferService,
+  startTestApp,
+} from '../integration/test-app.js';
 import { START_TIMEOUT_MS, startTestDb } from '../integration/test-db.js';
 import { CONTRACT_CASES, NOT_YET_SERVED } from './cases.js';
 import { ContractContext, SEED_PASSWORD } from './context.js';
@@ -36,11 +41,16 @@ beforeAll(async () => {
   await runSeed({ password: SEED_PASSWORD, now: seededAt });
 
   photoDir = await mkdtemp(join(tmpdir(), 'fedsa-contract-photos-'));
-  const offers = newOfferService({
-    photos: new LocalPhotoStore(photoDir),
-    notifier: notifications,
-  });
-  const main = await startTestApp([], offers, notifications);
+  const photos = new LocalPhotoStore(photoDir);
+  const offers = newOfferService({ photos, notifier: notifications });
+  const main = await startTestApp(
+    [],
+    offers,
+    notifications,
+    undefined,
+    undefined,
+    newHandoverService(offers, { photos, notifications }),
+  );
   const pushOff = await startTestApp();
   closers.push(main.close, pushOff.close);
   app = main.app;

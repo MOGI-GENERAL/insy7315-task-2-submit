@@ -1,94 +1,151 @@
-/* RECIPIENT HANDOVER CONFIRMATION — CONDITION ONLY; A PROBLEM GOES TO A COORDINATOR */
-
-import { useState } from 'react';
-import type { FormEvent } from 'react';
+import { useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { FoodPhoto } from '../../components/FoodPhoto';
+import {
+  RecipientConfirmRequest,
+  type Condition,
+  type Handover,
+  type Offer,
+} from '@fedsa/contract';
+import { isApiError, useData, useLoad } from '../../data';
+import {
+  ConfirmDialog,
+  errorKey,
+  LoadState,
+  PendingButton,
+  useToast,
+} from '../../components/feedback';
+import { Field, FormError, useForm } from '../../components/forms';
+import type { Validator } from '../../components/forms';
 import { Icon } from '../../components/Icon';
+import { OfferPhoto } from '../../components/OfferPhoto';
 import { Banner, PageHead } from '../../components/ui';
-import { useApp, useCurrentOrg, useCurrentUser } from '../../store/context';
-import { claimById, handoverForClaim, offerById, orgById } from '../../store/selectors';
+import type { StringKey } from '../../i18n/strings';
 import { useT } from '../../i18n/useT';
 import { formatDateTime, formatKg } from '../../lib/format';
-import type { Condition } from '../../store/types';
 import '../shared/Detail.css';
 import './Recipient.css';
 
 const conditions: Condition[] = ['good', 'acceptable', 'problem'];
 
-export function RecipientHandover() {
-  const { claimId } = useParams();
-  const { state, dispatch } = useApp();
-  const user = useCurrentUser()!;
-  const org = useCurrentOrg()!;
-  const navigate = useNavigate();
-  const t = useT();
+const conditionKey: Record<Condition, StringKey> = {
+  good: 'handover.conditionGood',
+  acceptable: 'handover.conditionAcceptable',
+  problem: 'handover.conditionPoor',
+};
 
-  const claim = claimById(state, claimId);
-  const offer = claim ? offerById(state, claim.offerId) : undefined;
-  const handover = claim ? handoverForClaim(state, claim.id) : undefined;
-  const donor = orgById(state, offer?.donorOrganisationId);
+interface Values {
+  conditionOnReceipt: Condition;
+  conditionNotes: string;
+}
 
-  const [condition, setCondition] = useState<Condition>('good');
-  const [note, setNote] = useState('');
-  const [touched, setTouched] = useState(false);
-
-  if (!claim || !offer || claim.recipientOrganisationId !== org.id) {
-    return (
-      <Banner tone="bad" title="Not found">
-        That handover does not belong to {org.name}.{' '}
-        <Link to="/recipient/claims">Back to your claims</Link>.
-      </Banner>
-    );
-  }
-
-  if (handover?.recipientConfirmedAt) {
-    return (
-      <>
-        <Banner tone="good" title={t('handover.done')}>
-          You confirmed receipt of {formatKg(handover.collectedQuantityKg)} on{' '}
-          {formatDateTime(handover.recipientConfirmedAt)}.
-        </Banner>
-        <Link to="/recipient/claims" className="btn btn--secondary">
-          {t('claims.title')}
-        </Link>
-      </>
-    );
-  }
-
-  if (!handover) {
-    return (
-      <>
-        <Banner tone="info" title="Waiting for the donor">
-          {donor?.name ?? 'The donor'} records the handover first, with the weight that left their
-          premises. You can confirm receipt once they have.
-        </Banner>
-        <Link to="/recipient/claims" className="btn btn--secondary">
-          {t('claims.title')}
-        </Link>
-      </>
-    );
-  }
-
-  const needsNote = condition === 'problem' && note.trim() === '';
-
-  function submit(event: FormEvent) {
-    event.preventDefault();
-    setTouched(true);
-    if (needsNote) return;
-    dispatch({
-      type: 'CONFIRM_HANDOVER_RECIPIENT',
-      claimId: claim!.id,
-      userId: user.id,
-      condition,
-      note: note.trim(),
+const schema: Validator<RecipientConfirmRequest> = {
+  safeParse: (v) => {
+    const values = v as Values;
+    return RecipientConfirmRequest.safeParse({
+      conditionOnReceipt: values.conditionOnReceipt,
+      conditionNotes: values.conditionNotes.trim() || undefined,
     });
-    navigate('/recipient/claims');
-  }
+  },
+};
+
+export function RecipientHandover() {
+  const { offerId = '' } = useParams();
+  const { offers } = useData();
+  const t = useT();
+  const detail = useLoad(() => offers.get(offerId), [offers, offerId]);
+  const claimsLink = (
+    <Link to="/recipient/claims" className="btn btn--secondary">
+      {t('claims.title')}
+    </Link>
+  );
 
   return (
-    <form className="form-screen" onSubmit={submit} noValidate>
-      <Link to="/recipient/claims" className="btn btn--ghost detail__back">
+    <LoadState result={detail}>
+      {({ offer, claim, handover }) => {
+        if (handover?.recipientConfirmedAt) {
+          return (
+            <>
+              <Banner tone="good" title={t('handover.receiptRecorded')}>
+                {t('handover.receiptDone')
+                  .replace('{kg}', formatKg(handover.collectedQuantityKg))
+                  .replace('{when}', formatDateTime(handover.recipientConfirmedAt))}
+              </Banner>
+              {claimsLink}
+            </>
+          );
+        }
+        if (claim?.status !== 'active') {
+          return (
+            <>
+              <Banner tone="warn" title={t('handover.notReady')}>
+                {t('handover.notReadyBody')}
+              </Banner>
+              {claimsLink}
+            </>
+          );
+        }
+        if (!handover) {
+          return (
+            <>
+              <Banner tone="info" title={t('handover.waitingDonor')}>
+                {t('handover.waitingDonorWhy')}
+              </Banner>
+              {claimsLink}
+            </>
+          );
+        }
+        return <ReceiptForm offer={offer} handover={handover} reload={detail.reload} />;
+      }}
+    </LoadState>
+  );
+}
+
+function ReceiptForm({
+  offer,
+  handover,
+  reload,
+}: {
+  offer: Offer;
+  handover: Handover;
+  reload: () => Promise<unknown>;
+}) {
+  const { handovers } = useData();
+  const navigate = useNavigate();
+  const toast = useToast();
+  const t = useT();
+  const [asking, setAsking] = useState(false);
+  // the dialog resubmits the form, which keeps server errors on the fields
+  const confirmed = useRef(false);
+
+  const form = useForm<Values, RecipientConfirmRequest>({
+    initial: { conditionOnReceipt: 'good', conditionNotes: '' },
+    schema,
+    onSubmit: async (body) => {
+      if (!confirmed.current) {
+        setAsking(true);
+        return;
+      }
+      confirmed.current = false;
+      try {
+        await handovers.recipientConfirm(offer.id, body);
+        toast.success(t('handover.receiptRecorded'));
+        navigate('/recipient/claims');
+      } catch (error) {
+        if (!isApiError(error, 'INVALID_STATE')) throw error;
+        toast.error(t(errorKey(error)));
+        await reload();
+      } finally {
+        setAsking(false);
+      }
+    },
+  });
+
+  const condition = form.values.conditionOnReceipt;
+  const photos = handover.donorPhotoThumbUrl ? [{ thumbUrl: handover.donorPhotoThumbUrl }] : [];
+
+  return (
+    <form className="form-screen" {...form.formProps}>
+      <Link to={`/recipient/offers/${offer.id}`} className="btn btn--ghost detail__back">
         <Icon name="back" size={18} />
         {t('common.back')}
       </Link>
@@ -97,19 +154,25 @@ export function RecipientHandover() {
 
       <div className="summary-strip">
         <div className="summary-strip__photo">
-          <FoodPhoto photo={offer.photo} />
+          <OfferPhoto
+            photos={photos.length ? photos : offer.photos}
+            alt={t('handover.donorPhoto')}
+          />
         </div>
         <div className="summary-strip__text">
           <strong>{offer.title}</strong>
           <span>
-            {offer.reference} · {donor?.name}
+            {offer.reference} · {offer.donor.name}
           </span>
           <span>
-            Donor recorded {formatKg(handover.collectedQuantityKg)} at{' '}
-            {formatDateTime(handover.donorConfirmedAt)}
+            {t('handover.donorRecordedAt')
+              .replace('{kg}', formatKg(handover.collectedQuantityKg))
+              .replace('{when}', formatDateTime(handover.donorConfirmedAt))}
           </span>
         </div>
       </div>
+
+      <FormError form={form} />
 
       <fieldset className="field">
         <legend className="field__label">{t('handover.condition')}</legend>
@@ -118,18 +181,12 @@ export function RecipientHandover() {
             <label key={c} className="choice">
               <input
                 type="radio"
-                name="condition"
+                name="conditionOnReceipt"
                 value={c}
                 checked={condition === c}
-                onChange={() => setCondition(c)}
+                onChange={() => form.set('conditionOnReceipt', c)}
               />
-              <span>
-                {c === 'good'
-                  ? t('handover.conditionGood')
-                  : c === 'acceptable'
-                    ? t('handover.conditionAcceptable')
-                    : t('handover.conditionPoor')}
-              </span>
+              <span>{t(conditionKey[c])}</span>
             </label>
           ))}
         </div>
@@ -138,34 +195,40 @@ export function RecipientHandover() {
         )}
       </fieldset>
 
-      <div className="field">
-        <label className="field__label" htmlFor="recv-note">
-          {t('handover.note')}{' '}
-          {condition !== 'problem' && <span className="muted">({t('common.optional')})</span>}
-        </label>
-        <textarea
-          id="recv-note"
-          className="textarea"
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          aria-invalid={touched && needsNote}
-          aria-describedby="recv-note-hint"
-        />
-        <span className="field__hint" id="recv-note-hint">
-          If less arrived than the donor recorded, choose Poor and say what arrived. A coordinator
-          settles it with both sides.
-        </span>
-        {touched && needsNote && (
-          <span className="field__error" role="alert">
-            Say what was wrong, so the coordinator can follow it up.
-          </span>
-        )}
-      </div>
+      <Field
+        form={form}
+        name="conditionNotes"
+        label={t('handover.note')}
+        hint={t('handover.lessArrived')}
+        optional={condition !== 'problem'}
+      >
+        {(props) => <textarea {...props} className="textarea" />}
+      </Field>
 
-      <button type="submit" className="btn btn--go btn--lg btn--block">
+      <PendingButton
+        type="submit"
+        className="btn btn--go btn--lg btn--block"
+        pending={form.pending}
+        pendingLabel={t('handover.confirmReceipt')}
+      >
         <Icon name="check" size={20} />
         {t('handover.confirmReceipt')}
-      </button>
+      </PendingButton>
+
+      <ConfirmDialog
+        open={asking}
+        title={t('handover.recipientAsk')}
+        confirmLabel={t('handover.confirmReceipt')}
+        tone="go"
+        busy={form.pending}
+        onConfirm={() => {
+          confirmed.current = true;
+          form.formProps.ref.current?.requestSubmit();
+        }}
+        onCancel={() => setAsking(false)}
+      >
+        {t('handover.recipientAskBody').replace('{kg}', formatKg(handover.collectedQuantityKg))}
+      </ConfirmDialog>
     </form>
   );
 }

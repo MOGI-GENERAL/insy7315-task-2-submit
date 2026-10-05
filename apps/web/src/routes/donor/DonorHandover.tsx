@@ -1,140 +1,178 @@
-/* DONOR-SIDE HANDOVER CONFIRMATION — RECIPIENT CONFIRMS SEPARATELY LATER */
-
-import { useState } from 'react';
-import type { FormEvent } from 'react';
+import { useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { FoodPhoto } from '../../components/FoodPhoto';
-import { PhotoPicker } from '../../components/PhotoPicker';
+import { DonorConfirmFields, type Handover, type Offer } from '@fedsa/contract';
+import { useData, useLoad } from '../../data';
+import { ConfirmDialog, LoadState, PendingButton, useToast } from '../../components/feedback';
+import { Field, FormError, useForm } from '../../components/forms';
 import { Icon } from '../../components/Icon';
+import { OfferPhoto } from '../../components/OfferPhoto';
+import { PhotoCapture } from '../../components/PhotoCapture';
 import { Banner, PageHead } from '../../components/ui';
-import { useApp, useCurrentOrg, useCurrentUser } from '../../store/context';
-import { claimById, handoverForClaim, offerById, orgById } from '../../store/selectors';
 import { useT } from '../../i18n/useT';
 import { formatKg } from '../../lib/format';
 import '../shared/Detail.css';
 
 export function DonorHandover() {
-  const { claimId } = useParams();
-  const { state, dispatch } = useApp();
-  const user = useCurrentUser()!;
-  const org = useCurrentOrg()!;
-  const navigate = useNavigate();
+  const { offerId = '' } = useParams();
+  const { offers } = useData();
   const t = useT();
-
-  const claim = claimById(state, claimId);
-  const offer = claim ? offerById(state, claim.offerId) : undefined;
-  const handover = claim ? handoverForClaim(state, claim.id) : undefined;
-  const recipient = orgById(state, claim?.recipientOrganisationId);
-
-  const [quantity, setQuantity] = useState(offer ? String(offer.offeredQuantityKg) : '');
-  const [photo, setPhoto] = useState<string | null>(offer?.photo ?? 'mixed');
-  const [touched, setTouched] = useState(false);
-
-  if (!claim || !offer || offer.donorOrganisationId !== org.id) {
-    return (
-      <Banner tone="bad" title="Not found">
-        That handover does not belong to {org.name}. <Link to="/donor">Back to your offers</Link>.
-      </Banner>
-    );
-  }
-
-  if (handover?.donorConfirmedAt) {
-    return (
-      <>
-        <Banner tone="good" title={t('handover.done')}>
-          You confirmed {formatKg(handover.collectedQuantityKg)} leaving your premises.{' '}
-          {handover.recipientConfirmedAt
-            ? 'The recipient has confirmed receipt, so the record is complete.'
-            : t('handover.waitingOther') + '.'}
-        </Banner>
-        <Link to={`/donor/offers/${offer.id}`} className="btn btn--secondary">
-          View the record
-        </Link>
-      </>
-    );
-  }
-
-  const kg = Number(quantity);
-  const valid = Number.isFinite(kg) && kg > 0;
-
-  function submit(event: FormEvent) {
-    event.preventDefault();
-    setTouched(true);
-    if (!valid) return;
-    dispatch({
-      type: 'CONFIRM_HANDOVER_DONOR',
-      claimId: claim!.id,
-      userId: user.id,
-      quantityKg: kg,
-      photo,
-    });
-    navigate(`/donor/offers/${offer!.id}`);
-  }
+  const detail = useLoad(() => offers.get(offerId), [offers, offerId]);
+  const back = (
+    <Link to={`/donor/offers/${offerId}`} className="btn btn--ghost detail__back">
+      <Icon name="back" size={18} />
+      {t('common.back')}
+    </Link>
+  );
 
   return (
-    <form className="form-screen" onSubmit={submit} noValidate>
-      <Link to={`/donor/offers/${offer.id}`} className="btn btn--ghost detail__back">
-        <Icon name="back" size={18} />
-        {t('common.back')}
-      </Link>
+    <LoadState result={detail}>
+      {({ offer, handover }) => {
+        if (handover) return <Recorded offer={offer} handover={handover} />;
+        if (offer.status !== 'claimed') {
+          return (
+            <>
+              {back}
+              <Banner tone="warn" title={t('handover.notReady')}>
+                {t('handover.notReadyBody')}
+              </Banner>
+            </>
+          );
+        }
+        return (
+          <>
+            {back}
+            <HandoverForm offer={offer} />
+          </>
+        );
+      }}
+    </LoadState>
+  );
+}
 
+function Recorded({ offer, handover }: { offer: Offer; handover: Handover }) {
+  const t = useT();
+  return (
+    <>
+      <Banner tone="good" title={t('handover.done')}>
+        {t('handover.donorDone').replace('{kg}', formatKg(handover.collectedQuantityKg))}{' '}
+        {handover.recipientConfirmedAt
+          ? t('handover.recordComplete')
+          : `${t('handover.waitingOther')}.`}
+      </Banner>
+      <Link to={`/donor/offers/${offer.id}`} className="btn btn--secondary">
+        {t('handover.viewRecord')}
+      </Link>
+    </>
+  );
+}
+
+function HandoverForm({ offer }: { offer: Offer }) {
+  const { handovers } = useData();
+  const navigate = useNavigate();
+  const toast = useToast();
+  const t = useT();
+  const [photos, setPhotos] = useState<File[]>([]);
+  const [asking, setAsking] = useState(false);
+  // the dialog resubmits the form, which keeps server errors on the fields
+  const confirmed = useRef(false);
+
+  const form = useForm<{ collectedQuantityKg: number | undefined }, DonorConfirmFields>({
+    initial: { collectedQuantityKg: offer.offeredQuantityKg },
+    schema: DonorConfirmFields,
+    onSubmit: async (fields) => {
+      if (!confirmed.current) {
+        setAsking(true);
+        return;
+      }
+      confirmed.current = false;
+      try {
+        const { remainderOffer } = await handovers.donorConfirm(
+          offer.id,
+          fields,
+          photos[0] ?? null,
+        );
+        toast.success(t('handover.recorded'));
+        navigate(`/donor/offers/${offer.id}`, { state: { remainderOffer } });
+      } finally {
+        setAsking(false);
+      }
+    },
+  });
+
+  const entered = form.values.collectedQuantityKg;
+
+  return (
+    <form className="form-screen" {...form.formProps}>
       <PageHead title={t('handover.title')} lead={t('handover.donorPrompt')} />
 
       <div className="summary-strip">
         <div className="summary-strip__photo">
-          <FoodPhoto photo={offer.photo} />
+          <OfferPhoto photos={offer.photos} alt={offer.title} />
         </div>
         <div className="summary-strip__text">
           <strong>{offer.title}</strong>
           <span>
-            {offer.reference} · {formatKg(offer.offeredQuantityKg)} offered
+            {offer.reference} · {formatKg(offer.offeredQuantityKg)}
           </span>
-          <span>Collected by {recipient?.name}</span>
         </div>
       </div>
 
-      <div className="field">
-        <label className="field__label" htmlFor="handover-kg">
-          {t('handover.quantity')}
-        </label>
-        <div className="qty">
-          <input
-            id="handover-kg"
-            className="input"
-            type="number"
-            inputMode="decimal"
-            min="0.1"
-            step="0.1"
-            value={quantity}
-            onChange={(e) => setQuantity(e.target.value)}
-            aria-describedby="handover-kg-hint"
-            aria-invalid={touched && !valid}
-          />
-          <span className="qty__unit">kg</span>
-        </div>
-        <span className="field__hint" id="handover-kg-hint">
-          Change it if less is going than you posted. Whatever is left over is posted again as a new
-          offer, and this figure is the one the reports and your tax certificate use.
-        </span>
-        {touched && !valid && (
-          <span className="field__error" role="alert">
-            Enter the weight actually handed over.
-          </span>
+      <FormError form={form} />
+
+      <Field
+        form={form}
+        name="collectedQuantityKg"
+        kind="number"
+        label={t('handover.quantity')}
+        hint={t('handover.donorHint')}
+      >
+        {(props) => (
+          <div className="qty">
+            <input
+              {...props}
+              className="input"
+              type="number"
+              inputMode="decimal"
+              min="0.1"
+              step="0.1"
+            />
+            <span className="qty__unit">kg</span>
+          </div>
         )}
-      </div>
+      </Field>
 
-      <PhotoPicker
-        value={photo}
-        onChange={setPhoto}
-        name="handover-photo"
+      <PhotoCapture
+        files={photos}
+        onChange={setPhotos}
+        max={1}
         label={t('handover.photo')}
         hint={t('handover.photoWhy')}
       />
 
-      <button type="submit" className="btn btn--go btn--lg btn--block">
+      <PendingButton
+        type="submit"
+        className="btn btn--go btn--lg btn--block"
+        pending={form.pending}
+        pendingLabel={t('handover.confirm')}
+      >
         <Icon name="check" size={20} />
         {t('handover.confirm')}
-      </button>
+      </PendingButton>
+
+      <ConfirmDialog
+        open={asking}
+        title={t('handover.donorAsk')}
+        confirmLabel={t('handover.confirm')}
+        tone="go"
+        busy={form.pending}
+        onConfirm={() => {
+          confirmed.current = true;
+          form.formProps.ref.current?.requestSubmit();
+        }}
+        onCancel={() => setAsking(false)}
+      >
+        {t('handover.donorAskBody').replace('{kg}', formatKg(entered ?? 0))}
+      </ConfirmDialog>
     </form>
   );
 }

@@ -1,4 +1,10 @@
-import type { RouteKey } from '@fedsa/contract';
+import type {
+  ClaimResponse,
+  CollectionResponse,
+  PostOfferResponse,
+  RouteKey,
+} from '@fedsa/contract';
+import { HandoverRecordModel } from '../../src/db/index.js';
 import { TestClient } from '../test-client.js';
 import { donorRegistration } from '../integration/test-app.js';
 import {
@@ -15,15 +21,45 @@ const JPEG = Buffer.from([
   0x00, 0x01, 0x00, 0x00, 0xff, 0xd9,
 ]);
 
-function offerForm(photo: Buffer) {
+function offerForm(photo: Buffer, title = 'End of day bake') {
   const form = new FormData();
-  form.append('title', 'End of day bake');
+  form.append('title', title);
   form.append('category', 'bakery');
   form.append('offeredQuantityKg', '31');
   form.append('coldChain', 'ambient');
   form.append('collectionDeadline', new Date(Date.now() + 3 * 3_600_000).toISOString());
   form.append('photos', new Blob([new Uint8Array(photo)], { type: 'image/jpeg' }), 'bread.jpg');
   return form;
+}
+
+function donorConfirmForm(kg: number) {
+  const form = new FormData();
+  form.append('collectedQuantityKg', String(kg));
+  form.append('photo', new Blob([new Uint8Array(JPEG)], { type: 'image/jpeg' }), 'handover.jpg');
+  return form;
+}
+
+const DAIRY = 'Chilled dairy, short date';
+
+async function claimDairy(t: ContractContext) {
+  const offerId = await t.offerId(DAIRY);
+  // a repeat by the same organisation answers with its claim. safe after the claim case
+  await t.request('peter', 'POST', `/api/offers/${offerId}/claim`, { transportNeeded: false });
+  return offerId;
+}
+
+/** the dairy handover. Kaap Foods confirms it with a photo the first time it is asked for */
+async function dairyHandover(t: ContractContext) {
+  const offerId = await claimDairy(t);
+  if (!(await HandoverRecordModel.exists({ offerId }))) {
+    await t.request(
+      'nomsa',
+      'POST',
+      `/api/offers/${offerId}/handover/donor-confirm`,
+      donorConfirmForm(45),
+    );
+  }
+  return t.handoverId(DAIRY);
 }
 
 const subscription = {
@@ -34,6 +70,28 @@ const subscription = {
 async function postOffer(t: ContractContext, photo: Buffer) {
   return (await t.client('riaan')).request('POST', '/api/offers', offerForm(photo));
 }
+
+let driverJobs = 0;
+
+/** a new offer that Athlone Haven claims with transport, for a case that has to dispatch it */
+async function transportClaim(t: ContractContext) {
+  driverJobs += 1;
+  const posted = await (
+    await t.client('riaan')
+  ).request('POST', '/api/offers', offerForm(JPEG, `Loaves needing a driver ${driverJobs}`));
+  const { offer } = (await posted.json()) as PostOfferResponse;
+  const claimed = await t.request('gadija', 'POST', `/api/offers/${offer.id}/claim`, {
+    transportNeeded: true,
+  });
+  if (claimed.status !== 201) throw new Error(`claiming for dispatch gave ${claimed.status}`);
+  return ((await claimed.json()) as ClaimResponse).claim.id;
+}
+
+const driver = () => ({
+  driverName: 'Themba Mokoena',
+  driverPhone: '+27821112222',
+  scheduledFor: new Date(Date.now() + 3_600_000).toISOString(),
+});
 
 /**
  * one entry per route the app serves. the success call must get the route's
@@ -298,6 +356,119 @@ export const CONTRACT_CASES: Partial<Record<RouteKey, ContractCase>> = {
     },
   },
 
+  'POST /api/offers/:id/handover/donor-confirm': {
+    success: async (t) =>
+      t.request(
+        'nomsa',
+        'POST',
+        `/api/offers/${await claimDairy(t)}/handover/donor-confirm`,
+        donorConfirmForm(45),
+      ),
+    error: {
+      code: 'INVALID_STATE',
+      send: async (t) =>
+        t.request(
+          'nomsa',
+          'POST',
+          `/api/offers/${await t.offerId('Bread and dry goods, tomorrow')}/handover/donor-confirm`,
+          donorConfirmForm(45),
+        ),
+    },
+  },
+  'POST /api/offers/:id/handover/recipient-confirm': {
+    success: async (t) =>
+      t.request(
+        'peter',
+        'POST',
+        `/api/offers/${await t.offerId('Function surplus, cold platters')}/handover/recipient-confirm`,
+        { conditionOnReceipt: 'good' },
+      ),
+    error: {
+      code: 'INVALID_STATE',
+      send: async (t) =>
+        t.request(
+          'nosipho',
+          'POST',
+          `/api/offers/${await t.offerId('Bread, 30 loaves')}/handover/recipient-confirm`,
+          { conditionOnReceipt: 'good' },
+        ),
+    },
+  },
+  'GET /api/handovers': {
+    success: (t) => t.request('nadia', 'GET', '/api/handovers?condition=problem'),
+    error: {
+      code: 'VALIDATION_FAILED',
+      send: (t) => t.request('nadia', 'GET', '/api/handovers?condition=awful'),
+    },
+  },
+  'POST /api/handovers/:id/resolution': {
+    success: async (t) =>
+      t.request(
+        'nadia',
+        'POST',
+        `/api/handovers/${await t.handoverId('Tomatoes and leafy greens')}/resolution`,
+        { resolutionNote: 'The donor agreed to credit the recipient on the next collection' },
+      ),
+    error: {
+      code: 'INVALID_STATE',
+      send: async (t) =>
+        t.request(
+          'nadia',
+          'POST',
+          `/api/handovers/${await t.handoverId('Function surplus, cold platters')}/resolution`,
+          { resolutionNote: 'Nothing was wrong with this one' },
+        ),
+    },
+  },
+  'GET /api/handovers/:id/photo': {
+    success: async (t) =>
+      t.request('nomsa', 'GET', `/api/handovers/${await dairyHandover(t)}/photo`),
+    error: {
+      code: 'NOT_FOUND',
+      send: async (t) =>
+        t.request('riaan', 'GET', `/api/handovers/${await dairyHandover(t)}/photo`),
+    },
+  },
+
+  'POST /api/claims/:id/collection': {
+    success: async (t) =>
+      t.request('nadia', 'POST', `/api/claims/${await transportClaim(t)}/collection`, driver()),
+    error: {
+      code: 'INVALID_STATE',
+      send: async (t) =>
+        t.request(
+          'nadia',
+          'POST',
+          `/api/claims/${await t.claimId('Function surplus, cold platters')}/collection`,
+          driver(),
+        ),
+    },
+  },
+  'PATCH /api/collections/:id': {
+    success: async (t) => {
+      const dispatched = await t.request(
+        'nadia',
+        'POST',
+        `/api/claims/${await transportClaim(t)}/collection`,
+        driver(),
+      );
+      const { collection } = (await dispatched.json()) as CollectionResponse;
+      return t.request('nadia', 'PATCH', `/api/collections/${collection.id}`, {
+        status: 'completed',
+      });
+    },
+    error: {
+      code: 'INVALID_STATE',
+      send: async (t) =>
+        t.request(
+          'nadia',
+          'PATCH',
+          `/api/collections/${await t.collectionId('Pastries and day-old bread')}`,
+          { status: 'completed' },
+        ),
+    },
+  },
+
   'GET /api/notifications': {
     success: (t) => t.request('peter', 'GET', '/api/notifications'),
     error: {
@@ -363,6 +534,23 @@ export const CONTRACT_CASES: Partial<Record<RouteKey, ContractCase>> = {
       code: 'FORBIDDEN',
       send: (t) =>
         t.request('nadia', 'GET', `/api/reports/outcomes?from=${t.period.from}&to=${t.period.to}`),
+    },
+  },
+  'GET /api/reports/export': {
+    success: (t) =>
+      t.request(
+        'zanele',
+        'GET',
+        `/api/reports/export?from=${t.period.from}&to=${t.period.to}&format=csv`,
+      ),
+    error: {
+      code: 'VALIDATION_FAILED',
+      send: (t) =>
+        t.request(
+          'zanele',
+          'GET',
+          `/api/reports/export?from=${t.period.from}&to=${t.period.to}&format=pdf`,
+        ),
     },
   },
   'GET /api/valuation-rates': {
@@ -486,14 +674,4 @@ export const CONTRACT_CASES: Partial<Record<RouteKey, ContractCase>> = {
 };
 
 /** in the routes table but not served yet. a route leaves this list when its case above is added */
-export const NOT_YET_SERVED: RouteKey[] = [
-  'POST /api/claims/:id/override',
-  'POST /api/claims/:id/collection',
-  'PATCH /api/collections/:id',
-  'POST /api/offers/:id/handover/donor-confirm',
-  'POST /api/offers/:id/handover/recipient-confirm',
-  'GET /api/handovers',
-  'POST /api/handovers/:id/resolution',
-  'GET /api/handovers/:id/photo',
-  'GET /api/reports/export',
-];
+export const NOT_YET_SERVED: RouteKey[] = ['POST /api/claims/:id/override'];

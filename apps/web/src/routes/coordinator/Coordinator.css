@@ -179,64 +179,21 @@
   padding: var(--s-4);
 }
 
-.driver-grid {
-  display: grid;
-  gap: var(--s-2);
-  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
-  margin-bottom: var(--s-4);
-}
-
-.driver-option {
-  position: relative;
-}
-
-.driver-option input {
-  position: absolute;
-  opacity: 0;
-  inset: 0;
-  cursor: pointer;
-}
-
-.driver-option span {
+.dispatch-actions {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-height: var(--tap-min);
-  justify-content: center;
-  padding: var(--s-3);
-  border: 1px solid var(--c-line-strong);
-  border-radius: var(--r-md);
-  font-size: var(--t-sm);
+  flex-wrap: wrap;
+  gap: var(--s-2);
 }
 
-.driver-option span strong {
-  font-family: var(--font-head);
-}
-
-.driver-option span small {
-  color: var(--c-muted);
-  font-size: var(--t-xs);
-}
-
-.driver-option input:checked + span {
-  border-color: var(--c-green-text);
-  background: var(--c-green-tint);
-}
-
-.driver-option input:focus-visible + span {
-  outline: var(--focus-ring);
-  outline-offset: var(--focus-offset);
-}
-
-/* WHATSAPP MESSAGE PREVIEW */
-.wa-preview {
+/* SMS PREVIEW */
+.sms-preview {
   background: #ece5dd;
   border-radius: var(--r-md);
   padding: var(--s-3);
   margin-bottom: var(--s-4);
 }
 
-.wa-preview__label {
+.sms-preview__label {
   display: flex;
   align-items: center;
   gap: var(--s-2);
@@ -246,7 +203,7 @@
   font-weight: var(--w-semi);
 }
 
-.wa-preview__bubble {
+.sms-preview__bubble {
   background: #fff;
   border-radius: 0 var(--r-md) var(--r-md) var(--r-md);
   padding: var(--s-3);
