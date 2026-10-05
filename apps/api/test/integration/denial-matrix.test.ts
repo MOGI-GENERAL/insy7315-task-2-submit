@@ -8,7 +8,14 @@ import {
 } from '@fedsa/contract';
 import { Types } from 'mongoose';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-import { ClaimModel, NotificationModel, OfferModel } from '../../src/db/index.js';
+import {
+  ClaimModel,
+  CollectionModel,
+  HandoverRecordModel,
+  NotificationModel,
+  OfferModel,
+  TaxCertificateModel,
+} from '../../src/db/index.js';
 import {
   TEST_PASSWORD,
   anonymousClient,
@@ -19,6 +26,7 @@ import {
   newOfferService,
   signedInClient,
   startTestApp,
+  uniqueEmail,
 } from './test-app.js';
 import { START_TIMEOUT_MS, startTestDb } from './test-db.js';
 
@@ -54,8 +62,15 @@ interface World {
   users: Record<SignedInCaller, { id: string; email: string }>;
   offerId: string;
   claimId: string;
+  donorOrganisationId: string;
   recipientOrganisationId: string;
   pendingOrganisationId: string;
+  collectionId: string;
+  /** donor confirmed, recipient has not */
+  awaitingReceiptOfferId: string;
+  /** received as a problem and not yet resolved, with a donor photo */
+  handoverId: string;
+  certificateId: string;
   inbox: Record<SignedInCaller, string>;
 }
 
@@ -79,6 +94,11 @@ const STRICT = process.env.DENIAL_MATRIX_STRICT === '1';
 
 const ANY_ID = '0123456789abcdef01234567';
 const HOUR = 60 * 60 * 1000;
+const inHours = (hours: number) => new Date(Date.now() + hours * HOUR).toISOString();
+
+const TODAY = new Date().toISOString().slice(0, 10);
+const REPORT_PERIOD = { periodStart: '2020-01-01', periodEnd: TODAY };
+const REPORT_RANGE = `from=${REPORT_PERIOD.periodStart}&to=${TODAY}`;
 
 const OFFER_VIEW: Record<Caller, string> = {
   anonymous: 'all',
@@ -162,33 +182,76 @@ const MATRIX = {
   'POST /api/claims/:id/release': (w) => ({ path: `/api/claims/${w.claimId}/release`, body: {} }),
   'POST /api/claims/:id/override': 'todo',
 
-  'POST /api/claims/:id/collection': 'todo',
-  'PATCH /api/collections/:id': 'todo',
-  'POST /api/offers/:id/handover/donor-confirm': 'todo',
-  'POST /api/offers/:id/handover/recipient-confirm': 'todo',
-  'GET /api/handovers': 'todo',
-  'POST /api/handovers/:id/resolution': 'todo',
-  'GET /api/handovers/:id/photo': 'todo',
+  'POST /api/claims/:id/collection': (w) => ({
+    path: `/api/claims/${w.claimId}/collection`,
+    body: { driverName: 'Themba Nkosi', driverPhone: '+27821112222', scheduledFor: inHours(2) },
+  }),
+  'PATCH /api/collections/:id': (w) => ({
+    path: `/api/collections/${w.collectionId}`,
+    body: { status: 'completed' },
+  }),
+  'POST /api/offers/:id/handover/donor-confirm': (w) => {
+    const form = new FormData();
+    form.append('collectedQuantityKg', '10');
+    return { path: `/api/offers/${w.offerId}/handover/donor-confirm`, body: form };
+  },
+  'POST /api/offers/:id/handover/recipient-confirm': (w) => ({
+    path: `/api/offers/${w.awaitingReceiptOfferId}/handover/recipient-confirm`,
+    body: { conditionOnReceipt: 'good' },
+  }),
+  'GET /api/handovers': () => ({ path: '/api/handovers' }),
+  'POST /api/handovers/:id/resolution': (w) => ({
+    path: `/api/handovers/${w.handoverId}/resolution`,
+    body: { resolutionNote: 'Replaced the stock' },
+  }),
+  'GET /api/handovers/:id/photo': (w) => ({ path: `/api/handovers/${w.handoverId}/photo` }),
 
   'GET /api/notifications': () => ({ path: '/api/notifications' }),
   'POST /api/notifications/:id/read': (w, caller) => ({
     path: `/api/notifications/${caller === 'anonymous' ? ANY_ID : w.inbox[caller]}/read`,
   }),
-  'POST /api/webhooks/twilio/inbound': 'todo',
-  'POST /api/webhooks/twilio/status': 'todo',
+  // no caller can sign these, so every cell is refused
+  'POST /api/webhooks/twilio/inbound': () => ({
+    path: '/api/webhooks/twilio/inbound',
+    body: new URLSearchParams({ From: 'whatsapp:+27821234567', Body: 'YES' }),
+  }),
+  'POST /api/webhooks/twilio/status': () => ({
+    path: '/api/webhooks/twilio/status',
+    body: new URLSearchParams({ MessageSid: 'SM0123', MessageStatus: 'delivered' }),
+  }),
 
-  'GET /api/reports/impact': 'todo',
-  'GET /api/reports/outcomes': 'todo',
-  'GET /api/reports/export': 'todo',
-  'GET /api/valuation-rates': 'todo',
-  'PUT /api/valuation-rates': 'todo',
-  'POST /api/tax-certificates': 'todo',
-  'GET /api/tax-certificates': 'todo',
-  'GET /api/tax-certificates/:id/pdf': 'todo',
-  'GET /api/users': 'todo',
-  'POST /api/users': 'todo',
-  'PATCH /api/users/:id': 'todo',
-  'GET /api/audit-log': 'todo',
+  'GET /api/reports/impact': () => ({ path: `/api/reports/impact?${REPORT_RANGE}` }),
+  'GET /api/reports/outcomes': () => ({ path: `/api/reports/outcomes?${REPORT_RANGE}` }),
+  'GET /api/reports/export': () => ({ path: `/api/reports/export?${REPORT_RANGE}` }),
+  'GET /api/valuation-rates': () => ({ path: '/api/valuation-rates' }),
+  'PUT /api/valuation-rates': () => ({
+    path: '/api/valuation-rates',
+    body: { items: [{ category: 'dairy', ratePerKg: 18 }] },
+  }),
+  'POST /api/tax-certificates': (w) => ({
+    path: '/api/tax-certificates',
+    body: { donorOrganisationId: w.donorOrganisationId, ...REPORT_PERIOD },
+  }),
+  'GET /api/tax-certificates': () => ({ path: '/api/tax-certificates' }),
+  'GET /api/tax-certificates/:id/pdf': (w) => ({
+    path: `/api/tax-certificates/${w.certificateId}/pdf`,
+  }),
+  'GET /api/users': () => ({ path: '/api/users' }),
+  'POST /api/users': () => ({
+    path: '/api/users',
+    body: {
+      fullName: 'Thandi Mokoena',
+      email: uniqueEmail('new-user'),
+      role: 'coordinator',
+      phone: '+27829998888',
+      languagePreference: 'en',
+    },
+  }),
+  'PATCH /api/users/:id': (w) => ({
+    path: `/api/users/${w.users.otherRecipient.id}`,
+    body: { status: 'disabled' },
+  }),
+  'GET /api/audit-log': () => ({ path: '/api/audit-log' }),
 } satisfies Record<MatrixKey, Row>;
 
 type Expected = 401 | 403 | 404 | 'allowed';
@@ -214,6 +277,54 @@ function expected(route: Route, caller: Caller): Expected {
 }
 
 let referenceCount = 0;
+
+/** a second offer, its claim and the donor's confirmation. `received` adds a problem receipt and a photo */
+async function handedOver(
+  donorOrganisationId: Types.ObjectId,
+  recipientOrganisationId: Types.ObjectId,
+  users: World['users'],
+  received: boolean,
+) {
+  referenceCount += 1;
+  const offer = await OfferModel.create({
+    donorOrganisationId,
+    postedByUserId: users.donor.id,
+    reference: `M${referenceCount.toString(36).toUpperCase().padStart(3, '0')}`,
+    title: '40 litres of milk',
+    description: null,
+    category: 'dairy',
+    offeredQuantityKg: 40,
+    coldChain: 'refrigerated',
+    photoUrls: [],
+    availableFrom: new Date(Date.now() - 2 * HOUR),
+    collectionDeadline: new Date(Date.now() + 3 * HOUR),
+    status: received ? 'collected' : 'claimed',
+  });
+  const claim = await ClaimModel.create({
+    offerId: offer._id,
+    recipientOrganisationId,
+    claimedByUserId: users.recipient.id,
+    claimedAt: new Date(Date.now() - HOUR),
+    transportNeeded: false,
+    status: received ? 'fulfilled' : 'active',
+  });
+  const handover = await HandoverRecordModel.create({
+    claimId: claim._id,
+    offerId: offer._id,
+    donorConfirmedByUserId: users.donor.id,
+    donorConfirmedAt: new Date(Date.now() - HOUR / 2),
+    donorPhotoUrl: received ? 'https://photos.example.org/milk.jpg' : null,
+    collectedQuantityKg: 40,
+    retainUntil: new Date(Date.now() + 700 * 24 * HOUR),
+    ...(received && {
+      recipientConfirmedByUserId: users.recipient.id,
+      recipientConfirmedAt: new Date(),
+      conditionOnReceipt: 'problem' as const,
+      conditionNotes: 'Warm on arrival',
+    }),
+  });
+  return { offerId: offer._id, handoverId: handover._id };
+}
 
 /** a fresh world per cell, so a cell that releases, cancels or signs out cannot change the next */
 async function createWorld(): Promise<World> {
@@ -263,8 +374,29 @@ async function createWorld(): Promise<World> {
     recipientOrganisationId: recipientOrg._id,
     claimedByUserId: users.recipient.id,
     claimedAt: new Date(),
-    transportNeeded: false,
+    transportNeeded: true,
     status: 'active',
+  });
+  const collection = await CollectionModel.create({
+    claimId: claim._id,
+    dispatchedByUserId: users.coordinator.id,
+    driverName: 'Sipho Dube',
+    driverPhone: '+27821110000',
+    scheduledFor: new Date(Date.now() + HOUR),
+  });
+  const awaitingReceipt = await handedOver(donorOrg._id, recipientOrg._id, users, false);
+  const received = await handedOver(donorOrg._id, recipientOrg._id, users, true);
+  const certificate = await TaxCertificateModel.create({
+    donorOrganisationId: donorOrg._id,
+    periodStart: new Date('2020-01-01'),
+    periodEnd: new Date(),
+    handoverRecordIds: [received.handoverId],
+    totalQuantityKg: 40,
+    valuationByCategory: [{ category: 'dairy', quantityKg: 40, ratePerKg: 18, value: 720 }],
+    totalValue: 720,
+    certificateNumber: `TC-${referenceCount}-${Date.now()}`,
+    donor: { name: donorOrg.name, addressLine: donorOrg.addressLine, suburb: donorOrg.suburb },
+    placeholderRates: true,
   });
 
   const rows = await NotificationModel.create(
@@ -286,7 +418,12 @@ async function createWorld(): Promise<World> {
     users,
     offerId: offer._id.toString(),
     claimId: claim._id.toString(),
+    donorOrganisationId: donorOrg._id.toString(),
     recipientOrganisationId: recipientOrg._id.toString(),
+    collectionId: collection._id.toString(),
+    awaitingReceiptOfferId: awaitingReceipt.offerId.toString(),
+    handoverId: received.handoverId.toString(),
+    certificateId: certificate._id.toString(),
     pendingOrganisationId: pendingOrg._id.toString(),
     inbox,
   };
