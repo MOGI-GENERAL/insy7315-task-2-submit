@@ -169,9 +169,7 @@ export class ClaimService {
       const releasedBy = result.claim.recipientOrganisationId.toString();
       this.inBackground('notifying the reopened offer', async () => {
         const recipients = await this.offerService.eligibleRecipients(result.reopened!);
-        const others = recipients
-          .map((r) => r._id.toString())
-          .filter((id) => id !== releasedBy);
+        const others = recipients.map((r) => r._id.toString()).filter((id) => id !== releasedBy);
         await this.offerNotifier.notifyEligible(view!, others);
       });
       this.inBackground('notifying the release', () =>

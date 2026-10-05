@@ -22,11 +22,9 @@ export class ClaimRepository {
     recipientOrganisationId: Types.ObjectId | string,
     session?: ClientSession,
   ) {
-    return ClaimModel.findOne(
-      { offerId, recipientOrganisationId, status: 'active' },
-      null,
-      { session },
-    ).exec();
+    return ClaimModel.findOne({ offerId, recipientOrganisationId, status: 'active' }, null, {
+      session,
+    }).exec();
   }
 
   /** null if the claim is not active. a repeated release changes nothing */
