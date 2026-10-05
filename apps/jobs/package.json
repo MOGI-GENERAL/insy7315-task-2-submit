@@ -1,7 +1,7 @@
 {
   "name": "@fedsa/jobs",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
     "build": "tsc -b",
@@ -9,7 +9,7 @@
     "test:unit": "vitest run --passWithNoTests --dir src"
   },
   "dependencies": {
-    "@fedsa/api": "0.0.0"
+    "@fedsa/api": "*"
   },
   "devDependencies": {
     "@types/node": "^22.20.4"
