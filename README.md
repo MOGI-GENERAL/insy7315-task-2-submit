@@ -12,7 +12,11 @@ The API for this demo runs on Render's free plan and sleeps after about 15 minut
 
 **The first request can take up to a minute, and may appear to have failed, refresh if you get a failure to load.**
 
-Presentation video: _link to be added_
+Presentation video: https://youtu.be/xtwgI0r1emY
+
+AI usage report: [docs/ai-usage.pdf](docs/ai-usage.pdf)
+
+Clips of the app in use recorded using [Playwright](https://playwright.dev/) scripts.
 
 ## Repository Guide
 
