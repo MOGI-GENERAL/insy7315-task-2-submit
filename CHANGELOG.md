@@ -2,6 +2,13 @@
 
 Each release is merged into `main` and tagged, and the deploy workflow then puts it into production.
 
+## 1.0.1 (2026-10-06)
+
+Documentation only.
+
+- **README:** a link to the presentation video, a link to the AI usage report, and a note on how the clips were recorded.
+- **AI usage report:** added as `docs/ai-usage.pdf`.
+
 ## 1.0.0 (2026-10-06)
 
 The first complete release.
