@@ -36,6 +36,7 @@ import { HandoverService } from './services/handover-service.js';
 import { HealthService } from './services/health-service.js';
 import { NotificationService } from './services/notification-service.js';
 import { OfferService } from './services/offer-service.js';
+import { OpenApiService } from './services/openapi-service.js';
 import { OrganisationService } from './services/organisation-service.js';
 import { ReportingService } from './services/reporting-service.js';
 import { UserService } from './services/user-service.js';
@@ -116,6 +117,7 @@ const server = createApp({
   logger,
   services: {
     health: new HealthService(fakeHealthRepository, 'test-sha'),
+    openApi: new OpenApiService(),
     users: new UserService(
       new UserRepository(),
       new OrganisationRepository(),

@@ -98,6 +98,10 @@ const driver = () => ({
  * status from the routes table, and the error call the status of its code
  */
 export const CONTRACT_CASES: Partial<Record<RouteKey, ContractCase>> = {
+  'GET /api/openapi.json': {
+    success: (t) => t.request('anonymous', 'GET', '/api/openapi.json'),
+    error: { code: 'VALIDATION_FAILED', send: (t) => t.malformedJson('GET', '/api/openapi.json') },
+  },
   'GET /api/health': {
     success: (t) => t.request('anonymous', 'GET', '/api/health'),
     error: { code: 'VALIDATION_FAILED', send: (t) => t.malformedJson('GET', '/api/health') },

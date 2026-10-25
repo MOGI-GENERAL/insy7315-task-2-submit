@@ -19,6 +19,7 @@ import { healthRouter } from './routes/health-router.js';
 import { meRouter } from './routes/me-router.js';
 import { notificationRouter } from './routes/notification-router.js';
 import { offerRouter } from './routes/offer-router.js';
+import { openApiRouter } from './routes/openapi-router.js';
 import { organisationRouter } from './routes/organisation-router.js';
 import { reportRouter } from './routes/report-router.js';
 import { userRouter } from './routes/user-router.js';
@@ -30,6 +31,7 @@ import type { HandoverService } from './services/handover-service.js';
 import type { HealthService } from './services/health-service.js';
 import type { NotificationService } from './services/notification-service.js';
 import type { OfferService } from './services/offer-service.js';
+import type { OpenApiService } from './services/openapi-service.js';
 import type { OrganisationService } from './services/organisation-service.js';
 import type { ReportingService } from './services/reporting-service.js';
 import type { UserService } from './services/user-service.js';
@@ -37,6 +39,7 @@ import type { WebhookService } from './services/webhook-service.js';
 
 export interface AppServices {
   health: HealthService;
+  openApi: OpenApiService;
   users: UserService;
   organisations: OrganisationService;
   offers: OfferService;
@@ -77,6 +80,7 @@ export function createApp(deps: AppDeps) {
   app.use(requirePasswordChanged);
 
   app.use('/api', healthRouter(deps.services.health));
+  app.use('/api', openApiRouter(deps.services.openApi));
   app.use('/api', authRouter(deps.services.users));
   app.use('/api', meRouter(deps.services.users));
   app.use('/api', organisationRouter(deps.services.organisations));

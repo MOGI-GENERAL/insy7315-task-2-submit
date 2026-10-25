@@ -50,6 +50,7 @@ import { HealthService } from '../../src/services/health-service.js';
 import { NotificationService } from '../../src/services/notification-service.js';
 import type { OfferNotifier } from '../../src/services/offer-notifier.js';
 import { OfferService } from '../../src/services/offer-service.js';
+import { OpenApiService } from '../../src/services/openapi-service.js';
 import { OrganisationService } from '../../src/services/organisation-service.js';
 import { ReportingService } from '../../src/services/reporting-service.js';
 import { UserService } from '../../src/services/user-service.js';
@@ -242,6 +243,7 @@ export async function startTestApp(
     logger: createLogger({ write: () => {} }),
     services: {
       health: new HealthService(new HealthRepository(), 'test-sha'),
+      openApi: new OpenApiService(),
       users: new UserService(
         new UserRepository(),
         new OrganisationRepository(),
