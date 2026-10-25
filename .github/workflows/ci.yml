@@ -4,9 +4,11 @@ on:
   push:
     branches:
       - '**'
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
+    paths:
+      - '**'
+      - '!**.md'
+      - '!docs/**'
+      - 'docs/openapi.json'
   workflow_call:
 
 permissions:
@@ -30,6 +32,8 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
+      - run: npm run openapi:check
+      - run: npx -y @redocly/cli@2.62.1 lint docs/openapi.json
       - run: npm run test:unit
       - run: npm run budget
 
