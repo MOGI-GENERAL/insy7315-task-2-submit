@@ -104,7 +104,7 @@ It is generated from the contract, and `npm run openapi` regenerates it.
 `npm run openapi:check` fails when the file is out of date.
 
 To read it in a viewer, open https://editor.swagger.io and choose File, then Import file, then select `docs/openapi.json`.
-For a static page, run `npx @redocly/cli build-docs docs/openapi.json`.
+For a static page, run `npx @redocly/cli@2.62.1 build-docs docs/openapi.json`.
 
 ## Demo accounts
 
