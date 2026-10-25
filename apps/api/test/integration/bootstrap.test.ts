@@ -115,13 +115,17 @@ test('bootstrap updates a validator that is out of date', async () => {
   } as const;
 
   await db.command({ collMod: 'notifications', validator: outdated });
-  await expect(NotificationModel.create(row)).rejects.toThrow();
+  try {
+    await expect(NotificationModel.create(row)).rejects.toThrow();
 
-  const result = await bootstrapDb();
+    const result = await bootstrapDb();
 
-  expect(result.updatedValidators).toEqual(['notifications']);
-  await NotificationModel.create(row);
-  await NotificationModel.deleteMany({});
+    expect(result.updatedValidators).toEqual(['notifications']);
+    await NotificationModel.create(row);
+    await NotificationModel.deleteMany({});
+  } finally {
+    await bootstrapDb();
+  }
 });
 
 test('bootstrap leaves indexes on collections it does not manage', async () => {

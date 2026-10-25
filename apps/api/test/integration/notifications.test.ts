@@ -379,7 +379,7 @@ describe('notifying from other work', () => {
     });
   });
 
-  test('a certificate reaches each active user of the donor in the inbox only, linked to the certificates screen', async () => {
+  test("a certificate reaches each active donor user's inbox, linked to the certificates screen, and never by SMS or WhatsApp", async () => {
     const bakery = await createOrganisation({ type: 'donor' });
     const first = await member(bakery._id, 'donor', { phone: '+27820000005' });
     const second = await member(bakery._id, 'donor', { phone: '+27820000006' });

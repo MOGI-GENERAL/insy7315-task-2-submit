@@ -52,7 +52,7 @@ const LOCALE: Record<Language, string> = { en: 'en-ZA', af: 'af-ZA', xh: 'xh-ZA'
 // there is no reviewed Afrikaans or isiXhosa text yet. every language gets the English
 const certificateIssued: Template<MessageData['certificate_issued']> = (d, f) => ({
   title: `Tax certificate ${d.certificateNumber}`,
-  body: `Your tax certificate for ${f.day(d.periodStart)} to ${f.day(d.periodEnd)} is ready to download under Certificates.`,
+  body: `Your tax certificate for ${f.day(d.periodStart)} to ${f.day(d.periodEnd)} is ready to download under Tax certificates.`,
 });
 
 /** the reply keyword stays YES in every language, so one rule parses every reply */

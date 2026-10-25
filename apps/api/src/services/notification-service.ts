@@ -56,7 +56,7 @@ interface FanOutResult {
 
 /** the screen that opens when the notification is tapped */
 function hrefFor(role: Role, kind: NotificationKind, offerId: string | null) {
-  if (kind === 'certificate_issued') return '/donor/certificates';
+  if (kind === 'certificate_issued') return role === 'donor' ? '/donor/certificates' : null;
   if (!offerId) return null;
   if (role === 'donor') return `/donor/offers/${offerId}`;
   if (role === 'recipient') return `/recipient/offers/${offerId}`;
