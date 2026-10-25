@@ -13,6 +13,10 @@ afterAll(async () => {
   await stopTestDb?.();
 });
 
+interface Validator {
+  $jsonSchema: { properties: { kind: { enum: string[] } } };
+}
+
 async function snapshot() {
   const db = mongoose.connection.db!;
   const collections = await db.listCollections().toArray();
@@ -91,6 +95,32 @@ test('an in-app row with no message id stays out of that index', async () => {
   const indexed = await NotificationModel.find({}).hint('providerMessageId_1');
 
   expect(indexed.map((n) => n.channel)).toEqual(['sms']);
+  await NotificationModel.deleteMany({});
+});
+
+test('bootstrap updates a validator that is out of date', async () => {
+  const db = mongoose.connection.db!;
+  const [info] = await db.listCollections({ name: 'notifications' }).toArray();
+  const current = (info as unknown as { options: { validator: Validator } }).options.validator;
+  const outdated = structuredClone(current);
+  outdated.$jsonSchema.properties.kind.enum = outdated.$jsonSchema.properties.kind.enum.filter(
+    (kind) => kind !== 'certificate_issued',
+  );
+  const row = {
+    kind: 'certificate_issued',
+    channel: 'in_app',
+    deliveryStatus: 'delivered',
+    title: 'Tax certificate FEDSA-2026-0001',
+    body: 'Your tax certificate is ready.',
+  } as const;
+
+  await db.command({ collMod: 'notifications', validator: outdated });
+  await expect(NotificationModel.create(row)).rejects.toThrow();
+
+  const result = await bootstrapDb();
+
+  expect(result.updatedValidators).toEqual(['notifications']);
+  await NotificationModel.create(row);
   await NotificationModel.deleteMany({});
 });
 

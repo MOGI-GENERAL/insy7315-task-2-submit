@@ -27,6 +27,8 @@ export interface MessageData {
   };
   verification: { organisationName: string };
   dispute: { reference: string; organisationName: string };
+  /** both dates are ISO date-times */
+  certificate_issued: { certificateNumber: string; periodStart: string; periodEnd: string };
 }
 
 export interface RenderedMessage {
@@ -39,12 +41,19 @@ export interface RenderedMessage {
 interface Format {
   kg(quantity: number): string;
   time(iso: string): string;
+  day(iso: string): string;
 }
 
 type Template<D> = (data: D, f: Format) => { title: string; body: string; reply?: string };
 type Templates = { [K in NotificationKind]: Template<MessageData[K]> };
 
 const LOCALE: Record<Language, string> = { en: 'en-ZA', af: 'af-ZA', xh: 'xh-ZA' };
+
+// there is no reviewed Afrikaans or isiXhosa text yet. every language gets the English
+const certificateIssued: Template<MessageData['certificate_issued']> = (d, f) => ({
+  title: `Tax certificate ${d.certificateNumber}`,
+  body: `Your tax certificate for ${f.day(d.periodStart)} to ${f.day(d.periodEnd)} is ready to download under Certificates.`,
+});
 
 /** the reply keyword stays YES in every language, so one rule parses every reply */
 const TEMPLATES: Record<Language, Templates> = {
@@ -84,6 +93,7 @@ const TEMPLATES: Record<Language, Templates> = {
       title: 'Problem reported',
       body: `${d.organisationName} reported a problem with the handover for offer ${d.reference}.`,
     }),
+    certificate_issued: certificateIssued,
   },
   af: {
     offer_posted: (d, f) => ({
@@ -121,6 +131,7 @@ const TEMPLATES: Record<Language, Templates> = {
       title: 'Probleem aangemeld',
       body: `${d.organisationName} het 'n probleem met die oorhandiging van aanbod ${d.reference} aangemeld.`,
     }),
+    certificate_issued: (d) => certificateIssued(d, formatFor('en')),
   },
   xh: {
     offer_posted: (d, f) => ({
@@ -158,6 +169,7 @@ const TEMPLATES: Record<Language, Templates> = {
       title: 'Kuxelwe ingxaki',
       body: `${d.organisationName} ixele ingxaki ngokunikezelwa kwesibonelelo ${d.reference}.`,
     }),
+    certificate_issued: (d) => certificateIssued(d, formatFor('en')),
   },
 };
 
@@ -224,9 +236,16 @@ function formatFor(language: Language): Format {
     minute: '2-digit',
     hourCycle: 'h23',
   });
+  const day = new Intl.DateTimeFormat(locale, {
+    timeZone: 'Africa/Johannesburg',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
   return {
     kg: (n) => `${quantity.format(n)} kg`,
     time: (iso) => time.format(new Date(iso)),
+    day: (iso) => day.format(new Date(iso)),
   };
 }
 
