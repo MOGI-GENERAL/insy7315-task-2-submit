@@ -249,7 +249,7 @@ describe('a monthly run', () => {
     expect(await TaxCertificateModel.countDocuments({ donorOrganisationId: odd._id })).toBe(0);
   });
 
-  test('the month runs from the first at 00:00 to the last day at 23:59 in Cape Town', async () => {
+  test('a handover at 23:30 on the last day is in the month and one at 00:30 on the 1st is not', async () => {
     const bakery = await createOrganisation({ type: 'donor', name: 'Bakery' });
     const before = await donation(bakery, 'bakery', 10, sa('2026-08-31T23:30:00'));
     const inside = await donation(bakery, 'bakery', 10, sa('2026-09-30T23:30:00'));
