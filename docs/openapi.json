@@ -4456,7 +4456,8 @@
                               "handover_confirmed",
                               "driver_dispatched",
                               "verification",
-                              "dispute"
+                              "dispute",
+                              "certificate_issued"
                             ],
                             "type": "string"
                           },
