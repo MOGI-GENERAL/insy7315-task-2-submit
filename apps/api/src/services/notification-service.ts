@@ -55,7 +55,8 @@ interface FanOutResult {
 }
 
 /** the screen that opens when the notification is tapped */
-function hrefFor(role: Role, offerId: string | null) {
+function hrefFor(role: Role, kind: NotificationKind, offerId: string | null) {
+  if (kind === 'certificate_issued') return role === 'donor' ? '/donor/certificates' : null;
   if (!offerId) return null;
   if (role === 'donor') return `/donor/offers/${offerId}`;
   if (role === 'recipient') return `/recipient/offers/${offerId}`;
@@ -322,7 +323,7 @@ export class NotificationService implements OfferNotifier, ClaimNotifier {
     offerId: string | null,
   ): Promise<DeliveryStatus[]> {
     const rendered = renderMessage(kind, user.languagePreference, data);
-    const message: OutgoingMessage = { ...rendered, href: hrefFor(user.role, offerId) };
+    const message: OutgoingMessage = { ...rendered, href: hrefFor(user.role, kind, offerId) };
     const row = {
       organisationId: user.organisationId,
       userId: user._id,

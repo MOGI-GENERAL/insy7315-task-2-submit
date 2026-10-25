@@ -22,6 +22,11 @@ const DATA: MessageData = {
   },
   verification: { organisationName: 'Siyakhula Shelter' },
   dispute: { reference: 'K4F2', organisationName: 'Siyakhula Shelter' },
+  certificate_issued: {
+    certificateNumber: 'FEDSA-2026-0001',
+    periodStart: '2026-09-30T22:00:00.000Z',
+    periodEnd: '2026-10-31T21:59:59.999Z',
+  },
 };
 
 /** every value a kind is given that should reach the reader as it is */
@@ -40,6 +45,7 @@ const MUST_SHOW: Record<NotificationKind, string[]> = {
   ],
   verification: ['Siyakhula Shelter'],
   dispute: ['K4F2', 'Siyakhula Shelter'],
+  certificate_issued: ['FEDSA-2026-0001', '1 Oct 2026', '31 Oct 2026'],
 };
 
 const CASES = Language.options.flatMap((language) =>
@@ -83,6 +89,13 @@ test.each(Language.options)('only an offer in %s asks for a reply', (language) =
   const others = NotificationKind.options.filter((kind) => kind !== 'offer_posted');
   for (const kind of others) {
     expect(renderMessage(kind, language, DATA[kind]).phoneText).not.toContain('YES');
+  }
+});
+
+test('a certificate notice is the English text in every language', () => {
+  const english = renderMessage('certificate_issued', 'en', DATA.certificate_issued);
+  for (const language of ['af', 'xh'] as const) {
+    expect(renderMessage('certificate_issued', language, DATA.certificate_issued)).toEqual(english);
   }
 });
 
