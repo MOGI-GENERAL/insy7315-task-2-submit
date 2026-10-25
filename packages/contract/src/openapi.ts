@@ -8,7 +8,6 @@ type Json = Record<string, unknown>;
 
 const SESSION_COOKIE = 'fedsa.sid';
 const TWILIO_HEADER = 'x-twilio-signature';
-const CONTENT_FREE_STATUS = [204, 302];
 
 /** file field names match the multer setup in the API */
 const FILE_FIELDS: Record<string, { name: string; many: boolean }> = {
@@ -47,8 +46,10 @@ function operationId(route: RouteSpec): string {
 
 function describeAccess(route: RouteSpec): string {
   let text: string;
-  if (route.access === 'public') text = 'Public.';
-  else if (route.access === 'any') text = 'Any signed-in user.';
+  if (route.access === 'public') {
+    text =
+      route.method === 'GET' ? 'Public.' : 'Public. Send the CSRF token from GET /api/auth/csrf.';
+  } else if (route.access === 'any') text = 'Any signed-in user.';
   else if (route.access === 'twilio') text = 'Twilio webhook, signed.';
   else text = `Roles: ${route.access.join(', ')}.`;
   if (route.ownedByOrganisation) text += " Another organisation's records answer 404.";
@@ -56,8 +57,8 @@ function describeAccess(route: RouteSpec): string {
 }
 
 function securityOf(route: RouteSpec): Json[] {
-  if (route.access === 'public') return [];
   if (route.access === 'twilio') return [{ twilioSignature: [] }];
+  if (route.access === 'public') return route.method === 'GET' ? [] : [{ csrfToken: [] }];
   if (route.method === 'GET') return [{ sessionCookie: [] }];
   return [{ sessionCookie: [], csrfToken: [] }];
 }
@@ -111,7 +112,7 @@ function successResponse(route: RouteSpec): Json {
     const location = { description: 'Short-lived photo URL', schema: { type: 'string' } };
     return { description: 'Redirect to the photo', headers: { Location: location } };
   }
-  if (CONTENT_FREE_STATUS.includes(route.status)) return { description: 'No content' };
+  if (route.status === 204) return { description: 'No content' };
   return { description: 'Success' };
 }
 

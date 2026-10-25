@@ -272,7 +272,7 @@
     },
     "/api/auth/login": {
       "post": {
-        "description": "Public.",
+        "description": "Public. Send the CSRF token from GET /api/auth/csrf.",
         "operationId": "postAuthLogin",
         "requestBody": {
           "content": {
@@ -688,7 +688,11 @@
             "description": "Error"
           }
         },
-        "security": [],
+        "security": [
+          {
+            "csrfToken": []
+          }
+        ],
         "summary": "POST /api/auth/login",
         "tags": [
           "auth"
@@ -728,7 +732,7 @@
     },
     "/api/auth/register": {
       "post": {
-        "description": "Public.",
+        "description": "Public. Send the CSRF token from GET /api/auth/csrf.",
         "operationId": "postAuthRegister",
         "requestBody": {
           "content": {
@@ -1435,7 +1439,11 @@
             "description": "Error"
           }
         },
-        "security": [],
+        "security": [
+          {
+            "csrfToken": []
+          }
+        ],
         "summary": "POST /api/auth/register",
         "tags": [
           "auth"
