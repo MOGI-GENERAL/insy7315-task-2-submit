@@ -47,6 +47,7 @@ import { CollectionService } from '../../src/services/collection-service.js';
 import { DEFAULT_RADIUS_KM } from '../../src/services/eligibility.js';
 import { HandoverService } from '../../src/services/handover-service.js';
 import { HealthService } from '../../src/services/health-service.js';
+import { OpenApiService } from '../../src/services/openapi-service.js';
 import { NotificationService } from '../../src/services/notification-service.js';
 import type { OfferNotifier } from '../../src/services/offer-notifier.js';
 import { OfferService } from '../../src/services/offer-service.js';
@@ -242,6 +243,7 @@ export async function startTestApp(
     logger: createLogger({ write: () => {} }),
     services: {
       health: new HealthService(new HealthRepository(), 'test-sha'),
+      openApi: new OpenApiService(),
       users: new UserService(
         new UserRepository(),
         new OrganisationRepository(),
