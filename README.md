@@ -27,6 +27,7 @@ This table points to where each part of the assessed work can be found.
 | Back end: programming                       | [apps/api/src/services](apps/api/src/services) has the business rules. [apps/api/src/db/repositories](apps/api/src/db/repositories) is the Repository pattern. [apps/api/src/notifications](apps/api/src/notifications) is the Strategy pattern for notification channels. [organisation-status.ts](apps/api/src/services/organisation-status.ts) is the verification state machine. |
 | Back end: database                          | [models](apps/api/src/db/models) and [bootstrap.ts](apps/api/src/db/bootstrap.ts), which applies the `$jsonSchema` validators and the indexes. One index is a partial unique index that stops two active claims on one offer.                                                                                                                                                        |
 | Back end: APIs                              | [packages/contract/src/routes.ts](packages/contract/src/routes.ts) lists every endpoint with its role and schemas. [apps/api/src/routes](apps/api/src/routes) and [controllers](apps/api/src/controllers) serve them, and [errors.ts](apps/api/src/errors.ts) defines the one error shape.                                                                                           |
+| Back end: API document                      | [docs/openapi.json](docs/openapi.json) is the OpenAPI 3.1 description of every endpoint.                                                                                                                                                                                                                                                                                             |
 | Back end: security                          | [middleware](apps/api/src/middleware) covers sessions, CSRF, role and ownership guards, rate limits and security headers. [denial-matrix.test.ts](apps/api/test/integration/denial-matrix.test.ts) checks every route against every kind of caller.                                                                                                                                  |
 | Back end: data flow and logic               | [claim-service.ts](apps/api/src/services/claim-service.ts) is the claim lock. [expiry-service.ts](apps/api/src/services/expiry-service.ts), [handover-service.ts](apps/api/src/services/handover-service.ts) and [meals.ts](apps/api/src/services/meals.ts) cover the rest of the flow.                                                                                              |
 | Hosting                                     | [Why this hosting](#why-this-hosting), [docs/ENVIRONMENTS.md](docs/ENVIRONMENTS.md), [netlify.toml](netlify.toml) and [render.yaml](render.yaml).                                                                                                                                                                                                                                    |
@@ -91,8 +92,19 @@ All paths start with `/api`.
 | Certificates    | `GET` and `PUT /valuation-rates`, `POST` and `GET /tax-certificates`, `GET /tax-certificates/:id/pdf`                                                       |
 | Users           | `GET` and `POST /users`, `PATCH /users/:id`, `GET /audit-log`                                                                                               |
 | Twilio          | `POST /webhooks/twilio/inbound`, `/webhooks/twilio/status`                                                                                                  |
+| Documentation   | `GET /openapi.json`                                                                                                                                         |
 
 Errors share one shape, which the contract package defines.
+
+### OpenAPI document
+
+[docs/openapi.json](docs/openapi.json) describes every endpoint as an OpenAPI 3.1 document.
+The running API serves the same document at `/api/openapi.json`, for example https://fedsa-mogi.netlify.app/api/openapi.json.
+It is generated from the contract, and `npm run openapi` regenerates it.
+`npm run openapi:check` fails when the file is out of date.
+
+To read it in a viewer, open https://editor.swagger.io and choose File, then Import file, then select `docs/openapi.json`.
+For a static page, run `npx @redocly/cli build-docs docs/openapi.json`.
 
 ## Demo accounts
 
