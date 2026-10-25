@@ -20,7 +20,7 @@ Clips of the app in use recorded using [Playwright](https://playwright.dev/) scr
 
 ## Repository Guide
 
-This table points to where each part of the assessed work can be found.
+This table points to where each part of the project can be found.
 
 | Area                                        | Where to look                                                                                                                                                                                                                                                                                                                                                                        |
 | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
