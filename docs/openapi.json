@@ -7101,6 +7101,62 @@
         ]
       }
     },
+    "/api/openapi.json": {
+      "get": {
+        "description": "Public.",
+        "operationId": "getOpenapi.json",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "components": {},
+                    "info": {},
+                    "openapi": {
+                      "type": "string"
+                    },
+                    "paths": {
+                      "additionalProperties": {},
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "type": "object"
+                    },
+                    "servers": {}
+                  },
+                  "required": [
+                    "openapi",
+                    "info",
+                    "servers",
+                    "paths",
+                    "components"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [],
+        "summary": "GET /api/openapi.json",
+        "tags": [
+          "openapi.json"
+        ]
+      }
+    },
     "/api/organisations": {
       "get": {
         "description": "Roles: coordinator, administrator.",
