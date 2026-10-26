@@ -1,70 +1,46 @@
 import {
-  IDEMPOTENCY_HEADER,
   MAX_PHOTOS_PER_OFFER,
-  objectId,
   type CancelOfferRequest,
   type ListOffersQuery,
   type Offer,
   type OfferDetailResponse,
   type OfferListResponse,
   type OfferResponse,
-  type OfferView,
-  type Photo,
   type PostOfferFields,
   type PostOfferResponse,
-  type Role,
 } from '@fedsa/contract';
-import { Types, mongo, type ClientSession } from 'mongoose';
+import { Types, type ClientSession } from 'mongoose';
 import type { Logger } from 'pino';
-import { z } from 'zod';
 import {
   runInTransaction,
   type ClaimRepository,
   type CollectionRepository,
   type HandoverRepository,
-  type OfferDoc,
   type OfferRepository,
   type OrganisationRepository,
 } from '../db/index.js';
-import { ForbiddenError, InvalidStateError, NotFoundError, ValidationError } from '../errors.js';
+import { NotFoundError } from '../errors.js';
 import { checkPhotos, type UploadedPhoto } from '../photos/check-photos.js';
 import type { PhotoStore } from '../photos/photo-store.js';
 import type { AuditService } from './audit-service.js';
 import { dayRange } from './day-range.js';
-import {
-  eligibleRecipientsFilter,
-  isEligible,
-  nearbyDonorsFilter,
-  offersForRecipientFilter,
-} from './eligibility.js';
+import { eligibleRecipientsFilter, isEligible } from './eligibility.js';
+import { claimOf, parseCursor, viewFilter } from './offer-access.js';
+import { cancelOpenOffer } from './offer-cancel.js';
 import type { OfferNotifier } from './offer-notifier.js';
+import { clientRequestId, createWithReference, isDuplicate } from './offer-posting.js';
 import { newOfferReference } from './offer-reference.js';
-import { canClaim } from './organisation-status.js';
+import {
+  donorsOf,
+  findOrganisation,
+  toOfferView,
+  type StoredOffer,
+  type StoredOrganisation,
+} from './offer-records.js';
 import type { SessionUser } from './user-service.js';
-import { claimView, collectionView, handoverView, offerView } from './views.js';
+import { claimView, collectionView, handoverView } from './views.js';
 
 const PAGE_SIZE = 50;
-
-/** about 900,000 references exist, so a clash is rare and a few retries are plenty */
-const MAX_REFERENCE_ATTEMPTS = 5;
-
-const DUPLICATE_KEY = 11000;
-
-const AUDIT_TARGET = 'offers';
-
-const VIEW_ROLES: Record<OfferView, Role[]> = {
-  feed: ['recipient'],
-  scheduled: ['recipient'],
-  mine: ['donor'],
-  all: ['coordinator'],
-};
-
-/** a client UUID in practice */
-const IdempotencyKey = z.string().trim().min(1).max(64);
-
-type StoredOffer = NonNullable<Awaited<ReturnType<OfferRepository['findById']>>>;
-type StoredOrganisation = NonNullable<Awaited<ReturnType<OrganisationRepository['findById']>>>;
-type StoredClaim = NonNullable<Awaited<ReturnType<ClaimRepository['findById']>>>;
 
 export interface OfferSettings {
   radiusKm: number;
@@ -73,13 +49,7 @@ export interface OfferSettings {
   newReference?: () => string;
 }
 
-export function isDuplicate(err: unknown, field: string) {
-  return (
-    err instanceof mongo.MongoServerError &&
-    err.code === DUPLICATE_KEY &&
-    field in (err.keyPattern ?? {})
-  );
-}
+export { isDuplicate };
 
 export class OfferService {
   private readonly offers: OfferRepository;
@@ -125,10 +95,10 @@ export class OfferService {
     files: UploadedPhoto[],
     idempotencyKey: string | undefined,
   ): Promise<PostOfferResponse> {
-    const donor = await this.findOrganisation(user.organisationId);
-    const clientRequestId = this.clientRequestId(donor._id, idempotencyKey);
-    if (clientRequestId) {
-      const existing = await this.offers.findByClientRequestId(clientRequestId);
+    const donor = await findOrganisation(this.organisations, user.organisationId);
+    const requestId = clientRequestId(donor._id, idempotencyKey);
+    if (requestId) {
+      const existing = await this.offers.findByClientRequestId(requestId);
       if (existing) return this.repeatedPost(existing, donor);
     }
 
@@ -139,7 +109,7 @@ export class OfferService {
 
     let offer: StoredOffer;
     try {
-      offer = await this.createWithReference({
+      offer = await createWithReference(this.offers, this.newReference, {
         donorOrganisationId: donor._id,
         postedByUserId: new Types.ObjectId(user.id),
         title: input.title,
@@ -151,18 +121,18 @@ export class OfferService {
         availableFrom: input.availableFrom ? new Date(input.availableFrom) : new Date(),
         collectionDeadline: new Date(input.collectionDeadline),
         status: 'open',
-        ...(clientRequestId ? { clientRequestId } : {}),
+        ...(requestId ? { clientRequestId: requestId } : {}),
       });
     } catch (err) {
       // the same key arrived twice at once and the other request saved first
-      if (clientRequestId && isDuplicate(err, 'clientRequestId')) {
-        const existing = await this.offers.findByClientRequestId(clientRequestId);
+      if (requestId && isDuplicate(err, 'clientRequestId')) {
+        const existing = await this.offers.findByClientRequestId(requestId);
         if (existing) return this.repeatedPost(existing, donor);
       }
       throw err;
     }
 
-    const view = this.view(offer, donor, false);
+    const view = toOfferView(this.photos, offer, donor, false);
     const recipients = await this.eligibleRecipients(offer, donor);
     this.notifyInBackground(
       view,
@@ -183,8 +153,8 @@ export class OfferService {
     const now = new Date();
     if (parent.collectionDeadline <= now) return null;
 
-    const donor = await this.findOrganisation(parent.donorOrganisationId);
-    const child = await this.createWithReference({
+    const donor = await findOrganisation(this.organisations, parent.donorOrganisationId);
+    const child = await createWithReference(this.offers, this.newReference, {
       donorOrganisationId: parent.donorOrganisationId,
       postedByUserId: new Types.ObjectId(user.id),
       title: parent.title,
@@ -199,7 +169,7 @@ export class OfferService {
       parentOfferId: parent._id,
     });
 
-    const view = this.view(child, donor, false);
+    const view = toOfferView(this.photos, child, donor, false);
     const recipients = await this.eligibleRecipients(child, donor);
     this.notifyInBackground(
       view,
@@ -210,32 +180,32 @@ export class OfferService {
 
   /** recipient organisations the offer goes to, in name order */
   async eligibleRecipients(offer: StoredOffer, donor?: StoredOrganisation) {
-    const owner = donor ?? (await this.findOrganisation(offer.donorOrganisationId));
+    const owner = donor ?? (await findOrganisation(this.organisations, offer.donorOrganisationId));
     return this.organisations.findMatching(
       eligibleRecipientsFilter(offer, owner.location.coordinates, this.radiusKm),
     );
   }
 
   async isEligibleRecipient(offer: StoredOffer, recipient: StoredOrganisation) {
-    const donor = await this.findOrganisation(offer.donorOrganisationId);
+    const donor = await findOrganisation(this.organisations, offer.donorOrganisationId);
     return isEligible(recipient, offer, donor.location.coordinates, this.radiusKm);
   }
 
   async listOffers(user: SessionUser, query: ListOffersQuery): Promise<OfferListResponse> {
-    const before = query.cursor === undefined ? undefined : this.parseCursor(query.cursor);
-    const viewFilter = await this.viewFilter(user, query.view);
-    if (!viewFilter) return { items: [], nextCursor: null };
+    const before = query.cursor === undefined ? undefined : parseCursor(query.cursor);
+    const filter = await viewFilter(this.organisations, this.radiusKm, user, query.view);
+    if (!filter) return { items: [], nextCursor: null };
 
-    const conditions: Record<string, unknown>[] = [viewFilter];
+    const conditions: Record<string, unknown>[] = [filter];
     if (query.status) conditions.push({ status: query.status });
     if (query.from || query.to) conditions.push({ availableFrom: dayRange(query.from, query.to) });
 
     const page = await this.offers.list({ $and: conditions }, PAGE_SIZE + 1, before);
     const items = page.slice(0, PAGE_SIZE);
-    const donors = await this.donorsOf(items);
+    const donors = await donorsOf(this.organisations, items);
     return {
       items: items.map((offer) =>
-        this.view(offer, donors.get(offer.donorOrganisationId.toString())!, false),
+        toOfferView(this.photos, offer, donors.get(offer.donorOrganisationId.toString())!, false),
       ),
       nextCursor: page.length > PAGE_SIZE ? items[items.length - 1]!._id.toString() : null,
     };
@@ -245,8 +215,8 @@ export class OfferService {
   async getOffer(user: SessionUser, id: string): Promise<OfferDetailResponse> {
     const offer = await this.offers.findById(id);
     if (!offer) throw new NotFoundError();
-    const donor = await this.findOrganisation(offer.donorOrganisationId);
-    const claim = await this.claimFor(user, offer, donor);
+    const donor = await findOrganisation(this.organisations, offer.donorOrganisationId);
+    const claim = await claimOf(this.claims, this.organisations, this.radiusKm, user, offer, donor);
 
     const [claimant, collection, handover] = claim
       ? await Promise.all([
@@ -257,7 +227,7 @@ export class OfferService {
       : [null, null, null];
 
     return {
-      offer: this.view(offer, donor, true),
+      offer: toOfferView(this.photos, offer, donor, true),
       claim: claim && claimant ? claimView(claim, claimant) : null,
       collection: collection ? collectionView(collection) : null,
       handover: handover
@@ -271,9 +241,9 @@ export class OfferService {
 
   /** list views, as `listOffers` builds them, for services that embed offers */
   async toViews(offers: StoredOffer[]): Promise<Offer[]> {
-    const donors = await this.donorsOf(offers);
+    const donors = await donorsOf(this.organisations, offers);
     return offers.map((offer) =>
-      this.view(offer, donors.get(offer.donorOrganisationId.toString())!, false),
+      toOfferView(this.photos, offer, donors.get(offer.donorOrganisationId.toString())!, false),
     );
   }
 
@@ -292,33 +262,15 @@ export class OfferService {
     id: string,
     input: CancelOfferRequest,
   ): Promise<OfferResponse> {
-    const cancel = async (session?: ClientSession) => {
-      const cancelled = await this.offers.cancelIfOpen(id, session);
-      if (cancelled) {
-        if (user.role === 'coordinator') {
-          await this.audit.record(
-            user.id,
-            'cancel_offer',
-            { type: AUDIT_TARGET, id: cancelled._id },
-            { note: input.reason || null, session },
-          );
-        }
-        return cancelled;
-      }
-
-      const current = await this.offers.findById(id, session);
-      if (!current) throw new NotFoundError();
-      // a repeated cancel gets the same answer as the first and is not audited twice
-      if (current.status === 'cancelled') return current;
-      throw new InvalidStateError('Only an open offer can be cancelled');
-    };
+    const cancel = (session?: ClientSession) =>
+      cancelOpenOffer(this.offers, this.audit, user, id, input, session);
 
     const offer =
       user.role === 'coordinator'
         ? await runInTransaction((session) => cancel(session))
         : await cancel();
-    const donor = await this.findOrganisation(offer.donorOrganisationId);
-    return { offer: this.view(offer, donor, false) };
+    const donor = await findOrganisation(this.organisations, offer.donorOrganisationId);
+    return { offer: toOfferView(this.photos, offer, donor, false) };
   }
 
   /** a repeat sends nothing, and reports how many organisations the offer reaches now */
@@ -327,112 +279,15 @@ export class OfferService {
     donor: StoredOrganisation,
   ): Promise<PostOfferResponse> {
     const recipients = await this.eligibleRecipients(offer, donor);
-    return { offer: this.view(offer, donor, false), notifiedCount: recipients.length };
-  }
-
-  /** scoped to the donor, so one organisation's key can never return another's offer */
-  private clientRequestId(donorId: Types.ObjectId, key: string | undefined) {
-    if (key === undefined) return undefined;
-    const parsed = IdempotencyKey.safeParse(key);
-    if (!parsed.success) {
-      throw new ValidationError({ [IDEMPOTENCY_HEADER]: 'Must be 1 to 64 characters' });
-    }
-    return `${donorId.toString()}:${parsed.data}`;
-  }
-
-  private async createWithReference(data: Partial<OfferDoc>) {
-    for (let attempt = 1; ; attempt += 1) {
-      try {
-        return await this.offers.create({ ...data, reference: this.newReference() });
-      } catch (err) {
-        if (attempt >= MAX_REFERENCE_ATTEMPTS || !isDuplicate(err, 'reference')) throw err;
-      }
-    }
+    return {
+      offer: toOfferView(this.photos, offer, donor, false),
+      notifiedCount: recipients.length,
+    };
   }
 
   private notifyInBackground(offer: Offer, recipientOrganisationIds: string[]) {
     this.notifier.notifyEligible(offer, recipientOrganisationIds).catch((err: unknown) => {
       this.logger.error({ err, offerId: offer.id }, 'notifying eligible recipients failed');
     });
-  }
-
-  /** null when the caller has nothing to see in the view */
-  private async viewFilter(
-    user: SessionUser,
-    view: OfferView,
-  ): Promise<Record<string, unknown> | null> {
-    if (!VIEW_ROLES[view].includes(user.role)) {
-      throw new ForbiddenError(`The ${view} view is not available to your role`);
-    }
-    if (view === 'all') return {};
-    if (view === 'mine') return { donorOrganisationId: new Types.ObjectId(user.organisationId!) };
-
-    // pending, rejected and suspended recipients have not been vetted, so they see no offers
-    const recipient = await this.findOrganisation(user.organisationId);
-    if (!canClaim(recipient)) return null;
-
-    const donorIds = await this.organisations.idsMatching(
-      nearbyDonorsFilter(recipient.location.coordinates, this.radiusKm),
-    );
-    const now = new Date();
-    const timing =
-      view === 'feed'
-        ? { availableFrom: { $lte: now }, collectionDeadline: { $gt: now } }
-        : { availableFrom: { $gt: now } };
-    return {
-      status: 'open',
-      donorOrganisationId: { $in: donorIds },
-      ...offersForRecipientFilter(recipient),
-      ...timing,
-    };
-  }
-
-  /** throws not found when the caller may not see the offer at all */
-  private async claimFor(
-    user: SessionUser,
-    offer: StoredOffer,
-    donor: StoredOrganisation,
-  ): Promise<StoredClaim | null> {
-    if (user.role === 'coordinator') return this.claims.latestForOffer(offer._id);
-    if (user.role === 'donor') {
-      if (offer.donorOrganisationId.toString() !== user.organisationId) throw new NotFoundError();
-      return this.claims.latestForOffer(offer._id);
-    }
-
-    const recipient = await this.findOrganisation(user.organisationId);
-    const own = await this.claims.latestForOffer(offer._id, recipient._id);
-    if (own) return own;
-    if (!isEligible(recipient, offer, donor.location.coordinates, this.radiusKm)) {
-      throw new NotFoundError();
-    }
-    return null;
-  }
-
-  private parseCursor(cursor: string) {
-    if (!objectId.safeParse(cursor).success) {
-      throw new ValidationError({ cursor: 'Not a cursor from a previous page' });
-    }
-    return new Types.ObjectId(cursor);
-  }
-
-  private async donorsOf(offers: StoredOffer[]) {
-    const ids = [...new Set(offers.map((offer) => offer.donorOrganisationId.toString()))];
-    const donors = await this.organisations.findByIds(ids.map((id) => new Types.ObjectId(id)));
-    return new Map(donors.map((donor) => [donor._id.toString(), donor]));
-  }
-
-  private view(offer: StoredOffer, donor: StoredOrganisation, withFullSize: boolean): Offer {
-    const photos: Photo[] = offer.photoUrls.map((url) =>
-      withFullSize
-        ? { thumbUrl: this.photos.thumbnailUrl(url), url: this.photos.fullSizeUrl(url) }
-        : { thumbUrl: this.photos.thumbnailUrl(url) },
-    );
-    return offerView(offer, donor, photos);
-  }
-
-  private async findOrganisation(id: Types.ObjectId | string | null) {
-    const organisation = id ? await this.organisations.findById(id) : null;
-    if (!organisation) throw new NotFoundError();
-    return organisation;
   }
 }
