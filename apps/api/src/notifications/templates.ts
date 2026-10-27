@@ -49,12 +49,6 @@ type Templates = { [K in NotificationKind]: Template<MessageData[K]> };
 
 const LOCALE: Record<Language, string> = { en: 'en-ZA', af: 'af-ZA', xh: 'xh-ZA' };
 
-// there is no reviewed Afrikaans or isiXhosa text yet. every language gets the English
-const certificateIssued: Template<MessageData['certificate_issued']> = (d, f) => ({
-  title: `Tax certificate ${d.certificateNumber}`,
-  body: `Your tax certificate for ${f.day(d.periodStart)} to ${f.day(d.periodEnd)} is ready to download under Tax certificates.`,
-});
-
 /** the reply keyword stays YES in every language, so one rule parses every reply */
 const TEMPLATES: Record<Language, Templates> = {
   en: {
@@ -93,7 +87,10 @@ const TEMPLATES: Record<Language, Templates> = {
       title: 'Problem reported',
       body: `${d.organisationName} reported a problem with the handover for offer ${d.reference}.`,
     }),
-    certificate_issued: certificateIssued,
+    certificate_issued: (d, f) => ({
+      title: `Tax certificate ${d.certificateNumber}`,
+      body: `Your tax certificate for ${f.day(d.periodStart)} to ${f.day(d.periodEnd)} is ready to download under Tax certificates.`,
+    }),
   },
   af: {
     offer_posted: (d, f) => ({
@@ -131,7 +128,10 @@ const TEMPLATES: Record<Language, Templates> = {
       title: 'Probleem aangemeld',
       body: `${d.organisationName} het 'n probleem met die oorhandiging van aanbod ${d.reference} aangemeld.`,
     }),
-    certificate_issued: (d) => certificateIssued(d, formatFor('en')),
+    certificate_issued: (d, f) => ({
+      title: `Belastingsertifikaat ${d.certificateNumber}`,
+      body: `Julle belastingsertifikaat vir ${f.day(d.periodStart)} tot ${f.day(d.periodEnd)} is gereed. Laai dit af onder Belastingsertifikate.`,
+    }),
   },
   xh: {
     offer_posted: (d, f) => ({
@@ -169,7 +169,10 @@ const TEMPLATES: Record<Language, Templates> = {
       title: 'Kuxelwe ingxaki',
       body: `${d.organisationName} ixele ingxaki ngokunikezelwa kwesibonelelo ${d.reference}.`,
     }),
-    certificate_issued: (d) => certificateIssued(d, formatFor('en')),
+    certificate_issued: (d, f) => ({
+      title: `Isatifikethi serhafu ${d.certificateNumber}`,
+      body: `Isatifikethi senu serhafu silungile. Ixesha: ${f.day(d.periodStart)} ukuya ku-${f.day(d.periodEnd)}. Sikhuphele kwi-Izatifikethi zerhafu.`,
+    }),
   },
 };
 

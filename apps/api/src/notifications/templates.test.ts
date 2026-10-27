@@ -45,7 +45,7 @@ const MUST_SHOW: Record<NotificationKind, string[]> = {
   ],
   verification: ['Siyakhula Shelter'],
   dispute: ['K4F2', 'Siyakhula Shelter'],
-  certificate_issued: ['FEDSA-2026-0001', '1 Oct 2026', '31 Oct 2026'],
+  certificate_issued: ['FEDSA-2026-0001'],
 };
 
 const CASES = Language.options.flatMap((language) =>
@@ -92,11 +92,21 @@ test.each(Language.options)('only an offer in %s asks for a reply', (language) =
   }
 });
 
-test('a certificate notice is the English text in every language', () => {
-  const english = renderMessage('certificate_issued', 'en', DATA.certificate_issued);
-  for (const language of ['af', 'xh'] as const) {
-    expect(renderMessage('certificate_issued', language, DATA.certificate_issued)).toEqual(english);
-  }
+test.each([
+  ['en', '1 Oct 2026', '31 Oct 2026'],
+  ['af', '1 Okt. 2026', '31 Okt. 2026'],
+  ['xh', 'Okt 1, 2026', 'Okt 31, 2026'],
+] as const)('a certificate notice in %s names both days of the month', (language, first, last) => {
+  const { body } = renderMessage('certificate_issued', language, DATA.certificate_issued);
+  expect(body).toContain(first);
+  expect(body).toContain(last);
+});
+
+test('the three languages are different text for a certificate', () => {
+  const titles = Language.options.map(
+    (l) => renderMessage('certificate_issued', l, DATA.certificate_issued).title,
+  );
+  expect(new Set(titles).size).toBe(3);
 });
 
 test('the deadline is in South African time whatever the server time zone', () => {
