@@ -8,10 +8,6 @@ Donors post surplus food, recipient organisations claim it, and coordinators and
 | Web app    | https://fedsa-mogi.netlify.app            | https://fedsa-staging.netlify.app            |
 | API health | https://fedsa-mogi.netlify.app/api/health | https://fedsa-staging.netlify.app/api/health |
 
-The API for this demo runs on Render's free plan and sleeps after about 15 minutes idle.
-
-**The first request can take up to a minute, and may appear to have failed, refresh if you get a failure to load.**
-
 Presentation video: https://youtu.be/xtwgI0r1emY
 
 AI usage report: [docs/ai-usage.pdf](docs/ai-usage.pdf)
@@ -47,14 +43,16 @@ flowchart LR
   API --> Atlas[("MongoDB Atlas, Cape Town")]
   API --> Cloudinary["Cloudinary: photos"]
   API --> Push["Web push"]
+  Jobs["Render cron: sweeps and certificates"] --> Atlas
+  Jobs --> Cloudinary
 ```
 
-| Path                | What it is                                                                |
-| ------------------- | ------------------------------------------------------------------------- |
-| `apps/web`          | React 19, Vite and TypeScript web app                                     |
-| `apps/api`          | Express 5 and Mongoose API with the expiry and retention sweeps           |
-| `apps/jobs`         | The sweeps as plain functions, for a cron service later                   |
-| `packages/contract` | zod schemas for requests and responses that the web app and the API share |
+| Path                | What it is                                                                                   |
+| ------------------- | -------------------------------------------------------------------------------------------- |
+| `apps/web`          | React 19, Vite and TypeScript web app                                                        |
+| `apps/api`          | Express 5 and Mongoose API with the expiry and retention sweeps                              |
+| `apps/jobs`         | The cron entry point: the expiry sweep, photo retention at 02:00 and certificates on the 1st |
+| `packages/contract` | zod schemas for requests and responses that the web app and the API share                    |
 
 The browser calls the API on its own origin through a Netlify `/api` rewrite.
 Sessions are cookies stored in MongoDB, and every state-changing request needs a CSRF token.
@@ -63,9 +61,14 @@ Sessions are cookies stored in MongoDB, and every state-changing request needs a
 
 - **Netlify** serves the static web app from a CDN.
   Its rewrite keeps the browser and the API on one origin, so cookies and CSRF work without cross-site settings.
-- **Render** runs the API as a plain Node service on the free plan, in Frankfurt.
-  The expiry sweep runs inside the API every five minutes, so there is no separate cron service to pay for.
-  A sleeping API runs no sweep and catches up when it wakes.
+- **Render** runs the production API as a plain Node service on the `0.5c-512mb` compute plan (formerly Starter), in Frankfurt.
+  A paid plan never sleeps (NFR08).
+  The first request answers at once, and an SMS reply reaches a running API well inside Twilio's 15-second timeout.
+- **A Render cron service** runs `apps/jobs` every five minutes against the production database.
+  It expires overdue offers and claims, deletes handover photos past their retention period at 02:00, and issues the previous month's tax certificates on the 1st.
+  These run on time when nobody is using the app, and a long job never slows a request.
+- **Staging** stays on Render's free plan, which sleeps after about 15 minutes idle and has no cron jobs.
+  Its API runs the sweeps on timers while it is awake, as a local API does.
 - **MongoDB Atlas** stores the data in Cape Town.
   The API processes it in Frankfurt, a cross-border transfer that POPIA section 72 allows.
 - **Cloudinary** stores offer and handover photos, and the database keeps only their addresses.
