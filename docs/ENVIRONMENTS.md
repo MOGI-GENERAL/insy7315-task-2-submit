@@ -1,6 +1,7 @@
 # Environments
 
-Which setting exists in which environment. Values are never written here: they live in the Render and Netlify dashboards and in the GitHub repository settings, and locally in an ignored `.env` copied from `.env.example`.
+Which setting exists in which environment.
+Values are never written here: they live in the Render and Netlify dashboards and in the GitHub repository settings, and locally in an ignored `.env` copied from `.env.example`.
 
 ## Services
 
@@ -23,7 +24,9 @@ Open the site a minute before a demo.
 Atlas accepts connections only from Render's Frankfurt outbound ranges, plus a developer's own IP for a limited time when one has to seed.
 An always-on deployment would put `fedsa-api` on Render's Starter plan and the jobs in a Render cron service.
 
-The browser only talks to the Netlify origin. Netlify rewrites `/api/*` to the Render service for its context, so the session cookie is first-party. Twilio webhooks go to Render directly and are signature-checked.
+The browser only talks to the Netlify origin.
+Netlify rewrites `/api/*` to the Render service for its context, so the session cookie is first-party.
+Twilio webhooks go to Render directly and are signature-checked.
 
 ## API and jobs
 
@@ -64,7 +67,7 @@ The workflows build the web app and upload it with the Netlify CLI.
 | Variable | Production | Staging | Local | Notes |
 |---|---|---|---|---|
 | `API_ORIGIN` | GitHub variable `PRODUCTION_API_ORIGIN` | GitHub variable `STAGING_API_ORIGIN` | – | Written into `_redirects` as the `/api` rewrite |
-| `VITE_DATA` | GitHub variable `VITE_DATA` | GitHub variable `VITE_DATA` | `fake` | `fake` or `http` |
+| `VITE_DATA` | unset | unset | `http` | The API unless set to `fake`, which runs on built-in demo data and shows a banner on every screen |
 
 ## GitHub
 
@@ -78,6 +81,6 @@ The workflows build the web app and upload it with the Netlify CLI.
 | `PRODUCTION_API_ORIGIN` | variable | `deploy.yml`, the Render production URL |
 | `STAGING_URL` | variable | `staging.yml`, the Netlify staging URL |
 | `STAGING_API_ORIGIN` | variable | `staging.yml`, the Render staging URL |
-| `VITE_DATA` | variable | `deploy.yml`, `staging.yml` |
 
-CI needs no database credentials. Integration tests start their own in-memory replica set.
+CI needs no database credentials.
+Integration tests start their own in-memory replica set.

@@ -122,18 +122,30 @@ The other seeded people are in [apps/api/src/seed/scenario.ts](apps/api/src/seed
 
 ## Running it locally
 
-Node 22 LTS (see `.nvmrc`), then from the repository root:
+Node 22 LTS (see `.nvmrc`).
+Copy `apps/api/.env.example` to `apps/api/.env` and fill in `MONGODB_URI` and `SESSION_SECRET`.
+Transactions need a MongoDB replica set, so use Atlas or a local replica set.
+Then, from the repository root:
 
 ```sh
 npm install
+npm run dev -w apps/api
+npm run seed -w apps/api -- --env=test
 npm run dev -w apps/web
 ```
 
-The web app starts on demo data and needs no API.
-To use the real API, copy `apps/api/.env.example` to `apps/api/.env` and fill in `MONGODB_URI` and `SESSION_SECRET`.
-Transactions need a MongoDB replica set, so use Atlas or a local replica set.
-Then run `npm run dev -w apps/api`, seed the database with `npm run seed -w apps/api -- --env=test`, and start the web app with `VITE_DATA=http npm run dev -w apps/web`.
+Each `dev` command keeps running in its own terminal.
+The web app calls the API through `/api`, which the development server forwards to `localhost:3000`.
 Every environment variable is listed in [docs/ENVIRONMENTS.md](docs/ENVIRONMENTS.md).
+
+To look around without a backend, start the web app on the built-in demo data instead:
+
+```sh
+VITE_DATA=fake npm run dev -w apps/web
+```
+
+A banner on every screen says the data is for demonstration and that nothing is saved.
+Reloading the page puts the demo data back as it was.
 
 ## Tests
 
