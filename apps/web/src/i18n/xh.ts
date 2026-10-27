@@ -1,5 +1,10 @@
 import { untranslated, type StringKey } from './strings';
 
+/*
+NOTE: MACHINE TRANSLATED
+NOT VERIFIED BY A NATIVE SPEAKER
+*/
+
 export const xh: Record<StringKey, string> = {
   'nav.home': 'Ikhaya',
   'nav.offers': 'Izibonelelo',
@@ -444,6 +449,9 @@ export const xh: Record<StringKey, string> = {
   'common.kg': 'kg',
   'common.required': 'Iyafuneka',
   'common.optional': 'akunyanzelekanga',
+
+  'demo.title': 'Iinkcukacha zomboniso.',
+  'demo.body': 'Akukho nto uyenzayo apha egcinwayo, kwaye ukulayisha kwakhona iphepha kuqala yonke into kwakhona.',
 
   ...untranslated,
 };
