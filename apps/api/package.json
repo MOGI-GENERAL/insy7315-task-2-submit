@@ -12,6 +12,10 @@
       "types": "./dist/src/services/expiry-service.d.ts",
       "default": "./dist/src/services/expiry-service.js"
     },
+    "./retention": {
+      "types": "./dist/src/services/retention-service.d.ts",
+      "default": "./dist/src/services/retention-service.js"
+    },
     "./certificates": {
       "types": "./dist/src/services/monthly-certificates.d.ts",
       "default": "./dist/src/services/monthly-certificates.js"

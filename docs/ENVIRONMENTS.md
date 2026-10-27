@@ -8,8 +8,8 @@ Values are never written here: they live in the Render and Netlify dashboards an
 | | Production | Staging | Local |
 |---|---|---|---|
 | Web | Netlify `fedsa-mogi`, deployed by `deploy.yml` from `main` | Netlify `fedsa-staging`, deployed by `staging.yml` from `develop` | `npm run dev -w apps/web` (Vite proxies `/api` to port 3000) |
-| API | Render `fedsa-api` (Free), deployed by hook from `deploy.yml` | Render `fedsa-api-staging` (Free), auto-deploys from `develop` | `npm run dev -w apps/api` |
-| Jobs | Run by the API every 5 minutes while it is awake | Same as production | Same as production |
+| API | Render `fedsa-api` (`0.5c-512mb`), deployed by hook from `deploy.yml` | Render `fedsa-api-staging` (Free), auto-deploys from `develop` | `npm run dev -w apps/api` |
+| Jobs | Render cron `fedsa-jobs` (`0.5c-512mb`) every 5 minutes, deployed by hook from `deploy.yml` | Run by the API every 5 minutes while it is awake | Run by the API, or once with `npm run start -w apps/jobs` after a build |
 | Database | Atlas `fedsa-production`, Cape Town | Atlas `fedsa-staging`, Cape Town | A local `mongod`, or the in-memory one the tests start |
 | Photos | Cloudinary folder `fedsa/production` | Cloudinary folder `fedsa/staging` | `PHOTO_STORE=local` |
 
@@ -18,11 +18,11 @@ Values are never written here: they live in the Render and Netlify dashboards an
 | Web | https://fedsa-mogi.netlify.app | https://fedsa-staging.netlify.app |
 | API | https://fedsa-api.onrender.com | https://fedsa-api-staging.onrender.com |
 
-Both Render services are on the free plan.
-A free service sleeps after about 15 minutes without requests, and the first request after that takes up to a minute while it starts.
-Open the site a minute before a demo.
+The production API and the cron service are on Render's `0.5c-512mb` compute plan, formerly called Starter, and the API never sleeps.
+The cron service starts, runs the expiry sweep, runs the photo retention sweep during the 02:00 hour and the previous month's certificates on the 1st (both South African time), and exits.
+A run where any of these fails exits non-zero, and Render marks it failed.
+Staging is on the free plan, which sleeps after about 15 minutes without requests, and the first request after that takes up to a minute while it starts.
 Atlas accepts connections only from Render's Frankfurt outbound ranges, plus a developer's own IP for a limited time when one has to seed.
-An always-on deployment would put `fedsa-api` on Render's Starter plan and the jobs in a Render cron service.
 
 The browser only talks to the Netlify origin.
 Netlify rewrites `/api/*` to the Render service for its context, so the session cookie is first-party.
@@ -31,6 +31,7 @@ Twilio webhooks go to Render directly and are signature-checked.
 ## API and jobs
 
 ✓ set, optional only when the feature is wanted, – not needed, *planned* not used by the code yet.
+The cron service needs the same database, photo, notification and Twilio settings as the production API, and none of the session, webhook or seed ones.
 
 | Variable | Production | Staging | Local | Notes |
 |---|---|---|---|---|
@@ -39,6 +40,7 @@ Twilio webhooks go to Render directly and are signature-checked.
 | `SESSION_SECRET` | ✓ | ✓ | ✓ | A long random string, different in every environment |
 | `PORT` | set by Render | set by Render | default `3000` | |
 | `RENDER_GIT_COMMIT` | set by Render | set by Render | – | Reported as `version` by `/api/health` |
+| `API_SWEEPS` | `false`, from `render.yaml` | – | – | `false` stops the API running the expiry and retention sweeps, which the cron service runs instead. On when empty |
 | `PHOTO_STORE` | ✓ `cloudinary` | ✓ `cloudinary` | `local` | `local` when empty |
 | `CLOUDINARY_URL` | ✓ | ✓ | optional | `cloudinary://KEY:SECRET@CLOUD_NAME`. Needed when `PHOTO_STORE=cloudinary` |
 | `CLOUDINARY_FOLDER` | ✓ `fedsa/production` | ✓ `fedsa/staging` | – | Defaults to `fedsa` |
@@ -57,7 +59,8 @@ Twilio webhooks go to Render directly and are signature-checked.
 Twilio calls Render directly, not Netlify.
 In the Twilio console, set the incoming-message webhook of the SMS number and of the WhatsApp sandbox to `<PUBLIC_API_URL>/api/webhooks/twilio/inbound`.
 The API adds the delivery-report callback to each message it sends.
-A free Render service that is asleep takes up to a minute to answer, which is longer than Twilio waits, so a reply sent while the API sleeps is lost.
+Production never sleeps.
+A sleeping staging API takes up to a minute to answer, which is longer than Twilio waits, and a reply sent to staging while it sleeps is lost.
 
 ## Web (built in GitHub Actions)
 
@@ -76,7 +79,8 @@ The workflows build the web app and upload it with the Netlify CLI.
 | `NETLIFY_AUTH_TOKEN` | secret | `deploy.yml`, `staging.yml` |
 | `NETLIFY_SITE_ID` | secret | `deploy.yml`, the production site |
 | `NETLIFY_STAGING_SITE_ID` | secret | `staging.yml`, the staging site |
-| `RENDER_API_HOOK` | secret | `deploy.yml` |
+| `RENDER_API_HOOK` | secret | `deploy.yml`, the production API |
+| `RENDER_JOBS_HOOK` | secret | `deploy.yml`, the cron service |
 | `PRODUCTION_URL` | variable | `deploy.yml`, the Netlify production URL |
 | `PRODUCTION_API_ORIGIN` | variable | `deploy.yml`, the Render production URL |
 | `STAGING_URL` | variable | `staging.yml`, the Netlify staging URL |

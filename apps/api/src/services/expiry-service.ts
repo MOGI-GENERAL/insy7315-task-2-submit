@@ -1,10 +1,10 @@
 import type { Logger } from 'pino';
 import {
+  ClaimRepository,
+  CollectionRepository,
+  HandoverRepository,
+  OfferRepository,
   runInTransaction,
-  type ClaimRepository,
-  type CollectionRepository,
-  type HandoverRepository,
-  type OfferRepository,
 } from '../db/index.js';
 
 export const SWEEP_INTERVAL_MS = 5 * 60 * 1000;
@@ -70,9 +70,18 @@ export class ExpiryService {
   }
 }
 
+export function createExpiryService() {
+  return new ExpiryService(
+    new OfferRepository(),
+    new ClaimRepository(),
+    new HandoverRepository(),
+    new CollectionRepository(),
+  );
+}
+
 /**
- * runs once at start and then on a timer, because the API has no cron service
- * beside it. a run still going when the next falls due is skipped
+ * runs once at start and then on a timer, for staging and local runs, which
+ * have no cron service. a run still going when the next falls due is skipped
  */
 export function startExpirySweep(
   expiry: Pick<ExpiryService, 'expireOverdue'>,
