@@ -2,6 +2,20 @@
 
 Each release is merged into `main` and tagged, and the deploy workflow then puts it into production.
 
+## 1.0.2 (2026-10-27)
+
+Production stays awake, and scheduled work runs in its own service.
+
+- **Hosting:** the production API is on a paid instance that never sleeps, so the first request no longer waits for a cold start.
+- **Scheduled jobs:** a cron service runs the offer expiry sweep every five minutes, the photo retention sweep once a day at 02:00, and the monthly tax certificates on the 1st.
+  The production API no longer runs the sweeps itself, while staging and the Docker stack still do.
+- **Real data by default:** the web app talks to the API unless a build asks for demo data, and demo builds show a banner on every screen saying nothing is saved.
+- **Monthly certificates:** every donor with eligible handovers gets the previous month's certificate in one run, and their users get a notification in English, Afrikaans or isiXhosa.
+  A command issues a given month by hand.
+- **OpenAPI:** the API publishes its OpenAPI 3.1 document at `/api/openapi.json`, built from the shared contract, and CI fails if the committed copy drifts.
+- **Code structure:** the offer and notification services are split into smaller modules, with no change in behaviour.
+- **Dependencies:** the npm audit advisories are fixed.
+
 ## 1.0.1 (2026-10-06)
 
 Documentation only.
