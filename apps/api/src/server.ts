@@ -25,12 +25,13 @@ import { AuditService } from './services/audit-service.js';
 import { ClaimService } from './services/claim-service.js';
 import { CollectionService } from './services/collection-service.js';
 import { DEFAULT_RADIUS_KM } from './services/eligibility.js';
-import { ExpiryService, startExpirySweep } from './services/expiry-service.js';
+import { createExpiryService, startExpirySweep } from './services/expiry-service.js';
 import { RetentionService, startRetentionSweep } from './services/retention-service.js';
 import { HandoverService } from './services/handover-service.js';
 import { HealthService } from './services/health-service.js';
 import { NotificationService } from './services/notification-service.js';
 import { OfferService } from './services/offer-service.js';
+import { OpenApiService } from './services/openapi-service.js';
 import { OrganisationService } from './services/organisation-service.js';
 import { ReportingService } from './services/reporting-service.js';
 import { UserService } from './services/user-service.js';
@@ -122,6 +123,7 @@ async function start() {
   const services = {
     // Render sets RENDER_GIT_COMMIT on every deploy
     health: new HealthService(new HealthRepository(), process.env.RENDER_GIT_COMMIT || 'dev'),
+    openApi: new OpenApiService(),
     users: new UserService(
       new UserRepository(),
       new OrganisationRepository(),
@@ -173,15 +175,11 @@ async function start() {
     logger.info(`api listening on ${port}`);
   });
 
-  startExpirySweep(
-    new ExpiryService(
-      new OfferRepository(),
-      new ClaimRepository(),
-      new HandoverRepository(),
-      new CollectionRepository(),
-    ),
-    logger,
-  );
+  if (process.env.API_SWEEPS === 'false') {
+    logger.info('sweeps left to the cron service');
+    return;
+  }
+  startExpirySweep(createExpiryService(), logger);
   startRetentionSweep(new RetentionService(new HandoverRepository(), photos), logger);
 }
 

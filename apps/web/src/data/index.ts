@@ -13,7 +13,7 @@ export type * from './repositories';
 export type DataMode = 'fake' | 'http';
 
 export function dataMode(): DataMode {
-  return import.meta.env.VITE_DATA === 'http' ? 'http' : 'fake';
+  return import.meta.env.VITE_DATA === 'fake' ? 'fake' : 'http';
 }
 
 /** `?fail=claim,post` makes those calls reject, to show the error states on demand */
@@ -27,7 +27,7 @@ export const demoAccounts: DemoAccount[] = [];
 
 /** reading the variable here, not through `dataMode()`, lets the HTTP build drop the fake and its demo data */
 export async function createDataLayer(): Promise<DataLayer> {
-  if (import.meta.env.VITE_DATA === 'http') return createHttpDataLayer();
+  if (import.meta.env.VITE_DATA !== 'fake') return createHttpDataLayer();
   const [{ createFakeDataLayer }, { createStore }, demo] = await Promise.all([
     import('./fake'),
     import('../store/store'),

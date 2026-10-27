@@ -1,7 +1,7 @@
 {
   "name": "@fedsa/api",
   "private": true,
-  "version": "1.0.1",
+  "version": "1.0.2",
   "type": "module",
   "exports": {
     "./db": {
@@ -11,6 +11,14 @@
     "./expiry": {
       "types": "./dist/src/services/expiry-service.d.ts",
       "default": "./dist/src/services/expiry-service.js"
+    },
+    "./retention": {
+      "types": "./dist/src/services/retention-service.d.ts",
+      "default": "./dist/src/services/retention-service.js"
+    },
+    "./certificates": {
+      "types": "./dist/src/services/monthly-certificates.d.ts",
+      "default": "./dist/src/services/monthly-certificates.js"
     }
   },
   "scripts": {
@@ -18,6 +26,7 @@
     "build": "tsc -b",
     "start": "node dist/src/server.js",
     "seed": "node --env-file-if-exists=.env dist/src/seed/cli.js",
+    "certificates:monthly": "node --env-file-if-exists=.env dist/src/certificates/cli.js",
     "test:unit": "vitest run --passWithNoTests --dir src",
     "test:integration": "vitest run --passWithNoTests --no-file-parallelism --dir test/integration",
     "test:contract": "vitest run --dir test/contract"

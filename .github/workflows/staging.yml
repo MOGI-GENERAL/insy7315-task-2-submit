@@ -35,7 +35,6 @@ jobs:
         run: npm run build -w packages/contract && npm run build -w apps/web
         env:
           API_ORIGIN: ${{ vars.STAGING_API_ORIGIN }}
-          VITE_DATA: ${{ vars.VITE_DATA }}
 
       - name: Deploy the web app on Netlify
         run: npx --yes netlify-cli deploy --prod --no-build --filter @fedsa/web --dir apps/web/dist --message "$GITHUB_SHA"

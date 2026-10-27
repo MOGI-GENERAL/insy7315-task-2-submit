@@ -19,6 +19,7 @@ const kindIcon: Record<NotificationKind, IconName> = {
   driver_dispatched: 'truck',
   verification: 'shield',
   dispute: 'alert',
+  certificate_issued: 'file',
 };
 
 export function Notifications() {

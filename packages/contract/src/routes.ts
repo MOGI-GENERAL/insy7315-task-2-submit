@@ -108,6 +108,19 @@ export const ROUTES = [
   { method: 'GET', path: '/api/health', access: 'public', status: 200, response: HealthResponse },
   { method: 'GET', path: '/api/auth/csrf', access: 'public', status: 200, response: CsrfResponse },
   {
+    method: 'GET',
+    path: '/api/openapi.json',
+    access: 'public',
+    status: 200,
+    response: z.object({
+      openapi: z.string(),
+      info: z.unknown(),
+      servers: z.unknown(),
+      paths: z.record(z.string(), z.unknown()),
+      components: z.unknown(),
+    }),
+  },
+  {
     method: 'POST',
     path: '/api/auth/register',
     access: 'public',

@@ -1,4 +1,8 @@
 import { untranslated, type StringKey } from './strings';
+/*
+NOTE: MACHINE TRANSLATED
+NOT VERIFIED BY A NATIVE SPEAKER
+*/
 
 export const af: Record<StringKey, string> = {
   'nav.home': 'Tuis',
@@ -446,6 +450,9 @@ export const af: Record<StringKey, string> = {
   'common.kg': 'kg',
   'common.required': 'Verpligtend',
   'common.optional': 'opsioneel',
+
+  'demo.title': 'Demonstrasiedata.',
+  'demo.body': 'Niks wat jy hier doen, word gestoor nie, en as jy die bladsy herlaai, begin dit van voor af.',
 
   ...untranslated,
 };

@@ -8,10 +8,6 @@ Donors post surplus food, recipient organisations claim it, and coordinators and
 | Web app    | https://fedsa-mogi.netlify.app            | https://fedsa-staging.netlify.app            |
 | API health | https://fedsa-mogi.netlify.app/api/health | https://fedsa-staging.netlify.app/api/health |
 
-The API for this demo runs on Render's free plan and sleeps after about 15 minutes idle.
-
-**The first request can take up to a minute, and may appear to have failed, refresh if you get a failure to load.**
-
 Presentation video: https://youtu.be/xtwgI0r1emY
 
 AI usage report: [docs/ai-usage.pdf](docs/ai-usage.pdf)
@@ -20,13 +16,14 @@ Clips of the app in use recorded using [Playwright](https://playwright.dev/) scr
 
 ## Repository Guide
 
-This table points to where each part of the assessed work can be found.
+This table points to where each part of the project can be found.
 
 | Area                                        | Where to look                                                                                                                                                                                                                                                                                                                                                                        |
 | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Back end: programming                       | [apps/api/src/services](apps/api/src/services) has the business rules. [apps/api/src/db/repositories](apps/api/src/db/repositories) is the Repository pattern. [apps/api/src/notifications](apps/api/src/notifications) is the Strategy pattern for notification channels. [organisation-status.ts](apps/api/src/services/organisation-status.ts) is the verification state machine. |
 | Back end: database                          | [models](apps/api/src/db/models) and [bootstrap.ts](apps/api/src/db/bootstrap.ts), which applies the `$jsonSchema` validators and the indexes. One index is a partial unique index that stops two active claims on one offer.                                                                                                                                                        |
 | Back end: APIs                              | [packages/contract/src/routes.ts](packages/contract/src/routes.ts) lists every endpoint with its role and schemas. [apps/api/src/routes](apps/api/src/routes) and [controllers](apps/api/src/controllers) serve them, and [errors.ts](apps/api/src/errors.ts) defines the one error shape.                                                                                           |
+| Back end: API document                      | [docs/openapi.json](docs/openapi.json) is the OpenAPI 3.1 description of every endpoint.                                                                                                                                                                                                                                                                                             |
 | Back end: security                          | [middleware](apps/api/src/middleware) covers sessions, CSRF, role and ownership guards, rate limits and security headers. [denial-matrix.test.ts](apps/api/test/integration/denial-matrix.test.ts) checks every route against every kind of caller.                                                                                                                                  |
 | Back end: data flow and logic               | [claim-service.ts](apps/api/src/services/claim-service.ts) is the claim lock. [expiry-service.ts](apps/api/src/services/expiry-service.ts), [handover-service.ts](apps/api/src/services/handover-service.ts) and [meals.ts](apps/api/src/services/meals.ts) cover the rest of the flow.                                                                                              |
 | Hosting                                     | [Why this hosting](#why-this-hosting), [docs/ENVIRONMENTS.md](docs/ENVIRONMENTS.md), [netlify.toml](netlify.toml) and [render.yaml](render.yaml).                                                                                                                                                                                                                                    |
@@ -46,14 +43,16 @@ flowchart LR
   API --> Atlas[("MongoDB Atlas, Cape Town")]
   API --> Cloudinary["Cloudinary: photos"]
   API --> Push["Web push"]
+  Jobs["Render cron: sweeps and certificates"] --> Atlas
+  Jobs --> Cloudinary
 ```
 
-| Path                | What it is                                                                |
-| ------------------- | ------------------------------------------------------------------------- |
-| `apps/web`          | React 19, Vite and TypeScript web app                                     |
-| `apps/api`          | Express 5 and Mongoose API with the expiry and retention sweeps           |
-| `apps/jobs`         | The sweeps as plain functions, for a cron service later                   |
-| `packages/contract` | zod schemas for requests and responses that the web app and the API share |
+| Path                | What it is                                                                                   |
+| ------------------- | -------------------------------------------------------------------------------------------- |
+| `apps/web`          | React 19, Vite and TypeScript web app                                                        |
+| `apps/api`          | Express 5 and Mongoose API with the expiry and retention sweeps                              |
+| `apps/jobs`         | The cron entry point: the expiry sweep, photo retention at 02:00 and certificates on the 1st |
+| `packages/contract` | zod schemas for requests and responses that the web app and the API share                    |
 
 The browser calls the API on its own origin through a Netlify `/api` rewrite.
 Sessions are cookies stored in MongoDB, and every state-changing request needs a CSRF token.
@@ -62,9 +61,14 @@ Sessions are cookies stored in MongoDB, and every state-changing request needs a
 
 - **Netlify** serves the static web app from a CDN.
   Its rewrite keeps the browser and the API on one origin, so cookies and CSRF work without cross-site settings.
-- **Render** runs the API as a plain Node service on the free plan, in Frankfurt.
-  The expiry sweep runs inside the API every five minutes, so there is no separate cron service to pay for.
-  A sleeping API runs no sweep and catches up when it wakes.
+- **Render** runs the production API as a plain Node service on the `0.5c-512mb` compute plan (formerly Starter), in Frankfurt.
+  A paid plan never sleeps (NFR08).
+  The first request answers at once, and an SMS reply reaches a running API well inside Twilio's 15-second timeout.
+- **A Render cron service** runs `apps/jobs` every five minutes against the production database.
+  It expires overdue offers and claims, deletes handover photos past their retention period at 02:00, and issues the previous month's tax certificates on the 1st.
+  These run on time when nobody is using the app, and a long job never slows a request.
+- **Staging** stays on Render's free plan, which sleeps after about 15 minutes idle and has no cron jobs.
+  Its API runs the sweeps on timers while it is awake, as a local API does.
 - **MongoDB Atlas** stores the data in Cape Town.
   The API processes it in Frankfurt, a cross-border transfer that POPIA section 72 allows.
 - **Cloudinary** stores offer and handover photos, and the database keeps only their addresses.
@@ -91,8 +95,19 @@ All paths start with `/api`.
 | Certificates    | `GET` and `PUT /valuation-rates`, `POST` and `GET /tax-certificates`, `GET /tax-certificates/:id/pdf`                                                       |
 | Users           | `GET` and `POST /users`, `PATCH /users/:id`, `GET /audit-log`                                                                                               |
 | Twilio          | `POST /webhooks/twilio/inbound`, `/webhooks/twilio/status`                                                                                                  |
+| Documentation   | `GET /openapi.json`                                                                                                                                         |
 
 Errors share one shape, which the contract package defines.
+
+### OpenAPI document
+
+[docs/openapi.json](docs/openapi.json) describes every endpoint as an OpenAPI 3.1 document.
+The running API serves the same document at `/api/openapi.json`, for example https://fedsa-mogi.netlify.app/api/openapi.json.
+It is generated from the contract, and `npm run openapi` regenerates it.
+`npm run openapi:check` fails when the file is out of date.
+
+To read it in a viewer, open https://editor.swagger.io and choose File, then Import file, then select `docs/openapi.json`.
+For a static page, run `npx @redocly/cli@2.62.1 build-docs docs/openapi.json`.
 
 ## Demo accounts
 
@@ -110,18 +125,30 @@ The other seeded people are in [apps/api/src/seed/scenario.ts](apps/api/src/seed
 
 ## Running it locally
 
-Node 22 LTS (see `.nvmrc`), then from the repository root:
+Node 22 LTS (see `.nvmrc`).
+Copy `apps/api/.env.example` to `apps/api/.env` and fill in `MONGODB_URI` and `SESSION_SECRET`.
+Transactions need a MongoDB replica set, so use Atlas or a local replica set.
+Then, from the repository root:
 
 ```sh
 npm install
+npm run dev -w apps/api
+npm run seed -w apps/api -- --env=test
 npm run dev -w apps/web
 ```
 
-The web app starts on demo data and needs no API.
-To use the real API, copy `apps/api/.env.example` to `apps/api/.env` and fill in `MONGODB_URI` and `SESSION_SECRET`.
-Transactions need a MongoDB replica set, so use Atlas or a local replica set.
-Then run `npm run dev -w apps/api`, seed the database with `npm run seed -w apps/api -- --env=test`, and start the web app with `VITE_DATA=http npm run dev -w apps/web`.
+Each `dev` command keeps running in its own terminal.
+The web app calls the API through `/api`, which the development server forwards to `localhost:3000`.
 Every environment variable is listed in [docs/ENVIRONMENTS.md](docs/ENVIRONMENTS.md).
+
+To look around without a backend, start the web app on the built-in demo data instead:
+
+```sh
+VITE_DATA=fake npm run dev -w apps/web
+```
+
+A banner on every screen says the data is for demonstration and that nothing is saved.
+Reloading the page puts the demo data back as it was.
 
 ## Tests
 

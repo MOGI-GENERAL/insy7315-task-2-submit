@@ -128,6 +128,7 @@ function offerForm() {
 
 const MATRIX = {
   'GET /api/health': () => ({ path: '/api/health' }),
+  'GET /api/openapi.json': () => ({ path: '/api/openapi.json' }),
   'GET /api/auth/csrf': () => ({ path: '/api/auth/csrf' }),
   'POST /api/auth/register': () => ({ path: '/api/auth/register', body: donorRegistration() }),
   'POST /api/auth/login': (w) => ({

@@ -53,6 +53,7 @@ export const NotificationKind = z.enum([
   'driver_dispatched',
   'verification',
   'dispute',
+  'certificate_issued',
 ]);
 export type NotificationKind = z.infer<typeof NotificationKind>;
 

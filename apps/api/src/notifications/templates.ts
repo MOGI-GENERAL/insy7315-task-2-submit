@@ -27,6 +27,8 @@ export interface MessageData {
   };
   verification: { organisationName: string };
   dispute: { reference: string; organisationName: string };
+  /** both dates are ISO date-times */
+  certificate_issued: { certificateNumber: string; periodStart: string; periodEnd: string };
 }
 
 export interface RenderedMessage {
@@ -39,6 +41,7 @@ export interface RenderedMessage {
 interface Format {
   kg(quantity: number): string;
   time(iso: string): string;
+  day(iso: string): string;
 }
 
 type Template<D> = (data: D, f: Format) => { title: string; body: string; reply?: string };
@@ -84,6 +87,10 @@ const TEMPLATES: Record<Language, Templates> = {
       title: 'Problem reported',
       body: `${d.organisationName} reported a problem with the handover for offer ${d.reference}.`,
     }),
+    certificate_issued: (d, f) => ({
+      title: `Tax certificate ${d.certificateNumber}`,
+      body: `Your tax certificate for ${f.day(d.periodStart)} to ${f.day(d.periodEnd)} is ready to download under Tax certificates.`,
+    }),
   },
   af: {
     offer_posted: (d, f) => ({
@@ -121,6 +128,10 @@ const TEMPLATES: Record<Language, Templates> = {
       title: 'Probleem aangemeld',
       body: `${d.organisationName} het 'n probleem met die oorhandiging van aanbod ${d.reference} aangemeld.`,
     }),
+    certificate_issued: (d, f) => ({
+      title: `Belastingsertifikaat ${d.certificateNumber}`,
+      body: `Julle belastingsertifikaat vir ${f.day(d.periodStart)} tot ${f.day(d.periodEnd)} is gereed. Laai dit af onder Belastingsertifikate.`,
+    }),
   },
   xh: {
     offer_posted: (d, f) => ({
@@ -157,6 +168,10 @@ const TEMPLATES: Record<Language, Templates> = {
     dispute: (d) => ({
       title: 'Kuxelwe ingxaki',
       body: `${d.organisationName} ixele ingxaki ngokunikezelwa kwesibonelelo ${d.reference}.`,
+    }),
+    certificate_issued: (d, f) => ({
+      title: `Isatifikethi serhafu ${d.certificateNumber}`,
+      body: `Isatifikethi senu serhafu silungile. Ixesha: ${f.day(d.periodStart)} ukuya ku-${f.day(d.periodEnd)}. Sikhuphele kwi-Izatifikethi zerhafu.`,
     }),
   },
 };
@@ -224,9 +239,16 @@ function formatFor(language: Language): Format {
     minute: '2-digit',
     hourCycle: 'h23',
   });
+  const day = new Intl.DateTimeFormat(locale, {
+    timeZone: 'Africa/Johannesburg',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
   return {
     kg: (n) => `${quantity.format(n)} kg`,
     time: (iso) => time.format(new Date(iso)),
+    day: (iso) => day.format(new Date(iso)),
   };
 }
 

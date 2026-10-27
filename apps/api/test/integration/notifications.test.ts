@@ -379,6 +379,35 @@ describe('notifying from other work', () => {
     });
   });
 
+  test("a certificate reaches each active donor user's inbox, linked to the certificates screen, and never by SMS or WhatsApp", async () => {
+    const bakery = await createOrganisation({ type: 'donor' });
+    const first = await member(bakery._id, 'donor', { phone: '+27820000005' });
+    const second = await member(bakery._id, 'donor', { phone: '+27820000006' });
+    const disabled = await member(bakery._id, 'donor', {
+      phone: '+27820000007',
+      status: 'disabled',
+    });
+
+    await notifications.notifyOrganisations([bakery._id.toString()], 'certificate_issued', {
+      certificateNumber: 'FEDSA-2026-0001',
+      periodStart: '2026-09-30T22:00:00.000Z',
+      periodEnd: '2026-10-31T21:59:59.999Z',
+    });
+
+    for (const user of [first, second]) {
+      const rows = await rowsFor(user._id);
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({
+        channel: 'in_app',
+        kind: 'certificate_issued',
+        href: '/donor/certificates',
+      });
+      expect(rows[0]!.title).toContain('FEDSA-2026-0001');
+    }
+    expect(await rowsFor(disabled._id)).toEqual([]);
+    expect(twilio.created).toEqual([]);
+  });
+
   test('a driver with no account gets one SMS, logged against the phone number alone', async () => {
     const offerId = new Types.ObjectId().toString();
     const status = await notifications.sendSms(

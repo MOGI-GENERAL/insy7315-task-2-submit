@@ -1,5 +1,6 @@
 import type { Logger } from 'pino';
-import type { HandoverRepository } from '../db/index.js';
+import { HandoverRepository } from '../db/index.js';
+import { createPhotoStore } from '../photos/create-photo-store.js';
 import type { PhotoStore } from '../photos/photo-store.js';
 
 export const RETENTION_INTERVAL_MS = 60 * 60 * 1000;
@@ -39,7 +40,12 @@ export class RetentionService {
   }
 }
 
-/** hourly, because the free plan sleeps and a fixed hour could pass unseen */
+/** throws when the photo settings are wrong */
+export function createRetentionService(env: NodeJS.ProcessEnv = process.env) {
+  return new RetentionService(new HandoverRepository(), createPhotoStore(env));
+}
+
+/** hourly, because staging sleeps and a fixed hour could pass unseen */
 export function startRetentionSweep(
   retention: Pick<RetentionService, 'sweep'>,
   logger: Logger,

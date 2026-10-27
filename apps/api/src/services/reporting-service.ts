@@ -36,6 +36,9 @@ import { certificateView, valuationRateView } from './views.js';
 
 const CERTIFICATE_COUNTER = 'taxCertificates';
 
+export const NOTHING_TO_CERTIFY =
+  'This donor has no confirmed handovers in this period that are not already certified';
+
 const saYear = new Intl.DateTimeFormat('en-ZA', {
   timeZone: 'Africa/Johannesburg',
   year: 'numeric',
@@ -239,9 +242,7 @@ export class ReportingService {
         session,
       );
       if (handovers.length === 0) {
-        throw new InvalidStateError(
-          'This donor has no confirmed handovers in this period that are not already certified',
-        );
+        throw new InvalidStateError(NOTHING_TO_CERTIFY);
       }
 
       const rates = await this.rates.list(session);

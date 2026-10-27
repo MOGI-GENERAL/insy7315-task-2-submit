@@ -887,6 +887,10 @@ export const en = {
   'common.required': 'Required',
   'common.optional': 'optional',
 
+  /* DEMO DATA */
+  'demo.title': 'Demo data.',
+  'demo.body': 'Nothing you do here is saved, and reloading the page starts it over.',
+
   ...untranslated,
 } as const;
 
