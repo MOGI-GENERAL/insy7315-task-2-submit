@@ -25,7 +25,7 @@ import { AuditService } from './services/audit-service.js';
 import { ClaimService } from './services/claim-service.js';
 import { CollectionService } from './services/collection-service.js';
 import { DEFAULT_RADIUS_KM } from './services/eligibility.js';
-import { ExpiryService, startExpirySweep } from './services/expiry-service.js';
+import { createExpiryService, startExpirySweep } from './services/expiry-service.js';
 import { RetentionService, startRetentionSweep } from './services/retention-service.js';
 import { HandoverService } from './services/handover-service.js';
 import { HealthService } from './services/health-service.js';
@@ -175,15 +175,11 @@ async function start() {
     logger.info(`api listening on ${port}`);
   });
 
-  startExpirySweep(
-    new ExpiryService(
-      new OfferRepository(),
-      new ClaimRepository(),
-      new HandoverRepository(),
-      new CollectionRepository(),
-    ),
-    logger,
-  );
+  if (process.env.API_SWEEPS === 'false') {
+    logger.info('sweeps left to the cron service');
+    return;
+  }
+  startExpirySweep(createExpiryService(), logger);
   startRetentionSweep(new RetentionService(new HandoverRepository(), photos), logger);
 }
 

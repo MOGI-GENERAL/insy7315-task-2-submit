@@ -19,6 +19,8 @@ import { NotificationService } from './notification-service.js';
 import { NOTHING_TO_CERTIFY, ReportingService } from './reporting-service.js';
 import { findOrCreateScheduler } from './scheduler-account.js';
 
+export { previousMonth } from './day-range.js';
+
 export interface MonthlySummary {
   month: string;
   issued: { donorOrganisationId: string; certificateNumber: string }[];
