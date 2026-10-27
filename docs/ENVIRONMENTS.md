@@ -9,7 +9,7 @@ Values are never written here: they live in the Render and Netlify dashboards an
 |---|---|---|---|
 | Web | Netlify `fedsa-mogi`, deployed by `deploy.yml` from `main` | Netlify `fedsa-staging`, deployed by `staging.yml` from `develop` | `npm run dev -w apps/web` (Vite proxies `/api` to port 3000) |
 | API | Render `fedsa-api` (`0.5c-512mb`), deployed by hook from `deploy.yml` | Render `fedsa-api-staging` (Free), auto-deploys from `develop` | `npm run dev -w apps/api` |
-| Jobs | Render cron `fedsa-jobs` (`0.5c-512mb`) every 5 minutes, deployed by hook from `deploy.yml` | Run by the API every 5 minutes while it is awake | Run by the API, or once with `npm run start -w apps/jobs` after a build |
+| Jobs | Render cron `fedsa-jobs` (`0.5c-512mb`) every 5 minutes, deployed by Render from `main` once every check on the commit passes | Run by the API every 5 minutes while it is awake | Run by the API, or once with `npm run start -w apps/jobs` after a build |
 | Database | Atlas `fedsa-production`, Cape Town | Atlas `fedsa-staging`, Cape Town | A local `mongod`, or the in-memory one the tests start |
 | Photos | Cloudinary folder `fedsa/production` | Cloudinary folder `fedsa/staging` | `PHOTO_STORE=local` |
 
@@ -80,7 +80,6 @@ The workflows build the web app and upload it with the Netlify CLI.
 | `NETLIFY_SITE_ID` | secret | `deploy.yml`, the production site |
 | `NETLIFY_STAGING_SITE_ID` | secret | `staging.yml`, the staging site |
 | `RENDER_API_HOOK` | secret | `deploy.yml`, the production API |
-| `RENDER_JOBS_HOOK` | secret | `deploy.yml`, the cron service |
 | `PRODUCTION_URL` | variable | `deploy.yml`, the Netlify production URL |
 | `PRODUCTION_API_ORIGIN` | variable | `deploy.yml`, the Render production URL |
 | `STAGING_URL` | variable | `staging.yml`, the Netlify staging URL |
