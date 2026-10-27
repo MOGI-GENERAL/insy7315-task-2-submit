@@ -52,7 +52,8 @@ services:
     region: frankfurt
     branch: main
     schedule: "*/5 * * * *"
-    autoDeployTrigger: "off"
+    # cron jobs have no deploy hook. this waits for every check on the commit, the deploy workflow included
+    autoDeployTrigger: checksPass
     buildCommand: npm ci --include=dev && npm run build -w packages/contract -w apps/api -w apps/jobs
     startCommand: npm run start -w apps/jobs
     envVars:
