@@ -36,7 +36,6 @@ jobs:
         run: npm run build -w packages/contract && npm run build -w apps/web
         env:
           API_ORIGIN: ${{ vars.PRODUCTION_API_ORIGIN }}
-          VITE_DATA: ${{ vars.VITE_DATA }}
 
       # the API goes first, so the new web app never talks to the old API
       - name: Deploy the API on Render
