@@ -1,11 +1,11 @@
 # secrets are marked sync: false and set in the Render dashboard, never here
-# both services are on the free plan, which sleeps when idle and has no cron jobs.
-# the API runs the expiry sweep itself while it is awake
+# production is always on and its sweeps run in the cron service.
+# staging is on the free plan, which has no cron jobs, and its API runs the sweeps itself
 services:
   - type: web
     name: fedsa-api
     runtime: node
-    plan: free
+    plan: 0.5c-512mb
     region: frankfurt
     branch: main
     # deploys come from the deploy workflow's hook once CI passes
@@ -22,6 +22,8 @@ services:
         sync: false
       - key: SESSION_SECRET
         sync: false
+      - key: API_SWEEPS
+        value: "false"
 
   - type: web
     name: fedsa-api-staging
@@ -41,4 +43,44 @@ services:
       - key: MONGODB_URI
         sync: false
       - key: SESSION_SECRET
+        sync: false
+
+  - type: cron
+    name: fedsa-jobs
+    runtime: node
+    plan: 0.5c-512mb
+    region: frankfurt
+    branch: main
+    schedule: "*/5 * * * *"
+    autoDeployTrigger: "off"
+    buildCommand: npm ci --include=dev && npm run build -w packages/contract -w apps/api -w apps/jobs
+    startCommand: npm run start -w apps/jobs
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "22"
+      - key: MONGODB_URI
+        sync: false
+      - key: PHOTO_STORE
+        sync: false
+      - key: CLOUDINARY_URL
+        sync: false
+      - key: CLOUDINARY_FOLDER
+        sync: false
+      - key: NOTIFY_CHANNELS
+        sync: false
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT
+        sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_SMS_FROM
+        sync: false
+      - key: TWILIO_WHATSAPP_FROM
         sync: false
