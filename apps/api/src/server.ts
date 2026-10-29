@@ -8,6 +8,7 @@ import {
   CounterRepository,
   HandoverRepository,
   HealthRepository,
+  LoginThrottleRepository,
   NotificationRepository,
   OfferRepository,
   OrganisationRepository,
@@ -17,6 +18,8 @@ import {
   ValuationRateRepository,
 } from './db/index.js';
 import { createLogger } from './logger.js';
+import { proxySettings } from './middleware/client-address.js';
+import { mongoRateLimitStores } from './middleware/rate-limit-store.js';
 import { createSessionStore } from './middleware/session.js';
 import { twilioWebhookSettings } from './middleware/twilio-signature.js';
 import { channelSettings } from './notifications/channel-settings.js';
@@ -129,6 +132,7 @@ async function start() {
       new OrganisationRepository(),
       new SessionRepository(),
       new AuditService(new AuditLogRepository()),
+      new LoginThrottleRepository(),
     ),
     organisations: new OrganisationService(
       new OrganisationRepository(),
@@ -170,8 +174,22 @@ async function start() {
   const port = Number(process.env.PORT || 3000);
 
   const twilioWebhooks = twilioWebhookSettings(process.env, logger);
+  let proxy;
+  try {
+    proxy = proxySettings(process.env, logger);
+  } catch (err) {
+    logger.fatal({ err }, 'could not set up the proxy signature check');
+    process.exit(1);
+  }
 
-  createApp({ logger, services, session, twilioWebhooks }).listen(port, () => {
+  createApp({
+    logger,
+    services,
+    session,
+    twilioWebhooks,
+    proxy,
+    rateLimitStores: mongoRateLimitStores,
+  }).listen(port, () => {
     logger.info(`api listening on ${port}`);
   });
 

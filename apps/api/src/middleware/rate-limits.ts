@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
-import { ipKeyGenerator, rateLimit } from 'express-rate-limit';
+import { ipKeyGenerator, rateLimit, type Store } from 'express-rate-limit';
 import { RateLimitedError } from '../errors.js';
 
 const FIFTEEN_MINUTES = 15 * 60 * 1000;
@@ -9,9 +9,9 @@ function refuse(_req: Request, _res: Response, next: NextFunction) {
   next(new RateLimitedError());
 }
 
-/** depends on `trust proxy` naming the right hop, or every caller shares one address */
+/** set by `clientAddress`, which has to run before any limiter */
 function clientIp(req: Request) {
-  return ipKeyGenerator(req.ip ?? '');
+  return ipKeyGenerator(req.clientIp);
 }
 
 /** runs before validation, so the email is normalised here the way the contract does it */
@@ -21,8 +21,8 @@ function loginEmail(req: Request) {
     .toLowerCase();
 }
 
-/** each limiter counts in its own memory, so call these once per app */
-export function loginLimit() {
+/** without a store, each limiter counts in its own memory. call these once per app */
+export function loginLimit(store?: Store) {
   return rateLimit({
     windowMs: FIFTEEN_MINUTES,
     limit: 5,
@@ -30,15 +30,29 @@ export function loginLimit() {
     // an account that keeps signing in from one network must never be locked out
     skipSuccessfulRequests: true,
     handler: refuse,
+    store,
   });
 }
 
-export function registerLimit() {
+/** one address trying many accounts, a password at a time */
+export function loginAddressLimit(store?: Store) {
+  return rateLimit({
+    windowMs: FIFTEEN_MINUTES,
+    limit: 30,
+    keyGenerator: clientIp,
+    skipSuccessfulRequests: true,
+    handler: refuse,
+    store,
+  });
+}
+
+export function registerLimit(store?: Store) {
   return rateLimit({
     windowMs: ONE_HOUR,
     limit: 10,
     keyGenerator: clientIp,
     handler: refuse,
+    store,
   });
 }
 

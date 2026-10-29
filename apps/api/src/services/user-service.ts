@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import {
   SUBURBS,
   suburbLocation,
@@ -19,6 +19,7 @@ import bcrypt from 'bcryptjs';
 import { mongo, Types } from 'mongoose';
 import {
   runInTransaction,
+  type LoginThrottleRepository,
   type OrganisationDoc,
   type OrganisationRepository,
   type SessionRepository,
@@ -27,6 +28,7 @@ import {
 import {
   InvalidStateError,
   NotFoundError,
+  RateLimitedError,
   UnauthenticatedError,
   ValidationError,
 } from '../errors.js';
@@ -51,6 +53,25 @@ const LOGIN_FAILED = 'The email or password is not correct';
 
 const DUPLICATE_KEY = 11000;
 
+/** failures on one email, from any address, before each further one delays the next attempt */
+const FREE_LOGIN_FAILURES = 9;
+const FIRST_LOGIN_DELAY_MS = 60 * 1000;
+const MAX_LOGIN_DELAY_MS = 15 * 60 * 1000;
+const LOGIN_FAILURE_MEMORY_MS = 24 * 60 * 60 * 1000;
+
+/** one minute at the 10th failure. each later one doubles it, up to 15 minutes */
+export function loginDelayMs(failures: number) {
+  if (failures <= FREE_LOGIN_FAILURES) return 0;
+  return Math.min(
+    MAX_LOGIN_DELAY_MS,
+    FIRST_LOGIN_DELAY_MS * 2 ** (failures - FREE_LOGIN_FAILURES - 1),
+  );
+}
+
+function throttleKey(email: string) {
+  return createHash('sha256').update(email).digest('hex');
+}
+
 const AUDIT_TARGET = 'users';
 
 /** staff have no organisation and members need one. a role never changes from one group to the other */
@@ -74,6 +95,7 @@ export class UserService {
   private readonly organisations: OrganisationRepository;
   private readonly sessions: SessionRepository;
   private readonly audit: AuditService;
+  private readonly throttle: LoginThrottleRepository;
   private unknownUserHash: Promise<string> | undefined;
 
   constructor(
@@ -81,11 +103,13 @@ export class UserService {
     organisations: OrganisationRepository,
     sessions: SessionRepository,
     audit: AuditService,
+    throttle: LoginThrottleRepository,
   ) {
     this.users = users;
     this.organisations = organisations;
     this.sessions = sessions;
     this.audit = audit;
+    this.throttle = throttle;
   }
 
   async register(input: RegisterRequest): Promise<SessionResponse> {
@@ -120,20 +144,38 @@ export class UserService {
     }
   }
 
-  /** an unknown email, a wrong password and a disabled account all fail the same way */
+  /**
+   * an unknown email, a wrong password and a disabled account all fail the same
+   * way, and all count towards the delay on that email
+   */
   async login(credentials: LoginRequest): Promise<SessionResponse> {
+    const key = throttleKey(credentials.email);
+    if (await this.throttle.isBlocked(key)) throw new RateLimitedError();
+
     const user = await this.users.findByEmail(credentials.email);
     // an unknown email still costs one hash comparison, so it takes as long as a wrong password
     const hash = user ? user.passwordHash : await this.hashForUnknownUser();
     const matches = await bcrypt.compare(credentials.password, hash);
 
     if (!user || !matches || user.status !== 'active') {
+      await this.recordLoginFailure(key);
       throw new UnauthenticatedError(LOGIN_FAILED);
     }
 
     const updated = await this.users.recordLogin(user._id);
     if (!updated) throw new UnauthenticatedError(LOGIN_FAILED);
+    await this.throttle.clear(key);
     return this.sessionResponse(updated);
+  }
+
+  private async recordLoginFailure(key: string) {
+    const now = Date.now();
+    const failures = await this.throttle.recordFailure(
+      key,
+      new Date(now + LOGIN_FAILURE_MEMORY_MS),
+    );
+    const delay = loginDelayMs(failures);
+    if (delay > 0) await this.throttle.blockUntil(key, new Date(now + delay));
   }
 
   async getSession(userId: string): Promise<SessionResponse> {

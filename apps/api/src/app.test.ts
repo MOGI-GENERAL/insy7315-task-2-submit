@@ -16,6 +16,7 @@ import {
   CollectionRepository,
   CounterRepository,
   HandoverRepository,
+  LoginThrottleRepository,
   NotificationRepository,
   OfferRepository,
   OrganisationRepository,
@@ -123,6 +124,7 @@ const server = createApp({
       new OrganisationRepository(),
       new SessionRepository(),
       new AuditService(new AuditLogRepository()),
+      new LoginThrottleRepository(),
     ),
     organisations: new OrganisationService(
       new OrganisationRepository(),
