@@ -5,9 +5,11 @@ import { claimValidator, ClaimModel } from './models/claim.js';
 import { collectionValidator, CollectionModel } from './models/collection.js';
 import { counterValidator, CounterModel } from './models/counter.js';
 import { handoverRecordValidator, HandoverRecordModel } from './models/handover-record.js';
+import { loginThrottleValidator, LoginThrottleModel } from './models/login-throttle.js';
 import { notificationValidator, NotificationModel } from './models/notification.js';
 import { offerValidator, OfferModel } from './models/offer.js';
 import { organisationValidator, OrganisationModel } from './models/organisation.js';
+import { rateLimitValidator, RateLimitModel } from './models/rate-limit.js';
 import { taxCertificateValidator, TaxCertificateModel } from './models/tax-certificate.js';
 import { userValidator, UserModel } from './models/user.js';
 import { valuationRateValidator, ValuationRateModel } from './models/valuation-rate.js';
@@ -36,6 +38,12 @@ export const MANAGED: ManagedCollection[] = [
   { model: CounterModel, validator: counterValidator },
 ];
 
+/** counts the API keeps for itself. bootstrap sets them up and the seed leaves them alone */
+export const API_STATE: ManagedCollection[] = [
+  { model: RateLimitModel, validator: rateLimitValidator },
+  { model: LoginThrottleModel, validator: loginThrottleValidator },
+];
+
 const VALIDATION = { validationLevel: 'strict', validationAction: 'error' } as const;
 
 export interface BootstrapResult {
@@ -62,7 +70,7 @@ export async function bootstrapDb(): Promise<BootstrapResult> {
   };
   const existing = await db.listCollections().toArray();
 
-  for (const { model, validator } of MANAGED) {
+  for (const { model, validator } of [...MANAGED, ...API_STATE]) {
     const name = model.collection.collectionName;
     const found = existing.find((c) => c.name === name);
 

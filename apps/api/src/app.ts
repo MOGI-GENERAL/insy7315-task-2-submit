@@ -1,10 +1,12 @@
 import express, { type Router } from 'express';
 import type { Logger } from 'pino';
 import { pinoHttp } from 'pino-http';
+import { clientAddress, type ProxySettings } from './middleware/client-address.js';
 import { csrfProtection } from './middleware/csrf.js';
 import { loadCurrentUser } from './middleware/current-user.js';
 import { errorHandler, notFound } from './middleware/error-handler.js';
 import { requirePasswordChanged } from './middleware/guards.js';
+import type { RateLimitStoreFactory } from './middleware/rate-limit-store.js';
 import { globalLimit } from './middleware/rate-limits.js';
 import { securityHeaders } from './middleware/security-headers.js';
 import { sessions, type SessionSettings } from './middleware/session.js';
@@ -58,12 +60,16 @@ export interface AppDeps {
   session: SessionSettings;
   /** absent or null refuses every Twilio webhook */
   twilioWebhooks?: TwilioWebhookSettings | null;
+  /** absent or null counts every request by the address that connected */
+  proxy?: ProxySettings | null;
+  /** absent keeps the sign-in and registration counts in memory */
+  rateLimitStores?: RateLimitStoreFactory;
   /** lets tests mount throwaway routes in front of the 404 */
   extraRouters?: Router[];
 }
 
-/** Netlify's edge, then Render's load balancer */
-const TRUSTED_PROXY_HOPS = 2;
+/** Render's proxy. Netlify's hops are not counted, since a client can reach Render directly */
+const TRUSTED_PROXY_HOPS = 1;
 
 export function createApp(deps: AppDeps) {
   const app = express();
@@ -71,6 +77,7 @@ export function createApp(deps: AppDeps) {
   app.set('trust proxy', TRUSTED_PROXY_HOPS);
   app.use(pinoHttp({ logger: deps.logger }));
   app.use(securityHeaders());
+  app.use(clientAddress(deps.proxy ?? null));
   app.use(express.json({ limit: '100kb' }));
 
   app.use(sessions(deps.session));
@@ -81,7 +88,7 @@ export function createApp(deps: AppDeps) {
 
   app.use('/api', healthRouter(deps.services.health));
   app.use('/api', openApiRouter(deps.services.openApi));
-  app.use('/api', authRouter(deps.services.users));
+  app.use('/api', authRouter(deps.services.users, deps.rateLimitStores));
   app.use('/api', meRouter(deps.services.users));
   app.use('/api', organisationRouter(deps.services.organisations));
   app.use('/api', offerRouter(deps.services.offers));

@@ -26,6 +26,8 @@ Atlas accepts connections only from Render's Frankfurt outbound ranges, plus a d
 
 The browser only talks to the Netlify origin.
 Netlify rewrites `/api/*` to the Render service for its context, so the session cookie is first-party.
+Netlify signs each request it forwards, and the API takes the client's address from Netlify only on a signed request.
+Rate limits count by that address.
 Twilio webhooks go to Render directly and are signature-checked.
 
 ## API and jobs
@@ -38,6 +40,8 @@ The cron service needs the same database, photo, notification and Twilio setting
 | `NODE_ENV` | ✓ `production` | ✓ `production` | `development` | Anything but `development` makes the session cookie `Secure` |
 | `MONGODB_URI` | ✓ | ✓ | ✓ | One database user per environment |
 | `SESSION_SECRET` | ✓ | ✓ | ✓ | A long random string, different in every environment |
+| `API_PROXY_SECRET` | ✓ | ✓ | – | Netlify signs every request it forwards to `/api` with this, and the API then counts each request by Netlify's client address. The same value as on the Netlify site, different in every environment |
+| `API_PROXY_REQUIRED` | ✓ `true` | ✓ `true` | – | `true` refuses requests Netlify did not sign, except Twilio's webhooks and `/api/health`. Set it only once the secret is in place on both sides |
 | `PORT` | set by Render | set by Render | default `3000` | |
 | `RENDER_GIT_COMMIT` | set by Render | set by Render | – | Reported as `version` by `/api/health` |
 | `API_SWEEPS` | `false`, from `render.yaml` | – | – | `false` stops the API running the expiry and retention sweeps, which the cron service runs instead. On when empty |
@@ -69,7 +73,8 @@ The workflows build the web app and upload it with the Netlify CLI.
 
 | Variable | Production | Staging | Local | Notes |
 |---|---|---|---|---|
-| `API_ORIGIN` | GitHub variable `PRODUCTION_API_ORIGIN` | GitHub variable `STAGING_API_ORIGIN` | – | Written into `_redirects` as the `/api` rewrite |
+| `API_ORIGIN` | GitHub variable `PRODUCTION_API_ORIGIN` | GitHub variable `STAGING_API_ORIGIN` | – | Written into `netlify.toml` at build time as the signed `/api` rewrite |
+| `API_PROXY_SECRET` | Netlify site variable, Runtime scope | Netlify site variable, Runtime scope | – | The same value as the API's `API_PROXY_SECRET` for that environment. Netlify reads it when it proxies, not at build time |
 | `VITE_DATA` | unset | unset | `http` | The API unless set to `fake`, which runs on built-in demo data and shows a banner on every screen |
 
 ## GitHub
