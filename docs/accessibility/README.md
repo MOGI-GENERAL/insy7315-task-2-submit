@@ -2,8 +2,47 @@
 
 The web app targets WCAG 2.2 AA (NFR05) on phones from 360 px wide up to desktop.
 This page records how every screen was checked on 5 October 2026, what the checks found, and what was fixed.
+Since 29 October 2026 an automated axe audit has also run in CI.
 
-## How the screens were checked
+## Automated audit
+
+The `accessibility` job in `.github/workflows/ci.yml` runs on every push that changes `apps/web` or `packages/contract`.
+It builds the web app on the demo data and serves it with `vite preview`, so it needs no API.
+It signs in as a donor, a recipient, a coordinator and an administrator, and opens every screen that role can reach.
+It also opens sign-in, registration and the privacy notice signed out.
+That is 37 pages, because notifications and change password are opened once for each role.
+Each page is checked at 360 px and at 1280 px against the axe rules tagged WCAG 2.0, 2.1 and 2.2 A and AA, 74 checks in all.
+
+The job fails on any violation rated serious or critical.
+Moderate and minor violations are listed in the report without failing the job.
+The HTML report is uploaded as the `accessibility-report` artifact on every run, pass or fail, and kept for 14 days.
+
+The audit is in `apps/web/a11y/audit.spec.ts`, and its settings are in `apps/web/playwright.config.ts`.
+
+### Running it locally
+
+From the repository root, with port 4173 free:
+
+```sh
+npx playwright install chromium        # once
+npm run build -w packages/contract     # once, or after the contract changes
+npm run test:a11y -w apps/web
+npx playwright show-report apps/web/a11y/out/report
+```
+
+The run builds the demo version into `apps/web/a11y/out/dist` and leaves the real `dist` alone.
+It takes about a minute and a quarter on a recent laptop.
+
+### Results
+
+The first run, on 29 October 2026, found no violations of any impact on any of the 74 checks.
+
+### Accepted exceptions
+
+None.
+An accepted exception is listed here with its reason, and `EXCEPTIONS` in `audit.spec.ts` excludes that one rule on that one element.
+
+## How the screens were checked by hand
 
 All 30 screens were opened signed in as each role, on the built-in demo data (`VITE_DATA=fake`).
 

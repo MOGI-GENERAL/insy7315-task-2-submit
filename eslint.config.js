@@ -6,7 +6,7 @@ import tseslint from 'typescript-eslint';
 import { defineConfig, globalIgnores } from 'eslint/config';
 
 export default defineConfig([
-  globalIgnores(['**/dist', '**/coverage']),
+  globalIgnores(['**/dist', '**/coverage', 'apps/web/a11y/out']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [js.configs.recommended, tseslint.configs.recommended],
@@ -30,7 +30,14 @@ export default defineConfig([
     },
   },
   {
-    files: ['apps/api/**/*.ts', 'apps/jobs/**/*.ts', 'packages/**/*.ts', 'apps/web/vite.config.ts'],
+    files: [
+      'apps/api/**/*.ts',
+      'apps/jobs/**/*.ts',
+      'packages/**/*.ts',
+      'apps/web/vite.config.ts',
+      'apps/web/playwright.config.ts',
+      'apps/web/a11y/*.ts',
+    ],
     languageOptions: {
       globals: globals.node,
     },
