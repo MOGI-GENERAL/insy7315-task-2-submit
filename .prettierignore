@@ -1,4 +1,5 @@
 dist
 coverage
+apps/web/a11y/out
 package-lock.json
 docs/openapi.json

@@ -7,6 +7,7 @@ node_modules
 dist
 dist-ssr
 coverage
+apps/web/a11y/out
 *.tsbuildinfo
 *.local
 
