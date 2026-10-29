@@ -30,7 +30,7 @@ This table points to where each part of the project can be found.
 | GitHub: branching                           | `git log --graph --first-parent develop` shows feature branches merged with `--no-ff`, releases into `main`, and the tags `v0.1.0`, `v0.2.0` and `v1.0.0`. [CONTRIBUTING.md](CONTRIBUTING.md) and [CHANGELOG.md](CHANGELOG.md) describe the workflow.                                                                                                                                |
 | GitHub: CI/CD                               | [.github/workflows](.github/workflows): `ci.yml` runs on every push, `staging.yml` deploys `develop`, and `deploy.yml` runs CI on `main` and deploys production only if it passes. [Dependabot](.github/dependabot.yml) is on.                                                                                                                                                       |
 | Front end: design and feedback              | [apps/web/src/styles/tokens.css](apps/web/src/styles/tokens.css) has the design tokens. [components/feedback](apps/web/src/components/feedback) is the shared loading, empty, error, success and confirmation kit. Its own README describes it.                                                                                                                                      |
-| Front end: accessibility and responsiveness | [docs/accessibility](docs/accessibility/README.md) records the axe results, the target sizes and the keyboard checks, with screenshots.                                                                                                                                                                                                                                              |
+| Front end: accessibility and responsiveness | [docs/accessibility](docs/accessibility/README.md) records the axe results, the target sizes and the keyboard checks, with screenshots. The `accessibility` job in `ci.yml` runs axe on every screen for every role at 360 and 1280 px.                                                                                                                                              |
 | Requirements                                | [docs/TRACEABILITY.md](docs/TRACEABILITY.md) matches every user story and non-functional requirement to its endpoints, screens and tests, with an honest status.                                                                                                                                                                                                                     |
 | Presentation                                | The video linked at the top of this file.                                                                                                                                                                                                                                                                                                                                            |
 
@@ -156,9 +156,10 @@ Reloading the page puts the demo data back as it was.
 npm run check              # lint, type check and unit tests
 npm run test:integration   # API against an in-memory replica set
 npm run test:contract      # every endpoint's responses against the contract
+npm run test:a11y -w apps/web   # axe on every screen for every role, at 360 and 1280 px
 ```
 
-CI runs all of them on every push.
+CI runs all of them on every push, except the accessibility audit, which runs only when a push changes the web app or the contract.
 The integration tests include the 20-way claim race, expiry running exactly once, and the dual handover.
 
 ## Languages
