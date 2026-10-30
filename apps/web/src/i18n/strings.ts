@@ -165,6 +165,8 @@ export const untranslated = {
   'dispatch.shareDone': 'Done',
   'dispatch.emailSubject': 'FEDSA collection {reference}',
   'form.tooShort': 'Use at least {n} characters.',
+  'login.forgot': 'Forgot your password? Phone FEDSA.',
+  'pending.message': 'The Offers tab shows food as soon as your organisation is verified.',
 
   /* coordinator screens */
   'dash.title': 'Operations board',
@@ -469,7 +471,6 @@ export const en = {
   'login.password': 'Password',
   'login.failed': 'The email or password is not right.',
   'login.signingIn': 'Signing in',
-  'login.forgot': 'Forgot your password? Ask a FEDSA coordinator to reset it.',
   'login.register': 'New organisation? Register here',
   'login.demoAccounts': 'Demo accounts',
   'login.demoNote': 'Demo data. Any password works for these accounts.',
@@ -520,7 +521,6 @@ export const en = {
   'pending.title': 'Waiting for verification',
   'pending.body':
     'A FEDSA coordinator checks every new organisation. You can sign in and look around, but you can claim offers only once your organisation is verified.',
-  'pending.message': 'We send you a message when it is done.',
   'pending.continue': 'Go to the offers',
   'pending.banner':
     'Your organisation is waiting for verification. You can claim offers once a coordinator has verified it.',
