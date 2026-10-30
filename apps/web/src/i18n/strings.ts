@@ -134,12 +134,9 @@ export const untranslated = {
   'dispatch.noneWaitingTitle': 'Every collection has transport',
   'dispatch.noneWaitingBody': 'Nothing is waiting on a driver right now.',
   'dispatch.driverHint':
-    'Drivers hold no account on the platform. They receive one text message per collection and nothing else.',
-  'dispatch.smsTo': 'SMS to {phone}',
-  'dispatch.smsToDriver': 'SMS to the driver',
-  'dispatch.confirmTitle': 'Send the details to {name}?',
-  'dispatch.confirmBody': '{name} gets this text on {phone}. It holds this collection only.',
-  'dispatch.confirmSend': 'Send text',
+    'Drivers hold no account on the platform. Each gets one message per collection, sent from your own WhatsApp or email.',
+  'dispatch.smsTo': 'Message to {phone}',
+  'dispatch.smsToDriver': 'Message to the driver',
   'dispatch.tableCaption': 'Collections with a driver dispatched',
   'dispatch.colOffer': 'Offer',
   'dispatch.colDriver': 'Driver',
@@ -167,6 +164,7 @@ export const untranslated = {
   'dispatch.shareAgain': 'Share again',
   'dispatch.shareDone': 'Done',
   'dispatch.emailSubject': 'FEDSA collection {reference}',
+  'form.tooShort': 'Use at least {n} characters.',
 
   /* coordinator screens */
   'dash.title': 'Operations board',
