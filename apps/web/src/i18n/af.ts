@@ -41,7 +41,6 @@ export const af: Record<StringKey, string> = {
   'login.password': 'Wagwoord',
   'login.failed': 'Die e-posadres of wagwoord is nie reg nie.',
   'login.signingIn': 'Besig om aan te meld',
-  'login.forgot': 'Wagwoord vergeet? Vra ’n FEDSA-koördineerder om dit terug te stel.',
   'login.register': 'Nuwe organisasie? Registreer hier',
   'login.demoAccounts': 'Demonstrasierekeninge',
   'login.demoNote': 'Demonstrasiedata. Enige wagwoord werk vir hierdie rekeninge.',
@@ -90,7 +89,6 @@ export const af: Record<StringKey, string> = {
   'pending.title': 'Wag vir verifikasie',
   'pending.body':
     '’n FEDSA-koördineerder kontroleer elke nuwe organisasie. Jy kan aanmeld en rondkyk, maar julle kan eers aanbiedinge eis sodra julle organisasie geverifieer is.',
-  'pending.message': 'Ons stuur vir jou ’n boodskap wanneer dit klaar is.',
   'pending.continue': 'Gaan na die aanbiedinge',
   'pending.banner':
     'Julle organisasie wag vir verifikasie. Julle kan aanbiedinge eis sodra ’n koördineerder dit geverifieer het.',
