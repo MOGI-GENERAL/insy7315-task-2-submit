@@ -15,7 +15,7 @@ const BY_MESSAGE: Record<string, StringKey> = {
   'The current password is not correct': 'account.wrongCurrent',
 };
 
-type ZodIssue = Issue & { format?: string };
+type ZodIssue = Issue & { format?: string; origin?: string };
 
 function localise(issue: ZodIssue, t: Translate): string {
   const known = BY_MESSAGE[issue.message];
@@ -23,6 +23,9 @@ function localise(issue: ZodIssue, t: Translate): string {
   if (issue.code === 'invalid_format' && issue.format === 'email') return t('form.emailFormat');
   if (issue.path.at(-1) === 'suburb') return t('register.pickSuburb');
   if (issue.code === 'too_small' && issue.minimum === 0) return t('form.number');
+  if (issue.code === 'too_small' && issue.origin === 'string') {
+    return t('form.tooShort').replace('{n}', String(issue.minimum));
+  }
   return issue.message;
 }
 

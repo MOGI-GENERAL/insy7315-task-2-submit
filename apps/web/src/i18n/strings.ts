@@ -164,6 +164,7 @@ export const untranslated = {
   'dispatch.shareAgain': 'Share again',
   'dispatch.shareDone': 'Done',
   'dispatch.emailSubject': 'FEDSA collection {reference}',
+  'form.tooShort': 'Use at least {n} characters.',
 
   /* coordinator screens */
   'dash.title': 'Operations board',
