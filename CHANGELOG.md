@@ -14,6 +14,8 @@ Drivers get their collection details, and the security and accessibility checks 
   A manual workflow reruns the ZAP scan.
 - **Accessibility audit:** CI runs axe on every screen when the web app or the contract changes, and fails on serious or critical issues.
 - **Form messages:** text that is too short says how many characters it needs, in place of the validation library's wording.
+- **Uptime:** a public status page checks the production API every five minutes, linked from the README.
+- **Demo accounts:** the README gives the seeded password.
 - **Help text:** the sign-in screen and the verification screen no longer promise a password reset or an approval message that the system does not send.
 
 ## 1.0.2 (2026-10-27)
