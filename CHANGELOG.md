@@ -2,6 +2,22 @@
 
 Each release is merged into `main` and tagged, and the deploy workflow then puts it into production.
 
+## 1.1.0 (2026-10-30)
+
+Drivers get their collection details, and the security and accessibility checks are part of the build.
+
+- **Driver dispatch:** the dispatch card has *Send on WhatsApp*, *Copy text* and *Send by email* in place of *Send to driver*.
+  One click records the dispatch and opens the coordinator's own WhatsApp or email with the driver's text filled in, while SMS sending waits on an account that can send.
+  *Share again* resends the text for a collection already arranged.
+- **Penetration test:** a ZAP baseline scan and manual checks of staging, written up in `docs/security`.
+  Sign-in attempts are counted per signed client address and kept in MongoDB, and the web app sends cross-origin opener and resource policies.
+  A manual workflow reruns the ZAP scan.
+- **Accessibility audit:** CI runs axe on every screen when the web app or the contract changes, and fails on serious or critical issues.
+- **Form messages:** text that is too short says how many characters it needs, in place of the validation library's wording.
+- **Uptime:** a public status page checks the production API every five minutes, linked from the README.
+- **Demo accounts:** the README gives the seeded password.
+- **Help text:** the sign-in screen and the verification screen no longer promise a password reset or an approval message that the system does not send.
+
 ## 1.0.2 (2026-10-27)
 
 Production stays awake, and scheduled work runs in its own service.

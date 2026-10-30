@@ -42,7 +42,6 @@ export const xh: Record<StringKey, string> = {
   'login.password': 'Iphasiwedi',
   'login.failed': 'I-imeyile okanye iphasiwedi ayichanekanga.',
   'login.signingIn': 'Iyangena',
-  'login.forgot': 'Uyilibele iphasiwedi yakho? Cela umququzeleli we-FEDSA ayitshintshe.',
   'login.register': 'Ningumbutho omtsha? Bhalisani apha',
   'login.demoAccounts': 'Iiakhawunti zomboniso',
   'login.demoNote': 'Iinkcukacha zomboniso. Nayiphi na iphasiwedi iyasebenza kwezi akhawunti.',
@@ -91,7 +90,6 @@ export const xh: Record<StringKey, string> = {
   'pending.title': 'Kulindwe ukuqinisekiswa',
   'pending.body':
     'Umququzeleli we-FEDSA uhlola wonke umbutho omtsha. Ungangena ujonge, kodwa ningabanga izibonelelo kuphela xa umbutho wenu uqinisekisiwe.',
-  'pending.message': 'Siza kukuthumelela umyalezo xa kugqityiwe.',
   'pending.continue': 'Yiya kwizibonelelo',
   'pending.banner':
     'Umbutho wenu ulindele ukuqinisekiswa. Ningabanga izibonelelo xa umququzeleli ewuqinisekisile.',

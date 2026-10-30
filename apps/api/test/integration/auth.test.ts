@@ -1,8 +1,19 @@
+import { createHash } from 'node:crypto';
 import { ErrorEnvelope, SessionResponse, UserResponse, suburbLocation } from '@fedsa/contract';
 import mongoose from 'mongoose';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-import { OrganisationModel, SESSIONS_COLLECTION, UserModel } from '../../src/db/index.js';
-import { CONSENT_VERSION } from '../../src/services/user-service.js';
+import {
+  LoginThrottleModel,
+  OrganisationModel,
+  SESSIONS_COLLECTION,
+  UserModel,
+} from '../../src/db/index.js';
+import {
+  NETLIFY_CLIENT_IP_HEADER,
+  NETLIFY_SIGNATURE_HEADER,
+} from '../../src/middleware/client-address.js';
+import { CONSENT_VERSION, loginDelayMs } from '../../src/services/user-service.js';
+import { netlifySignature } from '../netlify-signature.js';
 import { TestClient } from '../test-client.js';
 import {
   TEST_PASSWORD,
@@ -430,5 +441,152 @@ describe('rate limits', () => {
       password: TEST_PASSWORD,
     });
     expect(res.status).toBe(200);
+  });
+});
+
+describe('client address', () => {
+  test(
+    'a forged forwarded address does not escape the login limit',
+    { timeout: 30_000 },
+    async () => {
+      const user = await createUser({ role: 'coordinator' });
+      const client = await anonymousClient(baseUrl);
+
+      const statuses: number[] = [];
+      for (let i = 1; i <= 6; i += 1) {
+        // Render appends the address that connected. a forged one can only come before it
+        const res = await client.request(
+          'POST',
+          '/api/auth/login',
+          { email: user.email, password: 'not the password' },
+          { 'x-forwarded-for': `203.0.113.${i}, ${client.ip}` },
+        );
+        statuses.push(res.status);
+      }
+
+      expect(statuses).toEqual([401, 401, 401, 401, 401, 429]);
+    },
+  );
+
+  test(
+    'behind the signed rewrite, each client is counted by its own address',
+    { timeout: 30_000 },
+    async () => {
+      const secret = 'integration-test-proxy-secret';
+      const proxied = await startTestApp(
+        [],
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        {
+          secret,
+          required: true,
+        },
+      );
+      try {
+        async function throughNetlify(clientIp: string) {
+          const client = new TestClient(proxied.baseUrl);
+          // every request arrives from one Netlify address
+          const headers = {
+            'x-forwarded-for': '10.200.0.1',
+            [NETLIFY_SIGNATURE_HEADER]: netlifySignature(secret),
+            [NETLIFY_CLIENT_IP_HEADER]: clientIp,
+          };
+          const res = await client.request('GET', '/api/auth/csrf', undefined, headers);
+          client.csrfToken = ((await res.json()) as { csrfToken: string }).csrfToken;
+          return (email: string) =>
+            client.request(
+              'POST',
+              '/api/auth/login',
+              { email, password: 'not the password' },
+              headers,
+            );
+        }
+        const user = await createUser({ role: 'coordinator' });
+        const first = await throughNetlify('198.51.100.1');
+        const second = await throughNetlify('198.51.100.2');
+
+        for (let i = 0; i < 5; i += 1) expect((await first(user.email)).status).toBe(401);
+        expect((await first(user.email)).status).toBe(429);
+        expect((await second(user.email)).status).toBe(401);
+        expect((await new TestClient(proxied.baseUrl).get('/api/auth/csrf')).status).toBe(403);
+      } finally {
+        await proxied.close();
+      }
+    },
+  );
+});
+
+describe('shared counts', () => {
+  test('the login count survives a restart of the API', { timeout: 30_000 }, async () => {
+    const user = await createUser({ role: 'coordinator' });
+    const client = await anonymousClient(baseUrl);
+    for (let i = 0; i < 5; i += 1) {
+      const res = await client.post('/api/auth/login', {
+        email: user.email,
+        password: 'not the password',
+      });
+      expect(res.status).toBe(401);
+    }
+
+    const restarted = await startTestApp();
+    try {
+      const again = new TestClient(restarted.baseUrl);
+      const headers = { 'x-forwarded-for': client.ip };
+      const csrf = await again.request('GET', '/api/auth/csrf', undefined, headers);
+      again.csrfToken = ((await csrf.json()) as { csrfToken: string }).csrfToken;
+      const res = await again.request(
+        'POST',
+        '/api/auth/login',
+        { email: user.email, password: 'not the password' },
+        headers,
+      );
+
+      expect(res.status).toBe(429);
+    } finally {
+      await restarted.close();
+    }
+  });
+});
+
+describe('failures on one email', () => {
+  const failFromNewAddress = async (email: string) =>
+    (await anonymousClient(baseUrl)).post('/api/auth/login', {
+      email,
+      password: 'not the password',
+    });
+
+  test('the delay starts at one minute on the 10th failure and doubles up to 15', () => {
+    expect([9, 10, 11, 12, 13, 14, 15].map(loginDelayMs)).toEqual([
+      0, 60_000, 120_000, 240_000, 480_000, 900_000, 900_000,
+    ]);
+  });
+
+  test.each([
+    ['an account', async () => (await createUser({ role: 'coordinator' })).email],
+    ['an unknown email', async () => uniqueEmail('nobody')],
+  ])('ten from different addresses delay %s', { timeout: 60_000 }, async (_label, makeEmail) => {
+    const email = await makeEmail();
+    for (let i = 0; i < 10; i += 1) expect((await failFromNewAddress(email)).status).toBe(401);
+
+    const fresh = await anonymousClient(baseUrl);
+    const res = await fresh.post('/api/auth/login', { email, password: TEST_PASSWORD });
+
+    expect(res.status).toBe(429);
+    expect(await errorCode(res)).toBe('RATE_LIMITED');
+  });
+
+  test('a successful sign-in clears them', { timeout: 60_000 }, async () => {
+    const user = await createUser({ role: 'coordinator' });
+    const key = createHash('sha256').update(user.email).digest('hex');
+    for (let i = 0; i < 9; i += 1) expect((await failFromNewAddress(user.email)).status).toBe(401);
+    expect((await LoginThrottleModel.findById(key).lean())?.failures).toBe(9);
+
+    await signedInClient(baseUrl, user.email);
+
+    expect(await LoginThrottleModel.findById(key).lean()).toBeNull();
   });
 });

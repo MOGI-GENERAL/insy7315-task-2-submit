@@ -4,6 +4,7 @@
     { "path": "../../packages/contract" },
     { "path": "./tsconfig.app.json" },
     { "path": "./tsconfig.sw.json" },
-    { "path": "./tsconfig.node.json" }
+    { "path": "./tsconfig.node.json" },
+    { "path": "./tsconfig.a11y.json" }
   ]
 }

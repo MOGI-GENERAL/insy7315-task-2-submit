@@ -134,12 +134,9 @@ export const untranslated = {
   'dispatch.noneWaitingTitle': 'Every collection has transport',
   'dispatch.noneWaitingBody': 'Nothing is waiting on a driver right now.',
   'dispatch.driverHint':
-    'Drivers hold no account on the platform. They receive one text message per collection and nothing else.',
-  'dispatch.smsTo': 'SMS to {phone}',
-  'dispatch.smsToDriver': 'SMS to the driver',
-  'dispatch.confirmTitle': 'Send the details to {name}?',
-  'dispatch.confirmBody': '{name} gets this text on {phone}. It holds this collection only.',
-  'dispatch.confirmSend': 'Send text',
+    'Drivers hold no account on the platform. Each gets one message per collection, sent from your own WhatsApp or email.',
+  'dispatch.smsTo': 'Message to {phone}',
+  'dispatch.smsToDriver': 'Message to the driver',
   'dispatch.tableCaption': 'Collections with a driver dispatched',
   'dispatch.colOffer': 'Offer',
   'dispatch.colDriver': 'Driver',
@@ -157,6 +154,19 @@ export const untranslated = {
   'dispatch.keepDriver': 'Keep driver',
   'dispatch.driverCancelled': 'Driver cancelled',
   'dispatch.routeTo': '{from} to {to}',
+  'dispatch.shareTitle': 'Send it to {name} yourself',
+  'dispatch.shareBody':
+    'SMS sending is not live yet. Send the same text from your own WhatsApp or email, or copy it.',
+  'dispatch.shareWhatsapp': 'Send on WhatsApp',
+  'dispatch.shareEmail': 'Send by email',
+  'dispatch.shareCopy': 'Copy text',
+  'dispatch.copied': 'Text copied',
+  'dispatch.shareAgain': 'Share again',
+  'dispatch.shareDone': 'Done',
+  'dispatch.emailSubject': 'FEDSA collection {reference}',
+  'form.tooShort': 'Use at least {n} characters.',
+  'login.forgot': 'Forgot your password? Phone FEDSA.',
+  'pending.message': 'The Offers tab shows food as soon as your organisation is verified.',
 
   /* coordinator screens */
   'dash.title': 'Operations board',
@@ -461,7 +471,6 @@ export const en = {
   'login.password': 'Password',
   'login.failed': 'The email or password is not right.',
   'login.signingIn': 'Signing in',
-  'login.forgot': 'Forgot your password? Ask a FEDSA coordinator to reset it.',
   'login.register': 'New organisation? Register here',
   'login.demoAccounts': 'Demo accounts',
   'login.demoNote': 'Demo data. Any password works for these accounts.',
@@ -512,7 +521,6 @@ export const en = {
   'pending.title': 'Waiting for verification',
   'pending.body':
     'A FEDSA coordinator checks every new organisation. You can sign in and look around, but you can claim offers only once your organisation is verified.',
-  'pending.message': 'We send you a message when it is done.',
   'pending.continue': 'Go to the offers',
   'pending.banner':
     'Your organisation is waiting for verification. You can claim offers once a coordinator has verified it.',

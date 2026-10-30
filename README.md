@@ -8,6 +8,8 @@ Donors post surplus food, recipient organisations claim it, and coordinators and
 | Web app    | https://fedsa-mogi.netlify.app            | https://fedsa-staging.netlify.app            |
 | API health | https://fedsa-mogi.netlify.app/api/health | https://fedsa-staging.netlify.app/api/health |
 
+Uptime status: https://stats.uptimerobot.com/vGObooAo8B
+
 Presentation video: https://youtu.be/xtwgI0r1emY
 
 AI usage report: [docs/ai-usage.pdf](docs/ai-usage.pdf)
@@ -18,21 +20,21 @@ Clips of the app in use recorded using [Playwright](https://playwright.dev/) scr
 
 This table points to where each part of the project can be found.
 
-| Area                                        | Where to look                                                                                                                                                                                                                                                                                                                                                                        |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Back end: programming                       | [apps/api/src/services](apps/api/src/services) has the business rules. [apps/api/src/db/repositories](apps/api/src/db/repositories) is the Repository pattern. [apps/api/src/notifications](apps/api/src/notifications) is the Strategy pattern for notification channels. [organisation-status.ts](apps/api/src/services/organisation-status.ts) is the verification state machine. |
-| Back end: database                          | [models](apps/api/src/db/models) and [bootstrap.ts](apps/api/src/db/bootstrap.ts), which applies the `$jsonSchema` validators and the indexes. One index is a partial unique index that stops two active claims on one offer.                                                                                                                                                        |
-| Back end: APIs                              | [packages/contract/src/routes.ts](packages/contract/src/routes.ts) lists every endpoint with its role and schemas. [apps/api/src/routes](apps/api/src/routes) and [controllers](apps/api/src/controllers) serve them, and [errors.ts](apps/api/src/errors.ts) defines the one error shape.                                                                                           |
-| Back end: API document                      | [docs/openapi.json](docs/openapi.json) is the OpenAPI 3.1 description of every endpoint.                                                                                                                                                                                                                                                                                             |
-| Back end: security                          | [middleware](apps/api/src/middleware) covers sessions, CSRF, role and ownership guards, rate limits and security headers. [denial-matrix.test.ts](apps/api/test/integration/denial-matrix.test.ts) checks every route against every kind of caller.                                                                                                                                  |
-| Back end: data flow and logic               | [claim-service.ts](apps/api/src/services/claim-service.ts) is the claim lock. [expiry-service.ts](apps/api/src/services/expiry-service.ts), [handover-service.ts](apps/api/src/services/handover-service.ts) and [meals.ts](apps/api/src/services/meals.ts) cover the rest of the flow.                                                                                              |
-| Hosting                                     | [Why this hosting](#why-this-hosting), [docs/ENVIRONMENTS.md](docs/ENVIRONMENTS.md), [netlify.toml](netlify.toml) and [render.yaml](render.yaml).                                                                                                                                                                                                                                    |
-| GitHub: branching                           | `git log --graph --first-parent develop` shows feature branches merged with `--no-ff`, releases into `main`, and the tags `v0.1.0`, `v0.2.0` and `v1.0.0`. [CONTRIBUTING.md](CONTRIBUTING.md) and [CHANGELOG.md](CHANGELOG.md) describe the workflow.                                                                                                                                |
-| GitHub: CI/CD                               | [.github/workflows](.github/workflows): `ci.yml` runs on every push, `staging.yml` deploys `develop`, and `deploy.yml` runs CI on `main` and deploys production only if it passes. [Dependabot](.github/dependabot.yml) is on.                                                                                                                                                       |
-| Front end: design and feedback              | [apps/web/src/styles/tokens.css](apps/web/src/styles/tokens.css) has the design tokens. [components/feedback](apps/web/src/components/feedback) is the shared loading, empty, error, success and confirmation kit. Its own README describes it.                                                                                                                                      |
-| Front end: accessibility and responsiveness | [docs/accessibility](docs/accessibility/README.md) records the axe results, the target sizes and the keyboard checks, with screenshots.                                                                                                                                                                                                                                              |
-| Requirements                                | [docs/TRACEABILITY.md](docs/TRACEABILITY.md) matches every user story and non-functional requirement to its endpoints, screens and tests, with an honest status.                                                                                                                                                                                                                     |
-| Presentation                                | The video linked at the top of this file.                                                                                                                                                                                                                                                                                                                                            |
+| Area                                        | Where to look                                                                                                                                                                                                                                                                                                                                                                                              |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Back end: programming                       | [apps/api/src/services](apps/api/src/services) has the business rules. [apps/api/src/db/repositories](apps/api/src/db/repositories) is the Repository pattern. [apps/api/src/notifications](apps/api/src/notifications) is the Strategy pattern for notification channels. [organisation-status.ts](apps/api/src/services/organisation-status.ts) is the verification state machine.                       |
+| Back end: database                          | [models](apps/api/src/db/models) and [bootstrap.ts](apps/api/src/db/bootstrap.ts), which applies the `$jsonSchema` validators and the indexes. One index is a partial unique index that stops two active claims on one offer.                                                                                                                                                                              |
+| Back end: APIs                              | [packages/contract/src/routes.ts](packages/contract/src/routes.ts) lists every endpoint with its role and schemas. [apps/api/src/routes](apps/api/src/routes) and [controllers](apps/api/src/controllers) serve them, and [errors.ts](apps/api/src/errors.ts) defines the one error shape.                                                                                                                 |
+| Back end: API document                      | [docs/openapi.json](docs/openapi.json) is the OpenAPI 3.1 description of every endpoint.                                                                                                                                                                                                                                                                                                                   |
+| Back end: security                          | [middleware](apps/api/src/middleware) covers sessions, CSRF, role and ownership guards, rate limits and security headers. [denial-matrix.test.ts](apps/api/test/integration/denial-matrix.test.ts) checks every route against every kind of caller. [docs/security/PENETRATION-TEST.md](docs/security/PENETRATION-TEST.md) is the penetration test of staging, and the `zap` workflow reruns its ZAP scan. |
+| Back end: data flow and logic               | [claim-service.ts](apps/api/src/services/claim-service.ts) is the claim lock. [expiry-service.ts](apps/api/src/services/expiry-service.ts), [handover-service.ts](apps/api/src/services/handover-service.ts) and [meals.ts](apps/api/src/services/meals.ts) cover the rest of the flow.                                                                                                                    |
+| Hosting                                     | [Why this hosting](#why-this-hosting), [docs/ENVIRONMENTS.md](docs/ENVIRONMENTS.md), [netlify.toml](netlify.toml) and [render.yaml](render.yaml).                                                                                                                                                                                                                                                          |
+| GitHub: branching                           | `git log --graph --first-parent develop` shows feature branches merged with `--no-ff`, releases into `main`, and the tags `v0.1.0`, `v0.2.0` and `v1.0.0`. [CONTRIBUTING.md](CONTRIBUTING.md) and [CHANGELOG.md](CHANGELOG.md) describe the workflow.                                                                                                                                                      |
+| GitHub: CI/CD                               | [.github/workflows](.github/workflows): `ci.yml` runs on every push, `staging.yml` deploys `develop`, and `deploy.yml` runs CI on `main` and deploys production only if it passes. [Dependabot](.github/dependabot.yml) is on.                                                                                                                                                                             |
+| Front end: design and feedback              | [apps/web/src/styles/tokens.css](apps/web/src/styles/tokens.css) has the design tokens. [components/feedback](apps/web/src/components/feedback) is the shared loading, empty, error, success and confirmation kit. Its own README describes it.                                                                                                                                                            |
+| Front end: accessibility and responsiveness | [docs/accessibility](docs/accessibility/README.md) records the axe results, the target sizes and the keyboard checks, with screenshots. The `accessibility` job in `ci.yml` runs axe on every screen for every role at 360 and 1280 px.                                                                                                                                                                    |
+| Requirements                                | [docs/TRACEABILITY.md](docs/TRACEABILITY.md) matches every user story and non-functional requirement to its endpoints, screens and tests, with an honest status.                                                                                                                                                                                                                                           |
+| Presentation                                | The video linked at the top of this file.                                                                                                                                                                                                                                                                                                                                                                  |
 
 ## Architecture
 
@@ -63,7 +65,7 @@ Sessions are cookies stored in MongoDB, and every state-changing request needs a
   Its rewrite keeps the browser and the API on one origin, so cookies and CSRF work without cross-site settings.
 - **Render** runs the production API as a plain Node service on the `0.5c-512mb` compute plan (formerly Starter), in Frankfurt.
   A paid plan never sleeps (NFR08).
-  The first request answers at once, and an SMS reply reaches a running API well inside Twilio's 15-second timeout.
+  The first request answers at once.
 - **A Render cron service** runs `apps/jobs` every five minutes against the production database.
   It expires overdue offers and claims, deletes handover photos past their retention period at 02:00, and issues the previous month's tax certificates on the 1st.
   These run on time when nobody is using the app, and a long job never slows a request.
@@ -112,7 +114,7 @@ For a static page, run `npx @redocly/cli@2.62.1 build-docs docs/openapi.json`.
 ## Demo accounts
 
 Seeded on staging.
-The password is _to be added_.
+The password is Abc#1234567.
 
 | Role          | Name                               | Email                       |
 | ------------- | ---------------------------------- | --------------------------- |
@@ -156,9 +158,10 @@ Reloading the page puts the demo data back as it was.
 npm run check              # lint, type check and unit tests
 npm run test:integration   # API against an in-memory replica set
 npm run test:contract      # every endpoint's responses against the contract
+npm run test:a11y -w apps/web   # axe on every screen for every role, at 360 and 1280 px
 ```
 
-CI runs all of them on every push.
+CI runs all of them on every push, except the accessibility audit, which runs only when a push changes the web app or the contract.
 The integration tests include the 20-way claim race, expiry running exactly once, and the dual handover.
 
 ## Languages
@@ -170,7 +173,8 @@ The isiXhosa text has not yet been reviewed by a first-language speaker.
 
 - SMS and WhatsApp delivery is built and tested but was not sent live, because the Twilio trial account refused every message.
   Web push and the in-app inbox are the live channels.
-- Not built: offline queueing of forms, automatic monthly certificate issuance, PDF export of reports, a coordinator override of a claim, and a production WhatsApp sender.
+  After a driver is dispatched, the app fills in the driver's text for the coordinator to send from their own WhatsApp or email, or to copy.
+- Not built: offline queueing of forms, PDF export of reports, a coordinator override of a claim, and a production WhatsApp sender.
 
 ## Team
 

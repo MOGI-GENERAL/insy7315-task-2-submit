@@ -23,8 +23,18 @@ concurrency:
 jobs:
   fast:
     runs-on: ubuntu-latest
+    outputs:
+      web: ${{ steps.changes.outputs.web }}
     steps:
       - uses: actions/checkout@v7
+      # decided here so a push that leaves the web app alone starts no runner for the audit
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        id: changes
+        with:
+          filters: |
+            web:
+              - 'apps/web/**'
+              - 'packages/contract/**'
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
@@ -56,3 +66,34 @@ jobs:
       - run: npm run test:integration
       - run: npm run test:contract
       - run: npm audit --audit-level=high --omit=dev
+
+  accessibility:
+    needs: fast
+    if: needs.fast.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run build -w packages/contract
+      - id: playwright
+        run: echo "version=$(npx playwright --version | cut -d' ' -f2)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v6
+        id: browser
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+      # a cache hit installs nothing. the runner image already has the system libraries
+      - if: steps.browser.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps --only-shell chromium
+      - run: npm run test:a11y -w apps/web
+      - if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: accessibility-report
+          path: apps/web/a11y/out/report
+          retention-days: 14

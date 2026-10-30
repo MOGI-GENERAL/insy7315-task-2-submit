@@ -6,14 +6,7 @@ import {
   type Organisation,
 } from '@fedsa/contract';
 import { isApiError, useData, useLoad } from '../../data';
-import {
-  ConfirmDialog,
-  Empty,
-  errorKey,
-  LoadState,
-  PendingButton,
-  useToast,
-} from '../../components/feedback';
+import { ConfirmDialog, Empty, errorKey, LoadState, useToast } from '../../components/feedback';
 import { Field, FormError, useForm } from '../../components/forms';
 import type { Validator } from '../../components/forms';
 import { Countdown } from '../../components/Countdown';
@@ -23,14 +16,22 @@ import { PageHead, Section } from '../../components/ui';
 import { useT } from '../../i18n/useT';
 import { formatKg, formatWhen } from '../../lib/format';
 import { localInputToIso, toLocalInput } from '../../lib/localTime';
+import { emailLink, whatsAppLink } from '../../lib/share';
+import { localised } from '../account/messages';
 import './Coordinator.css';
 
-/** the donor and recipient are loaded only for a claim that still needs a driver */
 interface Row {
   claim: ClaimListItem;
   collection: Collection | null;
-  donor: Organisation | null;
-  recipient: Organisation | null;
+  donor: Organisation;
+  recipient: Organisation;
+}
+
+interface Sharing {
+  name: string;
+  phone: string;
+  reference: string;
+  text: string;
 }
 
 interface Values {
@@ -67,7 +68,6 @@ const address = (org: Organisation) => `${org.addressLine}, ${org.suburb}`;
 function driverText(row: Row) {
   const { offer } = row.claim;
   const { donor, recipient } = row;
-  if (!donor || !recipient) return '';
   const deadline = deadlineTime.format(new Date(offer.collectionDeadline));
   return `FEDSA: Collection ${offer.reference}. Collect from ${address(donor)} (${donor.contactName}, ${donor.contactPhone}) by ${deadline}. Deliver to ${address(recipient)}.`;
 }
@@ -79,6 +79,7 @@ export function Dispatch() {
   const t = useT();
   const toast = useToast();
   const [closing, setClosing] = useState<Closing | null>(null);
+  const [sharing, setSharing] = useState<Sharing | null>(null);
   const [busy, setBusy] = useState(false);
 
   const rows = useLoad(async (): Promise<Row[]> => {
@@ -87,15 +88,14 @@ export function Dispatch() {
       items
         .filter((claim) => claim.transportNeeded)
         .map(async (claim) => {
-          const { collection } = await offers.get(claim.offerId);
-          if (collection) return { claim, collection, donor: null, recipient: null };
-          const [donor, recipient] = await Promise.all([
+          const [{ collection }, donor, recipient] = await Promise.all([
+            offers.get(claim.offerId),
             organisations.get(claim.offer.donorOrganisationId),
             organisations.get(claim.recipientOrganisationId),
           ]);
           return {
             claim,
-            collection: null,
+            collection,
             donor: donor.organisation,
             recipient: recipient.organisation,
           };
@@ -199,6 +199,20 @@ export function Dispatch() {
                                   <button
                                     type="button"
                                     className="btn btn--secondary"
+                                    onClick={() =>
+                                      setSharing({
+                                        name: collection.driverName,
+                                        phone: collection.driverPhone,
+                                        reference: claim.offer.reference,
+                                        text: driverText(row),
+                                      })
+                                    }
+                                  >
+                                    {t('dispatch.shareAgain')}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="btn btn--secondary"
                                     onClick={() => setClosing({ row, status: 'cancelled' })}
                                   >
                                     {t('dispatch.cancelDriver')}
@@ -238,7 +252,60 @@ export function Dispatch() {
           : t('dispatch.markCollectedBody')
         ).replace('{name}', closing?.row.collection.driverName ?? '')}
       </ConfirmDialog>
+
+      <ShareDialog sharing={sharing} onClose={() => setSharing(null)} />
     </>
+  );
+}
+
+/** the driver's text from the coordinator's own WhatsApp or email, while SMS is not live */
+function ShareDialog({ sharing, onClose }: { sharing: Sharing | null; onClose: () => void }) {
+  const t = useT();
+  const toast = useToast();
+
+  async function copy() {
+    if (!sharing) return;
+    try {
+      await navigator.clipboard.writeText(sharing.text);
+      toast.success(t('dispatch.copied'));
+    } catch {
+      toast.error(t('error.internal'));
+    }
+  }
+
+  return (
+    <ConfirmDialog
+      open={sharing !== null}
+      title={t('dispatch.shareTitle').replace('{name}', sharing?.name ?? '')}
+      confirmLabel={t('dispatch.shareWhatsapp')}
+      cancelLabel={t('dispatch.shareDone')}
+      tone="go"
+      onConfirm={() => {
+        if (sharing) window.open(whatsAppLink(sharing.phone, sharing.text), '_blank', 'noopener');
+      }}
+      onCancel={onClose}
+    >
+      <p>{t('dispatch.shareBody')}</p>
+      <p className="muted">{sharing?.text}</p>
+      <div className="share-actions">
+        <a
+          className="btn btn--secondary"
+          href={
+            sharing
+              ? emailLink(
+                  t('dispatch.emailSubject').replace('{reference}', sharing.reference),
+                  sharing.text,
+                )
+              : undefined
+          }
+        >
+          {t('dispatch.shareEmail')}
+        </a>
+        <button type="button" className="btn btn--secondary" onClick={() => void copy()}>
+          {t('dispatch.shareCopy')}
+        </button>
+      </div>
+    </ConfirmDialog>
   );
 }
 
@@ -248,35 +315,46 @@ function DispatchCard({ row, onSent }: { row: Row; onSent: () => Promise<void> }
   const toast = useToast();
   const { claim } = row;
   const { offer } = claim;
-  const [pendingRequest, setPendingRequest] = useState<DispatchRequest | null>(null);
-  const [busy, setBusy] = useState(false);
   const [soon] = useState(() => toLocalInput(new Date(Date.now() + 30 * 60_000)));
 
   const form = useForm<Values, DispatchRequest>({
     initial: { driverName: '', driverPhone: '', scheduledFor: soon },
-    schema: requestSchema,
-    // the dialog sends it, once the coordinator has read the text
-    onSubmit: (request) => setPendingRequest(request),
+    schema: localised(requestSchema, t),
+    onSubmit: async (request) => {
+      try {
+        await claims.dispatch(claim.id, request);
+        toast.success(t('dispatch.sent'));
+      } catch (error) {
+        toast.error(t(errorKey(error)));
+        // invalid state means the claim changed under us. reload shows it
+        if (!isApiError(error, 'INVALID_STATE')) return;
+      }
+      await onSent();
+    },
   });
 
-  async function send() {
-    if (!pendingRequest) return;
-    setBusy(true);
-    try {
-      await claims.dispatch(claim.id, pendingRequest);
-      toast.success(t('dispatch.sent'));
-    } catch (error) {
-      toast.error(t(errorKey(error)));
-      // invalid state means the claim changed under us. reload shows it
-      if (!isApiError(error, 'INVALID_STATE')) return;
-    } finally {
-      setBusy(false);
-      setPendingRequest(null);
+  /** runs in the click itself, because iOS refuses a new window or the clipboard once it has passed */
+  function share(channel: 'whatsapp' | 'email' | 'copy') {
+    const parsed = requestSchema.safeParse(form.values);
+    // the submit that follows shows the field errors
+    if (!parsed.success) return;
+    const text = driverText(row);
+    if (channel === 'whatsapp') {
+      window.open(whatsAppLink(parsed.data.driverPhone, text), '_blank', 'noopener');
+    } else if (channel === 'email') {
+      window.location.href = emailLink(
+        t('dispatch.emailSubject').replace('{reference}', offer.reference),
+        text,
+      );
+    } else {
+      navigator.clipboard.writeText(text).then(
+        () => toast.success(t('dispatch.copied')),
+        () => toast.error(t('error.internal')),
+      );
     }
-    await onSent();
   }
 
-  const { driverName, driverPhone } = form.values;
+  const { driverPhone } = form.values;
 
   return (
     <div className="dispatch-card">
@@ -335,33 +413,33 @@ function DispatchCard({ row, onSent }: { row: Row; onSent: () => Promise<void> }
           <div className="sms-preview__bubble">{driverText(row)}</div>
         </div>
 
-        <PendingButton
-          type="submit"
-          className="btn btn--go btn--block"
-          pending={form.pending}
-          pendingLabel={t('dispatch.sending')}
-        >
-          <Icon name="truck" size={20} />
-          {t('dispatch.send')}
-        </PendingButton>
+        <div className="share-actions">
+          <button
+            type="submit"
+            className="btn btn--go"
+            disabled={form.pending}
+            onClick={() => share('whatsapp')}
+          >
+            {t('dispatch.shareWhatsapp')}
+          </button>
+          <button
+            type="submit"
+            className="btn btn--secondary"
+            disabled={form.pending}
+            onClick={() => share('copy')}
+          >
+            {t('dispatch.shareCopy')}
+          </button>
+          <button
+            type="submit"
+            className="btn btn--secondary"
+            disabled={form.pending}
+            onClick={() => share('email')}
+          >
+            {t('dispatch.shareEmail')}
+          </button>
+        </div>
       </form>
-
-      <ConfirmDialog
-        open={pendingRequest !== null}
-        title={t('dispatch.confirmTitle').replace('{name}', driverName.trim())}
-        confirmLabel={t('dispatch.confirmSend')}
-        tone="go"
-        busy={busy}
-        onConfirm={() => void send()}
-        onCancel={() => setPendingRequest(null)}
-      >
-        <p>
-          {t('dispatch.confirmBody')
-            .replace('{name}', driverName.trim())
-            .replace('{phone}', pendingRequest?.driverPhone ?? '')}
-        </p>
-        <p className="muted">{driverText(row)}</p>
-      </ConfirmDialog>
     </div>
   );
 }

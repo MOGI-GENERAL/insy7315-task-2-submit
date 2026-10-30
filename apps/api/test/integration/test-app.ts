@@ -21,6 +21,7 @@ import {
   CounterRepository,
   HandoverRepository,
   HealthRepository,
+  LoginThrottleRepository,
   NotificationRepository,
   OfferRepository,
   OrganisationModel,
@@ -32,6 +33,8 @@ import {
   ValuationRateRepository,
 } from '../../src/db/index.js';
 import { createLogger } from '../../src/logger.js';
+import type { ProxySettings } from '../../src/middleware/client-address.js';
+import { mongoRateLimitStores } from '../../src/middleware/rate-limit-store.js';
 import { createSessionStore } from '../../src/middleware/session.js';
 import {
   TWILIO_SIGNATURE_HEADER,
@@ -228,6 +231,7 @@ export async function startTestApp(
   twilioWebhooks: TwilioWebhookSettings | null = TEST_TWILIO_WEBHOOKS,
   handovers?: HandoverService,
   collections?: CollectionService,
+  proxy: ProxySettings | null = null,
 ) {
   // a default parameter cannot see a later one, and offers has to share the notification service
   notifications ??= newNotificationService();
@@ -249,6 +253,7 @@ export async function startTestApp(
         new OrganisationRepository(),
         new SessionRepository(),
         new AuditService(new AuditLogRepository()),
+        new LoginThrottleRepository(),
       ),
       organisations: newOrganisationService(),
       offers,
@@ -266,6 +271,8 @@ export async function startTestApp(
       store: await createSessionStore(),
     },
     twilioWebhooks,
+    proxy,
+    rateLimitStores: mongoRateLimitStores,
     extraRouters,
   });
   const server = app.listen(0);
