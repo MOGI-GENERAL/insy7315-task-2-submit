@@ -63,7 +63,7 @@ Sessions are cookies stored in MongoDB, and every state-changing request needs a
   Its rewrite keeps the browser and the API on one origin, so cookies and CSRF work without cross-site settings.
 - **Render** runs the production API as a plain Node service on the `0.5c-512mb` compute plan (formerly Starter), in Frankfurt.
   A paid plan never sleeps (NFR08).
-  The first request answers at once, and an SMS reply reaches a running API well inside Twilio's 15-second timeout.
+  The first request answers at once.
 - **A Render cron service** runs `apps/jobs` every five minutes against the production database.
   It expires overdue offers and claims, deletes handover photos past their retention period at 02:00, and issues the previous month's tax certificates on the 1st.
   These run on time when nobody is using the app, and a long job never slows a request.
@@ -171,7 +171,8 @@ The isiXhosa text has not yet been reviewed by a first-language speaker.
 
 - SMS and WhatsApp delivery is built and tested but was not sent live, because the Twilio trial account refused every message.
   Web push and the in-app inbox are the live channels.
-- Not built: offline queueing of forms, automatic monthly certificate issuance, PDF export of reports, a coordinator override of a claim, and a production WhatsApp sender.
+  After a driver is dispatched, the app fills in the driver's text for the coordinator to send from their own WhatsApp or email, or to copy.
+- Not built: offline queueing of forms, PDF export of reports, a coordinator override of a claim, and a production WhatsApp sender.
 
 ## Team
 
