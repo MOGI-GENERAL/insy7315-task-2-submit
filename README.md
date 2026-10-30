@@ -8,6 +8,8 @@ Donors post surplus food, recipient organisations claim it, and coordinators and
 | Web app    | https://fedsa-mogi.netlify.app            | https://fedsa-staging.netlify.app            |
 | API health | https://fedsa-mogi.netlify.app/api/health | https://fedsa-staging.netlify.app/api/health |
 
+Uptime status: https://stats.uptimerobot.com/vGObooAo8B
+
 Presentation video: https://youtu.be/xtwgI0r1emY
 
 AI usage report: [docs/ai-usage.pdf](docs/ai-usage.pdf)
@@ -112,7 +114,7 @@ For a static page, run `npx @redocly/cli@2.62.1 build-docs docs/openapi.json`.
 ## Demo accounts
 
 Seeded on staging.
-The password is _to be added_.
+The password is Abc#1234567.
 
 | Role          | Name                               | Email                       |
 | ------------- | ---------------------------------- | --------------------------- |
