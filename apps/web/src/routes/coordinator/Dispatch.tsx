@@ -6,14 +6,7 @@ import {
   type Organisation,
 } from '@fedsa/contract';
 import { isApiError, useData, useLoad } from '../../data';
-import {
-  ConfirmDialog,
-  Empty,
-  errorKey,
-  LoadState,
-  PendingButton,
-  useToast,
-} from '../../components/feedback';
+import { ConfirmDialog, Empty, errorKey, LoadState, useToast } from '../../components/feedback';
 import { Field, FormError, useForm } from '../../components/forms';
 import type { Validator } from '../../components/forms';
 import { Countdown } from '../../components/Countdown';
@@ -24,6 +17,7 @@ import { useT } from '../../i18n/useT';
 import { formatKg, formatWhen } from '../../lib/format';
 import { localInputToIso, toLocalInput } from '../../lib/localTime';
 import { emailLink, whatsAppLink } from '../../lib/share';
+import { localised } from '../account/messages';
 import './Coordinator.css';
 
 interface Row {
@@ -321,44 +315,46 @@ function DispatchCard({ row, onSent }: { row: Row; onSent: () => Promise<void> }
   const toast = useToast();
   const { claim } = row;
   const { offer } = claim;
-  const [pendingRequest, setPendingRequest] = useState<DispatchRequest | null>(null);
-  const [sharing, setSharing] = useState<Sharing | null>(null);
-  const [busy, setBusy] = useState(false);
   const [soon] = useState(() => toLocalInput(new Date(Date.now() + 30 * 60_000)));
 
   const form = useForm<Values, DispatchRequest>({
     initial: { driverName: '', driverPhone: '', scheduledFor: soon },
-    schema: requestSchema,
-    // the dialog sends it, once the coordinator has read the text
-    onSubmit: (request) => setPendingRequest(request),
+    schema: localised(requestSchema, t),
+    onSubmit: async (request) => {
+      try {
+        await claims.dispatch(claim.id, request);
+        toast.success(t('dispatch.sent'));
+      } catch (error) {
+        toast.error(t(errorKey(error)));
+        // invalid state means the claim changed under us. reload shows it
+        if (!isApiError(error, 'INVALID_STATE')) return;
+      }
+      await onSent();
+    },
   });
 
-  async function send() {
-    if (!pendingRequest) return;
-    setBusy(true);
-    try {
-      await claims.dispatch(claim.id, pendingRequest);
-      toast.success(t('dispatch.sent'));
-      // the reload waits for the share dialog, or the card would vanish under it
-      setSharing({
-        name: pendingRequest.driverName,
-        phone: pendingRequest.driverPhone,
-        reference: offer.reference,
-        text: driverText(row),
-      });
-      return;
-    } catch (error) {
-      toast.error(t(errorKey(error)));
-      // invalid state means the claim changed under us. reload shows it
-      if (!isApiError(error, 'INVALID_STATE')) return;
-    } finally {
-      setBusy(false);
-      setPendingRequest(null);
+  /** runs in the click itself, because iOS refuses a new window or the clipboard once it has passed */
+  function share(channel: 'whatsapp' | 'email' | 'copy') {
+    const parsed = requestSchema.safeParse(form.values);
+    // the submit that follows shows the field errors
+    if (!parsed.success) return;
+    const text = driverText(row);
+    if (channel === 'whatsapp') {
+      window.open(whatsAppLink(parsed.data.driverPhone, text), '_blank', 'noopener');
+    } else if (channel === 'email') {
+      window.location.href = emailLink(
+        t('dispatch.emailSubject').replace('{reference}', offer.reference),
+        text,
+      );
+    } else {
+      navigator.clipboard.writeText(text).then(
+        () => toast.success(t('dispatch.copied')),
+        () => toast.error(t('error.internal')),
+      );
     }
-    await onSent();
   }
 
-  const { driverName, driverPhone } = form.values;
+  const { driverPhone } = form.values;
 
   return (
     <div className="dispatch-card">
@@ -417,41 +413,33 @@ function DispatchCard({ row, onSent }: { row: Row; onSent: () => Promise<void> }
           <div className="sms-preview__bubble">{driverText(row)}</div>
         </div>
 
-        <PendingButton
-          type="submit"
-          className="btn btn--go btn--block"
-          pending={form.pending}
-          pendingLabel={t('dispatch.sending')}
-        >
-          <Icon name="truck" size={20} />
-          {t('dispatch.send')}
-        </PendingButton>
+        <div className="share-actions">
+          <button
+            type="submit"
+            className="btn btn--go"
+            disabled={form.pending}
+            onClick={() => share('whatsapp')}
+          >
+            {t('dispatch.shareWhatsapp')}
+          </button>
+          <button
+            type="submit"
+            className="btn btn--secondary"
+            disabled={form.pending}
+            onClick={() => share('copy')}
+          >
+            {t('dispatch.shareCopy')}
+          </button>
+          <button
+            type="submit"
+            className="btn btn--secondary"
+            disabled={form.pending}
+            onClick={() => share('email')}
+          >
+            {t('dispatch.shareEmail')}
+          </button>
+        </div>
       </form>
-
-      <ConfirmDialog
-        open={pendingRequest !== null}
-        title={t('dispatch.confirmTitle').replace('{name}', driverName.trim())}
-        confirmLabel={t('dispatch.confirmSend')}
-        tone="go"
-        busy={busy}
-        onConfirm={() => void send()}
-        onCancel={() => setPendingRequest(null)}
-      >
-        <p>
-          {t('dispatch.confirmBody')
-            .replace('{name}', driverName.trim())
-            .replace('{phone}', pendingRequest?.driverPhone ?? '')}
-        </p>
-        <p className="muted">{driverText(row)}</p>
-      </ConfirmDialog>
-
-      <ShareDialog
-        sharing={sharing}
-        onClose={() => {
-          setSharing(null);
-          void onSent();
-        }}
-      />
     </div>
   );
 }
