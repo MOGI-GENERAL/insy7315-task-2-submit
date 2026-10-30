@@ -157,6 +157,16 @@ export const untranslated = {
   'dispatch.keepDriver': 'Keep driver',
   'dispatch.driverCancelled': 'Driver cancelled',
   'dispatch.routeTo': '{from} to {to}',
+  'dispatch.shareTitle': 'Send it to {name} yourself',
+  'dispatch.shareBody':
+    'SMS sending is not live yet. Send the same text from your own WhatsApp or email, or copy it.',
+  'dispatch.shareWhatsapp': 'Send on WhatsApp',
+  'dispatch.shareEmail': 'Send by email',
+  'dispatch.shareCopy': 'Copy text',
+  'dispatch.copied': 'Text copied',
+  'dispatch.shareAgain': 'Share again',
+  'dispatch.shareDone': 'Done',
+  'dispatch.emailSubject': 'FEDSA collection {reference}',
 
   /* coordinator screens */
   'dash.title': 'Operations board',
