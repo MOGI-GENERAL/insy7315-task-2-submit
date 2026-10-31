@@ -17,6 +17,7 @@ import type {
   DispatchRequest,
   DonorConfirmFields,
   DonorConfirmResponse,
+  DriverCollectionResponse,
   HandoverListResponse,
   HandoverResponse,
   ImpactQuery,
@@ -46,6 +47,7 @@ import type {
   ReleaseClaimRequest,
   ReportRangeQuery,
   ResolutionRequest,
+  RotateDriverLinkRequest,
   SessionResponse,
   UpdateCollectionRequest,
   UpdateDonorOrganisationRequest,
@@ -97,8 +99,16 @@ export interface OffersRepository {
 export interface ClaimsRepository {
   list(query: ListClaimsQuery): Promise<ClaimListResponse>;
   release(id: string, body: ReleaseClaimRequest): Promise<ClaimWithOfferResponse>;
-  dispatch(id: string, body: DispatchRequest): Promise<CollectionResponse>;
+  /** `created` is false when the claim already had a collection, which comes back unchanged */
+  dispatch(id: string, body: DispatchRequest): Promise<CollectionResponse & { created: boolean }>;
   updateCollection(id: string, body: UpdateCollectionRequest): Promise<CollectionResponse>;
+  /** the link sent before stops working. the driver is not texted */
+  rotateDriverLink(collectionId: string, body: RotateDriverLinkRequest): Promise<void>;
+}
+
+/** the driver's page needs no sign-in, and the token in the link is the only credential */
+export interface DriverRepository {
+  collection(token: string): Promise<DriverCollectionResponse>;
 }
 
 export interface HandoversRepository {
@@ -148,6 +158,7 @@ export interface DataLayer {
   organisations: OrganisationsRepository;
   offers: OffersRepository;
   claims: ClaimsRepository;
+  driver: DriverRepository;
   handovers: HandoversRepository;
   notifications: NotificationsRepository;
   reports: ReportsRepository;

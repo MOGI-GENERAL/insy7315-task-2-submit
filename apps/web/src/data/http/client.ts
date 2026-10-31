@@ -23,10 +23,14 @@ export interface SendOptions {
   /** sent as multipart. the browser writes the content type and boundary itself */
   form?: FormData;
   headers?: Record<string, string>;
+  /** told the status of the response that was read */
+  onStatus?: (status: number) => void;
 }
 
 export interface ApiClient {
   get<T>(path: string, query?: Query): Promise<T>;
+  /** for pages with no session. no cookies go out and no referrer */
+  getAnonymous<T>(path: string): Promise<T>;
   send<T>(method: 'POST' | 'PUT' | 'PATCH' | 'DELETE', path: string, options?: SendOptions): Promise<T>;
   /** the server starts a new session on sign-in and sign-out, and the old token dies with it */
   forgetCsrfToken(): void;
@@ -100,6 +104,12 @@ export function createApiClient(fetchFn: typeof fetch = (...args) => fetch(...ar
       return read<T>(res);
     },
 
+    async getAnonymous<T>(path: string) {
+      const res = await fetchFn(path, { credentials: 'omit', referrerPolicy: 'no-referrer' });
+      if (!res.ok) throw await toApiError(res);
+      return read<T>(res);
+    },
+
     async send<T>(method: 'POST' | 'PUT' | 'PATCH' | 'DELETE', path: string, options: SendOptions = {}) {
       let res = await sendOnce(method, path, options);
       if (!res.ok) {
@@ -110,6 +120,7 @@ export function createApiClient(fetchFn: typeof fetch = (...args) => fetch(...ar
         res = await sendOnce(method, path, options);
         if (!res.ok) throw await toApiError(res);
       }
+      options.onStatus?.(res.status);
       return read<T>(res);
     },
 
