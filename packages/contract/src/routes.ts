@@ -33,12 +33,14 @@ import {
   DispatchRequest,
   DonorConfirmFields,
   DonorConfirmResponse,
+  DriverCollectionResponse,
   HandoverListResponse,
   HandoverResponse,
   ListHandoversQuery,
   RecipientConfirmRequest,
   RecipientConfirmResponse,
   ResolutionRequest,
+  RotateDriverLinkRequest,
   UpdateCollectionRequest,
 } from './handover.js';
 import { NotificationListResponse, TwilioInboundBody, TwilioStatusBody } from './notifications.js';
@@ -306,6 +308,20 @@ export const ROUTES = [
     body: UpdateCollectionRequest,
     status: 200,
     response: CollectionResponse,
+  },
+  {
+    method: 'PUT',
+    path: '/api/collections/:id/driver-link',
+    access: [C],
+    body: RotateDriverLinkRequest,
+    status: 204,
+  },
+  {
+    method: 'GET',
+    path: '/api/driver-collections/:token',
+    access: 'public',
+    status: 200,
+    response: DriverCollectionResponse,
   },
   {
     method: 'POST',

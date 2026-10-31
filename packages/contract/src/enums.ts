@@ -77,6 +77,7 @@ export const AuditAction = z.enum([
   'override_claim',
   'dispatch_driver',
   'update_collection',
+  'rotate_driver_link',
   'resolve_dispute',
   'update_valuation_rates',
   'issue_certificate',
