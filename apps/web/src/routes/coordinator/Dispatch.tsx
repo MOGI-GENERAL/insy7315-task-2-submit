@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   DispatchRequest,
   type ClaimListItem,
@@ -15,6 +15,8 @@ import { OfferPhoto } from '../../components/OfferPhoto';
 import { PageHead, Section } from '../../components/ui';
 import { useT } from '../../i18n/useT';
 import { formatKg, formatWhen } from '../../lib/format';
+import { driverLink, mintDriverToken } from '../../lib/driverLink';
+import { driverText } from '../../lib/driverText';
 import { localInputToIso, toLocalInput } from '../../lib/localTime';
 import { emailLink, whatsAppLink } from '../../lib/share';
 import { localised } from '../account/messages';
@@ -28,9 +30,12 @@ interface Row {
 }
 
 interface Sharing {
+  collectionId: string;
   name: string;
   phone: string;
   reference: string;
+  /** the link in `text`, which replaces the driver's current link on the first send */
+  token: string;
   text: string;
 }
 
@@ -52,24 +57,34 @@ const requestSchema: Validator<DispatchRequest> = {
   },
 };
 
-const deadlineTime = new Intl.DateTimeFormat('en-ZA', {
-  timeZone: 'Africa/Johannesburg',
-  weekday: 'short',
-  day: 'numeric',
-  month: 'short',
-  hour: '2-digit',
-  minute: '2-digit',
-  hourCycle: 'h23',
-});
-
 const address = (org: Organisation) => `${org.addressLine}, ${org.suburb}`;
 
 /** the text the API sends, word for word */
-function driverText(row: Row) {
+function textFor(row: Row, link: string) {
   const { offer } = row.claim;
   const { donor, recipient } = row;
-  const deadline = deadlineTime.format(new Date(offer.collectionDeadline));
-  return `FEDSA: Collection ${offer.reference}. Collect from ${address(donor)} (${donor.contactName}, ${donor.contactPhone}) by ${deadline}. Deliver to ${address(recipient)}.`;
+  return driverText({
+    reference: offer.reference,
+    deadline: offer.collectionDeadline,
+    pickupAddress: address(donor),
+    contactName: donor.contactName,
+    contactPhone: donor.contactPhone,
+    dropOffAddress: address(recipient),
+    link,
+  });
+}
+
+/** minted in the click. the text on screen is the text that gets sent */
+function sharingFor(row: Row & { collection: Collection }): Sharing {
+  const token = mintDriverToken();
+  return {
+    collectionId: row.collection.id,
+    name: row.collection.driverName,
+    phone: row.collection.driverPhone,
+    reference: row.claim.offer.reference,
+    token,
+    text: textFor(row, driverLink(window.location.origin, token)),
+  };
 }
 
 type Closing = { row: Row & { collection: Collection }; status: 'completed' | 'cancelled' };
@@ -199,14 +214,7 @@ export function Dispatch() {
                                   <button
                                     type="button"
                                     className="btn btn--secondary"
-                                    onClick={() =>
-                                      setSharing({
-                                        name: collection.driverName,
-                                        phone: collection.driverPhone,
-                                        reference: claim.offer.reference,
-                                        text: driverText(row),
-                                      })
-                                    }
+                                    onClick={() => setSharing(sharingFor(row))}
                                   >
                                     {t('dispatch.shareAgain')}
                                   </button>
@@ -253,20 +261,51 @@ export function Dispatch() {
         ).replace('{name}', closing?.row.collection.driverName ?? '')}
       </ConfirmDialog>
 
-      <ShareDialog sharing={sharing} onClose={() => setSharing(null)} />
+      <ShareDialog
+        sharing={sharing}
+        onClose={() => setSharing(null)}
+        onClosedElsewhere={() => void rows.reload()}
+      />
     </>
   );
 }
 
 /** the driver's text from the coordinator's own WhatsApp or email, while SMS is not live */
-function ShareDialog({ sharing, onClose }: { sharing: Sharing | null; onClose: () => void }) {
+function ShareDialog({
+  sharing,
+  onClose,
+  onClosedElsewhere,
+}: {
+  sharing: Sharing | null;
+  onClose: () => void;
+  onClosedElsewhere: () => void;
+}) {
+  const { claims } = useData();
   const t = useT();
   const toast = useToast();
+  const rotated = useRef(false);
+
+  useEffect(() => {
+    rotated.current = false;
+  }, [sharing?.token]);
+
+  /** the old link works until the first send, and closing the dialog unsent leaves it alone */
+  function rotateOnce() {
+    if (!sharing || rotated.current) return;
+    rotated.current = true;
+    claims.rotateDriverLink(sharing.collectionId, { driverToken: sharing.token }).catch((error) => {
+      const closed = isApiError(error, 'INVALID_STATE');
+      toast.error(t(closed ? 'dispatch.rotateClosed' : 'dispatch.rotateFailed'));
+      onClose();
+      if (closed) onClosedElsewhere();
+    });
+  }
 
   async function copy() {
     if (!sharing) return;
     try {
       await navigator.clipboard.writeText(sharing.text);
+      rotateOnce();
       toast.success(t('dispatch.copied'));
     } catch {
       toast.error(t('error.internal'));
@@ -281,7 +320,9 @@ function ShareDialog({ sharing, onClose }: { sharing: Sharing | null; onClose: (
       cancelLabel={t('dispatch.shareDone')}
       tone="go"
       onConfirm={() => {
-        if (sharing) window.open(whatsAppLink(sharing.phone, sharing.text), '_blank', 'noopener');
+        if (!sharing) return;
+        window.open(whatsAppLink(sharing.phone, sharing.text), '_blank', 'noopener');
+        rotateOnce();
       }}
       onCancel={onClose}
     >
@@ -290,6 +331,7 @@ function ShareDialog({ sharing, onClose }: { sharing: Sharing | null; onClose: (
       <div className="share-actions">
         <a
           className="btn btn--secondary"
+          onClick={rotateOnce}
           href={
             sharing
               ? emailLink(
@@ -316,14 +358,22 @@ function DispatchCard({ row, onSent }: { row: Row; onSent: () => Promise<void> }
   const { claim } = row;
   const { offer } = claim;
   const [soon] = useState(() => toLocalInput(new Date(Date.now() + 30 * 60_000)));
+  // one link per card. a retry after a failure has to store the link already sent
+  const token = useRef<string | null>(null);
+  const posted = useRef(false);
 
   const form = useForm<Values, DispatchRequest>({
     initial: { driverName: '', driverPhone: '', scheduledFor: soon },
     schema: localised(requestSchema, t),
     onSubmit: async (request) => {
       try {
-        await claims.dispatch(claim.id, request);
-        toast.success(t('dispatch.sent'));
+        const driverToken = (token.current ??= mintDriverToken());
+        // a repeat of our own post that got through is not another coordinator's collection
+        const retried = posted.current;
+        posted.current = true;
+        const { created } = await claims.dispatch(claim.id, { ...request, driverToken });
+        if (created || retried) toast.success(t('dispatch.sent'));
+        else toast.error(t('dispatch.alreadyArranged'));
       } catch (error) {
         toast.error(t(errorKey(error)));
         // invalid state means the claim changed under us. reload shows it
@@ -338,7 +388,8 @@ function DispatchCard({ row, onSent }: { row: Row; onSent: () => Promise<void> }
     const parsed = requestSchema.safeParse(form.values);
     // the submit that follows shows the field errors
     if (!parsed.success) return;
-    const text = driverText(row);
+    const link = driverLink(window.location.origin, (token.current ??= mintDriverToken()));
+    const text = textFor(row, link);
     if (channel === 'whatsapp') {
       window.open(whatsAppLink(parsed.data.driverPhone, text), '_blank', 'noopener');
     } else if (channel === 'email') {
@@ -410,7 +461,9 @@ function DispatchCard({ row, onSent }: { row: Row; onSent: () => Promise<void> }
               ? t('dispatch.smsTo').replace('{phone}', driverPhone.trim())
               : t('dispatch.smsToDriver')}
           </span>
-          <div className="sms-preview__bubble">{driverText(row)}</div>
+          <div className="sms-preview__bubble">
+            {textFor(row, driverLink(window.location.origin, '…'))}
+          </div>
         </div>
 
         <div className="share-actions">

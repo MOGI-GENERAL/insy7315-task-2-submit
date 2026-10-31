@@ -110,7 +110,7 @@ export const af: Record<StringKey, string> = {
     'Ons vra nooit besonderhede oor die mense wat die kos ontvang nie. Moet dit nêrens in die app intik nie.',
   'privacy.sharingTitle': 'Wie dit sien',
   'privacy.sharing':
-    'FEDSA-personeel. Wanneer julle ’n aanbod eis, sien die skenker julle organisasie en kontakpersoon, en julle sien hulle s’n. ’n Bestuurder wat gestuur word om af te haal, sien net die afhaal- en afleweringsbesonderhede van daardie afhaling.',
+    'FEDSA-personeel. Wanneer julle ’n aanbod eis, sien die skenker julle organisasie en kontakpersoon, en julle sien hulle s’n. ’n Bestuurder wat gestuur word om af te haal, sien net daardie afhaling: die kos, die name en adresse van die organisasies waar afgehaal en afgelewer word, en die skenker en ontvanger se kontakpersoon en nommer. Die bestuurder kry ’n skakel wat nie aanmelding nodig het nie. Dit hou op werk sodra die afhaling voltooi of gekanselleer word, die eis nie meer aktief is nie, of 24 uur nadat die “Haal af voor”-tyd verby is, en ’n koördineerder kan dit enige tyd vervang.',
   'privacy.keepTitle': 'Hoe lank ons dit hou',
   'privacy.keep':
     'Persoonlike besonderhede word uitgevee sodra dit nie meer vir verslae nodig is nie. Verslagtotale word sonder name gehou.',
@@ -428,6 +428,31 @@ export const af: Record<StringKey, string> = {
   'dispatch.send': 'Stuur na bestuurder',
   'dispatch.sending': 'Besig om te stuur',
   'dispatch.sent': 'Afhaalbesonderhede is na die bestuurder gestuur',
+  'dispatch.alreadyArranged':
+    'Hierdie afhaling het reeds ’n bestuurder, so die skakel wat jy pas gestuur het, sal nie werk nie. Deel dit weer om ’n werkende een te stuur.',
+  'dispatch.rotateFailed':
+    'Die nuwe skakel is nie gestoor nie, so die skakel wat jy pas gestuur het, sal nie werk nie. Deel dit weer om ’n nuwe een te stuur.',
+  'dispatch.rotateClosed':
+    'Hierdie afhaling is reeds gesluit, so die skakel wat jy pas gestuur het, sal nie werk nie.',
+
+  'driver.reference': 'Afhaling {reference}',
+  'driver.for': 'Vir {name}',
+  'driver.foodTitle': 'Die kos',
+  'driver.category': 'Soort',
+  'driver.quantity': 'Hoeveelheid',
+  'driver.temperature': 'Temperatuur',
+  'driver.notes': 'Notas',
+  'driver.collectBy': 'Haal af teen',
+  'driver.pickupTime': 'Afhaaltyd',
+  'driver.pickupTitle': 'Haal af by',
+  'driver.dropOffTitle': 'Lewer af by',
+  'driver.openMaps': 'Maak {address} in Maps oop',
+  'driver.newTab': '(maak in ’n nuwe oortjie oop)',
+  'driver.callContact': 'Bel {name} by {phone}',
+  'driver.contact': 'Kontak',
+  'driver.goneTitle': 'Skakel nie beskikbaar nie',
+  'driver.gone': 'Hierdie skakel is nie meer beskikbaar nie. Kontak die koördineerder wat dit gestuur het.',
+  'driver.failed': 'Kon nie laai nie. Probeer weer.',
 
   'notif.title': 'Kennisgewings',
   'notif.empty': 'Nog niks nie.',
