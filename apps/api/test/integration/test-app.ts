@@ -152,6 +152,7 @@ export function newClaimService(offers: OfferService, options: ClaimTestOptions 
 /** a test passes its own notification service to read what was texted */
 export function newCollectionService(
   notifications: Pick<NotificationService, 'sendSms'> = newNotificationService(),
+  webOrigin: string | null = 'https://web.example.org',
 ) {
   return new CollectionService(
     new CollectionRepository(),
@@ -161,6 +162,7 @@ export function newCollectionService(
     new AuditService(new AuditLogRepository()),
     notifications,
     createLogger({ write: () => {} }),
+    webOrigin,
   );
 }
 
