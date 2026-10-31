@@ -11,6 +11,10 @@ export class CollectionRepository {
     return CollectionModel.findOne({ claimId }, null, { session }).exec();
   }
 
+  findByDriverTokenHash(hash: string) {
+    return CollectionModel.findOne({ driverTokenHash: hash }).exec();
+  }
+
   create(data: Partial<CollectionDoc>, session?: ClientSession) {
     return new CollectionModel(data).save({ session });
   }
@@ -32,6 +36,15 @@ export class CollectionRepository {
     return CollectionModel.findOneAndUpdate(
       { _id: id, status: 'dispatched' },
       { $set: { status } },
+      { returnDocument: 'after', runValidators: true, session },
+    ).exec();
+  }
+
+  /** null if the collection has left `dispatched`. a reused hash throws a duplicate key error */
+  replaceDriverTokenHash(id: Types.ObjectId | string, hash: string, session: ClientSession) {
+    return CollectionModel.findOneAndUpdate(
+      { _id: id, status: 'dispatched' },
+      { $set: { driverTokenHash: hash } },
       { returnDocument: 'after', runValidators: true, session },
     ).exec();
   }
