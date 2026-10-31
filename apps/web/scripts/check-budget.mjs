@@ -6,6 +6,8 @@ import { build } from 'vite';
 
 const LIMIT_BYTES = 500 * 1000;
 const FEED_SCREENS = 'src/routes/recipient/screens.ts';
+// a signed-in visit loads the shell as its own chunk
+const SIGNED_IN_APP = 'src/SignedInApp.tsx';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const dist = new URL('../dist/', import.meta.url);
@@ -29,6 +31,7 @@ function collect(key) {
 }
 
 collect('index.html');
+collect(SIGNED_IN_APP);
 collect(FEED_SCREENS);
 
 let total = 0;

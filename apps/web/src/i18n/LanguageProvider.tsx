@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { Language } from '@fedsa/contract';
-import { LanguageContext } from './context';
+import { LANGUAGE_STORAGE_KEY, LanguageContext } from './context';
 import { en, languageNames, loadDictionary, type Dictionary } from './strings';
-
-const STORAGE_KEY = 'fedsa.language';
 
 const isLanguage = (value: unknown): value is Language =>
   typeof value === 'string' && value in languageNames;
@@ -12,7 +10,7 @@ const isLanguage = (value: unknown): value is Language =>
 /** remembered per device so the sign-in screen opens in the last language used */
 function readStored(): Language {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
+    const stored = localStorage.getItem(LANGUAGE_STORAGE_KEY);
     return isLanguage(stored) ? stored : 'en';
   } catch {
     return 'en';
@@ -40,10 +38,11 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     };
   }, [language]);
 
-  const setLanguage = useCallback((next: Language) => {
+  const setLanguage = useCallback((next: Language, remember = true) => {
     setState(next);
+    if (!remember) return;
     try {
-      localStorage.setItem(STORAGE_KEY, next);
+      localStorage.setItem(LANGUAGE_STORAGE_KEY, next);
     } catch {
       // private windows can refuse storage, and the choice still lasts for this visit
     }
