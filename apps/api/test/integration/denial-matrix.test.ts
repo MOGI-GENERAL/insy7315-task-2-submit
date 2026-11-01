@@ -263,6 +263,9 @@ const MATRIX = {
     path: `/api/users/${w.users.otherRecipient.id}`,
     body: { status: 'disabled' },
   }),
+  'POST /api/users/:id/password-reset': (w) => ({
+    path: `/api/users/${w.users.otherRecipient.id}/password-reset`,
+  }),
   'GET /api/audit-log': () => ({ path: '/api/audit-log' }),
 } satisfies Record<MatrixKey, Row>;
 

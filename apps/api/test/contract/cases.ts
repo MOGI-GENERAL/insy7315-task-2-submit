@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import type {
   ClaimResponse,
   CollectionResponse,
+  CreateUserResponse,
   PostOfferResponse,
   RouteKey,
 } from '@fedsa/contract';
@@ -703,6 +704,25 @@ export const CONTRACT_CASES: Partial<Record<RouteKey, ContractCase>> = {
         t.request('zanele', 'PATCH', `/api/users/${await t.userId('zanele')}`, {
           status: 'disabled',
         }),
+    },
+  },
+  'POST /api/users/:id/password-reset': {
+    // its own new account. resetting a seeded person would end sessions the other cases share
+    success: async (t) => {
+      const created = await t.request('zanele', 'POST', '/api/users', {
+        fullName: 'Ayanda Khumalo',
+        email: 'ayanda@fedsa.example',
+        role: 'coordinator',
+        phone: '+27829990003',
+        languagePreference: 'en',
+      });
+      const { user } = (await created.json()) as CreateUserResponse;
+      return t.request('zanele', 'POST', `/api/users/${user.id}/password-reset`);
+    },
+    error: {
+      code: 'INVALID_STATE',
+      send: async (t) =>
+        t.request('zanele', 'POST', `/api/users/${await t.userId('zanele')}/password-reset`),
     },
   },
   'GET /api/audit-log': {
