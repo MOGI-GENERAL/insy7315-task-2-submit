@@ -78,6 +78,7 @@ import {
   CreateUserRequest,
   CreateUserResponse,
   ListUsersQuery,
+  ResetPasswordResponse,
   UpdateUserRequest,
   UserListResponse,
 } from './users.js';
@@ -468,6 +469,13 @@ export const ROUTES = [
     body: UpdateUserRequest,
     status: 200,
     response: UserResponse,
+  },
+  {
+    method: 'POST',
+    path: '/api/users/:id/password-reset',
+    access: [A],
+    status: 200,
+    response: ResetPasswordResponse,
   },
   {
     method: 'GET',

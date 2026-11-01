@@ -33,6 +33,10 @@ export type CreateUserRequest = z.infer<typeof CreateUserRequest>;
 export const CreateUserResponse = z.object({ user: User, tempPassword: z.string() });
 export type CreateUserResponse = z.infer<typeof CreateUserResponse>;
 
+/** a new `tempPassword`, shown once, that must be changed at the next sign-in */
+export const ResetPasswordResponse = z.object({ user: User, tempPassword: z.string() });
+export type ResetPasswordResponse = z.infer<typeof ResetPasswordResponse>;
+
 export const UpdateUserRequest = z
   .object({ role: Role.optional(), status: UserStatus.optional() })
   .refine((b) => b.role !== undefined || b.status !== undefined, 'Change the role or the status');

@@ -73,6 +73,7 @@ export const AuditAction = z.enum([
   'disable_user',
   'enable_user',
   'change_role',
+  'reset_password',
   'cancel_offer',
   'override_claim',
   'dispatch_driver',
