@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AuditAction, CreateUserRequest, Language, Role } from '@fedsa/contract';
 import type { Organisation, Role as RoleName, User } from '@fedsa/contract';
 import { Field, FormError, useForm } from '../../components/forms';
@@ -25,7 +25,15 @@ const AUDIT_SHOWN = 50;
 
 type Change =
   | { kind: 'status'; user: User; status: 'active' | 'disabled' }
-  | { kind: 'role'; user: User; role: RoleName };
+  | { kind: 'role'; user: User; role: RoleName }
+  | { kind: 'reset'; user: User };
+
+/** a temporary password to hand over, from a new account or a reset */
+interface TempPassword {
+  kind: 'created' | 'reset';
+  name: string;
+  tempPassword: string;
+}
 
 /** an empty organisation box means none, which only staff accounts may have */
 const createAccount: Validator<CreateUserRequest> = {
@@ -143,7 +151,8 @@ export function ManageAccounts() {
   const toast = useToast();
   const [change, setChange] = useState<Change | null>(null);
   const [busy, setBusy] = useState(false);
-  const [created, setCreated] = useState<{ name: string; tempPassword: string } | null>(null);
+  const [created, setCreated] = useState<TempPassword | null>(null);
+  const tempRef = useRef<HTMLDivElement>(null);
   const [auditFilter, setAuditFilter] = useState<AuditAction | ''>('');
 
   const accounts = useLoad(async () => {
@@ -155,10 +164,21 @@ export function ManageAccounts() {
     [users, auditFilter],
   );
 
+  // the banner is at the top, far from the button that produced it
+  useEffect(() => {
+    if (created) tempRef.current?.focus();
+  }, [created]);
+
   async function apply() {
     if (!change) return;
     setBusy(true);
     try {
+      if (change.kind === 'reset') {
+        const { tempPassword } = await users.resetPassword(change.user.id);
+        toast.success(t('acct.resetDone'));
+        setCreated({ kind: 'reset', name: change.user.fullName, tempPassword });
+        return;
+      }
       await users.update(
         change.user.id,
         change.kind === 'status' ? { status: change.status } : { role: change.role },
@@ -177,30 +197,36 @@ export function ManageAccounts() {
     } finally {
       setBusy(false);
       setChange(null);
+      await Promise.all([accounts.reload(), audit.reload()]);
     }
-    await Promise.all([accounts.reload(), audit.reload()]);
   }
 
   const confirm = change && {
     name: change.user.fullName,
     title:
-      change.kind === 'role'
-        ? t('acct.confirmRole')
-        : change.status === 'disabled'
-          ? t('acct.confirmDisable')
-          : t('acct.confirmEnable'),
+      change.kind === 'reset'
+        ? t('acct.confirmReset')
+        : change.kind === 'role'
+          ? t('acct.confirmRole')
+          : change.status === 'disabled'
+            ? t('acct.confirmDisable')
+            : t('acct.confirmEnable'),
     why:
-      change.kind === 'role'
-        ? t('acct.whyRole')
-        : change.status === 'disabled'
-          ? t('acct.whyDisable')
-          : t('acct.whyEnable'),
+      change.kind === 'reset'
+        ? t('acct.whyReset')
+        : change.kind === 'role'
+          ? t('acct.whyRole')
+          : change.status === 'disabled'
+            ? t('acct.whyDisable')
+            : t('acct.whyEnable'),
     label:
-      change.kind === 'role'
-        ? t(change.role === 'administrator' ? 'acct.makeAdministrator' : 'acct.makeCoordinator')
-        : change.status === 'disabled'
-          ? t('acct.disable')
-          : t('acct.enable'),
+      change.kind === 'reset'
+        ? t('acct.resetPassword')
+        : change.kind === 'role'
+          ? t(change.role === 'administrator' ? 'acct.makeAdministrator' : 'acct.makeCoordinator')
+          : change.status === 'disabled'
+            ? t('acct.disable')
+            : t('acct.enable'),
   };
 
   return (
@@ -208,16 +234,23 @@ export function ManageAccounts() {
       <PageHead title={t('acct.title')} lead={t('acct.lead')} />
 
       {created && (
-        <Banner tone="warn" title={fill(t('acct.tempTitle'), { name: created.name })}>
-          <p>{fill(t('acct.tempBody'), { name: created.name })}</p>
-          <p>
-            <span className="muted">{t('acct.tempLabel')}</span>{' '}
-            <code className="temp-password">{created.tempPassword}</code>
-          </p>
-          <button type="button" className="btn btn--secondary" onClick={() => setCreated(null)}>
-            {t('acct.tempDismiss')}
-          </button>
-        </Banner>
+        <div ref={tempRef} tabIndex={-1}>
+          <Banner
+            tone="warn"
+            title={fill(t(created.kind === 'reset' ? 'acct.resetTitle' : 'acct.tempTitle'), {
+              name: created.name,
+            })}
+          >
+            <p>{fill(t('acct.tempBody'), { name: created.name })}</p>
+            <p>
+              <span className="muted">{t('acct.tempLabel')}</span>{' '}
+              <code className="temp-password">{created.tempPassword}</code>
+            </p>
+            <button type="button" className="btn btn--secondary" onClick={() => setCreated(null)}>
+              {t('acct.tempDismiss')}
+            </button>
+          </Banner>
+        </div>
       )}
 
       <LoadState result={accounts}>
@@ -299,6 +332,15 @@ export function ManageAccounts() {
                             >
                               {u.status === 'active' ? t('acct.disable') : t('acct.enable')}
                             </button>
+                            {u.status === 'active' && (
+                              <button
+                                type="button"
+                                className="btn btn--ghost"
+                                onClick={() => setChange({ kind: 'reset', user: u })}
+                              >
+                                {t('acct.resetPassword')}
+                              </button>
+                            )}
                             {staff && (
                               <button
                                 type="button"
@@ -326,7 +368,7 @@ export function ManageAccounts() {
                 <CreateAccount
                   organisations={orgs}
                   onCreated={async (name, tempPassword) => {
-                    setCreated({ name, tempPassword });
+                    setCreated({ kind: 'created', name, tempPassword });
                     await Promise.all([accounts.reload(), audit.reload()]);
                   }}
                 />

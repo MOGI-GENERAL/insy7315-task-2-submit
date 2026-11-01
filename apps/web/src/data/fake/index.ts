@@ -800,6 +800,23 @@ export function createFakeDataLayer(store: Store, options: FakeOptions): DataLay
             ),
           };
         }),
+      resetPassword: (id) =>
+        call('users', 'resetPassword', () => {
+          const actor = me();
+          const target = state().users.find((u) => u.id === id);
+          if (!target) throw notFound();
+          if (id === actor.id) {
+            throw invalidState('Change your own password from your account instead.');
+          }
+          if (!target.active) {
+            throw invalidState('Enable the account before resetting its password.');
+          }
+          store.dispatch({ type: 'FAKE_RESET_PASSWORD', actorUserId: actor.id, targetUserId: id });
+          return {
+            user: { ...toUser(target, state()), mustChangePassword: true },
+            tempPassword: 'Demo-Temp-1234',
+          };
+        }),
       auditLog: (query) =>
         call('users', 'auditLog', () => {
           const items = state()

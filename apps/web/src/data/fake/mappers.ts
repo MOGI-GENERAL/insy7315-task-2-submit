@@ -178,6 +178,7 @@ const AUDIT_ACTIONS: [RegExp, C.AuditAction][] = [
   [/^Changed role/, 'change_role'],
   [/^Disabled account/, 'disable_user'],
   [/^Enabled account/, 'enable_user'],
+  [/^Reset password/, 'reset_password'],
   [/^Issued tax certificate/, 'issue_certificate'],
   [/^Resolved dispute/, 'resolve_dispute'],
 ];
