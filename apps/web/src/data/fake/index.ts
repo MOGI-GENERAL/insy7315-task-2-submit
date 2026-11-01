@@ -44,6 +44,11 @@ export interface FakeOptions {
 /** a driver link that opens the page on demo data, for the first claim that needs transport */
 export const DEMO_DRIVER_TOKEN = 'DemoDriverLinkDemoDriverLinkDemoDriverLink0';
 
+/** the API's driver link works until a day after the collection deadline */
+const LINK_GRACE_MS = 24 * 60 * 60 * 1000;
+const linkExpired = (offer: Offer) =>
+  Date.now() > Date.parse(offer.collectionDeadline) + LINK_GRACE_MS;
+
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 let sequence = 0;
@@ -460,6 +465,11 @@ export function createFakeDataLayer(store: Store, options: FakeOptions): DataLay
           if (collection.status !== 'dispatched') {
             throw invalidState('This collection is already closed.');
           }
+          const claim = state().claims.find((c) => c.id === collection.claimId);
+          const offer = offerById(state(), claim?.offerId);
+          if (offer && linkExpired(offer)) {
+            throw invalidState('This collection is past its deadline and can no longer get a link.');
+          }
           if (driverTokens.has(body.driverToken)) {
             throw new ApiError('VALIDATION_FAILED', 'Some fields need attention.', {
               driverToken: 'Use a new link.',
@@ -483,6 +493,7 @@ export function createFakeDataLayer(store: Store, options: FakeOptions): DataLay
           const recipient = orgById(s, claim?.recipientOrganisationId);
           if (!claim || !offer || !donor || !recipient) throw notFound();
           if (collection && collection.status !== 'dispatched') throw notFound();
+          if (claim.status !== 'active' || linkExpired(offer)) throw notFound();
           const stop = (org: Organisation) => {
             const { addressLine, suburb } = toOrganisation(org, false);
             return {

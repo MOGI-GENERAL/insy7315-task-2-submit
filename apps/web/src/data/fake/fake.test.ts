@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import { createStore } from '../../store/store';
 import { isApiError } from '../ApiError';
 import { createFakeDataLayer } from '.';
@@ -259,6 +259,24 @@ describe('fake data layer', () => {
       await expect(
         data.claims.rotateDriverLink(collection.id, { driverToken: token('b') }),
       ).rejects.toMatchObject({ code: 'INVALID_STATE', status: 409 });
+    });
+
+    test('more than a day past the deadline the link is dead and cannot be rotated', async () => {
+      const { data, collection } = await dispatched(token('a'));
+      const { collectionDeadline } = await data.driver.collection(token('a'));
+      const now = vi.spyOn(Date, 'now');
+      try {
+        now.mockReturnValue(Date.parse(collectionDeadline) + 25 * 3_600_000);
+
+        await expect(data.driver.collection(token('a'))).rejects.toMatchObject({
+          code: 'NOT_FOUND',
+        });
+        await expect(
+          data.claims.rotateDriverLink(collection.id, { driverToken: token('b') }),
+        ).rejects.toMatchObject({ code: 'INVALID_STATE', status: 409 });
+      } finally {
+        now.mockRestore();
+      }
     });
   });
 
