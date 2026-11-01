@@ -433,7 +433,8 @@ export const af: Record<StringKey, string> = {
   'dispatch.rotateFailed':
     'Die nuwe skakel is nie gestoor nie, so die skakel wat jy pas gestuur het, sal nie werk nie. Deel dit weer om ’n nuwe een te stuur.',
   'dispatch.rotateClosed':
-    'Hierdie afhaling is reeds gesluit, so die skakel wat jy pas gestuur het, sal nie werk nie.',
+    'Hierdie afhaling is gesluit of die afhaaltyd is meer as ’n dag verby, so die skakel wat jy pas gestuur het, sal nie werk nie.',
+  'dispatch.copiedReplaced': 'Teks gekopieer. Die skakel wat voorheen gestuur is, werk nie meer nie.',
 
   'driver.reference': 'Afhaling {reference}',
   'driver.for': 'Vir {name}',

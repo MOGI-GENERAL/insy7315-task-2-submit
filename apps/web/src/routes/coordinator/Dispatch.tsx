@@ -306,8 +306,9 @@ function ShareDialog({
     if (!sharing) return;
     try {
       await navigator.clipboard.writeText(sharing.text);
+      const replacing = !rotated.current;
       rotateOnce();
-      toast.success(t('dispatch.copied'));
+      toast.success(t(replacing ? 'dispatch.copiedReplaced' : 'dispatch.copied'));
     } catch {
       toast.error(t('error.internal'));
     }

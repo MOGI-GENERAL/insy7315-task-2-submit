@@ -878,7 +878,8 @@ export const en = {
   'dispatch.rotateFailed':
     'The new link was not saved, so the link you just sent will not work. Share it again to send a new one.',
   'dispatch.rotateClosed':
-    'This collection is already closed, so the link you just sent will not work.',
+    'This collection is closed or more than a day past its deadline, so the link you just sent will not work.',
+  'dispatch.copiedReplaced': 'Text copied. The link sent before no longer works.',
 
   /* DRIVER PAGE */
   'driver.reference': 'Collection {reference}',

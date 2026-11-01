@@ -432,7 +432,9 @@ export const xh: Record<StringKey, string> = {
   'dispatch.rotateFailed':
     'Ikhonkco elitsha aligcinwanga, ngoko ikhonkco olithumele ngoku aliyi kusebenza. Yabelana ngalo kwakhona ukuthumela elitsha.',
   'dispatch.rotateClosed':
-    'Oku kuthatha sele kuvaliwe, ngoko ikhonkco olithumele ngoku aliyi kusebenza.',
+    'Oku kuthatha kuvaliwe okanye kudlule ngaphezu kosuku emva kwexesha lokugqibela, ngoko ikhonkco olithumele ngoku aliyi kusebenza.',
+  'dispatch.copiedReplaced':
+    'Umbhalo ukhutshelwe. Ikhonkco elithunyelwe ngaphambili alisasebenzi.',
 
   'driver.reference': 'Ukuthatha {reference}',
   'driver.for': 'Umqhubi: {name}',
