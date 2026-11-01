@@ -16,6 +16,13 @@ test('hides a token in a page or api path', () => {
   );
 });
 
+test('leaves an object id or a longer segment after `/c/` alone', () => {
+  const objectId = '/api/offers/c/0123456789abcdef01234567';
+  const longer = `/c/${TOKEN}extra`;
+  expect(hideDriverToken(objectId)).toBe(objectId);
+  expect(hideDriverToken(longer)).toBe(longer);
+});
+
 test('request logs show neither the url token nor the referer token', async () => {
   const lines: string[] = [];
   const logger = createLogger({ write: (line: string) => void lines.push(line) });

@@ -21,7 +21,7 @@ export function createLogger(destination?: DestinationStream) {
   return destination ? pino(options, destination) : pino(options);
 }
 
-const DRIVER_LINK_TOKEN = /(\/(?:c|api\/driver-collections)\/)[A-Za-z0-9_-]{20,}/g;
+const DRIVER_LINK_TOKEN = /(\/(?:c|api\/driver-collections)\/)[A-Za-z0-9_-]{43}(?![A-Za-z0-9_-])/g;
 
 /** a driver link's token is a credential. logs and stored texts show a placeholder */
 export function hideDriverToken(text: string) {
