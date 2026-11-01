@@ -16,5 +16,9 @@ export function userController(users: UserService) {
     async update(req: Request, res: Response) {
       res.json(await users.updateUser(req.user!.id, String(req.params.id), req.body));
     },
+
+    async resetPassword(req: Request, res: Response) {
+      res.json(await users.resetPassword(req.user!.id, String(req.params.id)));
+    },
   };
 }

@@ -71,6 +71,15 @@ export class UserRepository {
     ).exec();
   }
 
+  /** null if the account was disabled since it was read */
+  resetPassword(id: Types.ObjectId | string, passwordHash: string, session?: ClientSession) {
+    return UserModel.findOneAndUpdate(
+      { _id: id, status: 'active' },
+      { $set: { passwordHash, mustChangePassword: true } },
+      { returnDocument: 'after', runValidators: true, session },
+    ).exec();
+  }
+
   findActiveByIds(ids: (Types.ObjectId | string)[]) {
     return UserModel.find({ _id: { $in: ids }, status: 'active' })
       .sort({ _id: 1 })

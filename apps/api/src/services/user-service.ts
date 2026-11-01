@@ -8,6 +8,7 @@ import {
   type ListUsersQuery,
   type LoginRequest,
   type RegisterRequest,
+  type ResetPasswordResponse,
   type Role,
   type SessionResponse,
   type UpdateMeRequest,
@@ -264,6 +265,42 @@ export class UserService {
       }
       throw err;
     }
+  }
+
+  /**
+   * replaces a forgotten password with a temporary one, shown here once. the
+   * user is signed out everywhere, must choose a new password at the next
+   * sign-in, and any delay from failed sign-ins on their email is lifted
+   */
+  async resetPassword(adminId: string, userId: string): Promise<ResetPasswordResponse> {
+    const user = await this.users.findById(userId);
+    if (!user) throw new NotFoundError();
+    if (userId === adminId) {
+      throw new InvalidStateError('Change your own password from your account instead');
+    }
+    if (user.status !== 'active') {
+      throw new InvalidStateError('Enable the account before resetting its password');
+    }
+
+    const tempPassword = newTemporaryPassword();
+    const passwordHash = await hashPassword(tempPassword);
+
+    const updated = await runInTransaction(async (session) => {
+      const changed = await this.users.resetPassword(user._id, passwordHash, session);
+      // another administrator disabled the account first
+      if (!changed) throw new InvalidStateError('Enable the account before resetting its password');
+      await this.audit.record(
+        adminId,
+        'reset_password',
+        { type: AUDIT_TARGET, id: changed._id },
+        { session },
+      );
+      return changed;
+    });
+
+    await this.sessions.deleteForUser(userId);
+    await this.throttle.clear(throttleKey(updated.email));
+    return { user: userView(updated), tempPassword };
   }
 
   /** a role or status change signs the user out of every browser */
