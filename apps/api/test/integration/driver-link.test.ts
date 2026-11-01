@@ -340,6 +340,16 @@ describe('dispatching with a token', () => {
     expect(res.status).toBe(400);
   });
 
+  test('rejects a well-formed token that was not randomly minted', async () => {
+    const { claim } = await claimedOffer();
+    const nadia = await coordinator();
+
+    const res = await dispatch(nadia, claim._id, dispatchBody({ driverToken: 'A'.repeat(43) }));
+
+    expect(res.status).toBe(400);
+    expect(await CollectionModel.countDocuments()).toBe(0);
+  });
+
   test('a repeat dispatch with a different token keeps the first token and kills the second', async () => {
     const { claim, token, nadia } = await linked();
     const second = newToken();
@@ -420,6 +430,35 @@ describe('sharing the link again', () => {
 
     expect(res.status).toBe(409);
     expect(ErrorEnvelope.parse(res.body).error.code).toBe('INVALID_STATE');
+  });
+
+  test('is refused more than a day past the collection deadline', async () => {
+    const { token, nadia, collection } = await linked(-25);
+
+    const res = await rotate(nadia, collection._id, newToken());
+
+    expect(res.status).toBe(409);
+    expect(ErrorEnvelope.parse(res.body).error.code).toBe('INVALID_STATE');
+    expect(await CollectionModel.findById(collection._id)).toMatchObject({
+      driverTokenHash: hashDriverToken(token),
+    });
+  });
+
+  test('still works within a day after the collection deadline', async () => {
+    const { nadia, collection } = await linked(-23);
+
+    const res = await rotate(nadia, collection._id, newToken());
+
+    expect(res.status).toBe(204);
+  });
+
+  test('refuses a well-formed token that was not randomly minted', async () => {
+    const { token, nadia, collection } = await linked();
+
+    const res = await rotate(nadia, collection._id, 'A'.repeat(43));
+
+    expect(res.status).toBe(400);
+    expect((await visit(token)).status).toBe(200);
   });
 
   test('answers an unknown collection with 404', async () => {

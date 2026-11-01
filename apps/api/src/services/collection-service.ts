@@ -32,8 +32,14 @@ const LINK_GRACE_MS = 24 * 60 * 60 * 1000;
 
 const TOKEN_REUSED = { driverToken: 'This link has already been used' };
 
+const LINK_EXPIRED = 'This collection is past its deadline and can no longer get a link';
+
 export function hashDriverToken(token: string) {
   return createHash('sha256').update(token).digest('hex');
+}
+
+function linkExpired(offer: { collectionDeadline: Date }) {
+  return Date.now() > offer.collectionDeadline.getTime() + LINK_GRACE_MS;
 }
 
 type StoredOrganisation = NonNullable<Awaited<ReturnType<OrganisationRepository['findById']>>>;
@@ -179,6 +185,11 @@ export class CollectionService {
 
   /** the old link stops working at once. a token already in use is refused */
   async rotateDriverLink(user: SessionUser, id: string, input: RotateDriverLinkRequest) {
+    const collection = await this.collections.findById(id);
+    if (!collection) throw new NotFoundError();
+    const claim = await this.claims.findById(collection.claimId);
+    const offer = claim ? await this.offers.findById(claim.offerId) : null;
+    if (offer && linkExpired(offer)) throw new InvalidStateError(LINK_EXPIRED);
     try {
       await runInTransaction(async (session) => {
         const updated = await this.collections.replaceDriverTokenHash(
@@ -217,7 +228,7 @@ export class CollectionService {
     ]);
     const donor = offer ? await this.organisations.findById(offer.donorOrganisationId) : null;
     if (!offer || !recipient || !donor) throw new NotFoundError();
-    if (Date.now() > offer.collectionDeadline.getTime() + LINK_GRACE_MS) throw new NotFoundError();
+    if (linkExpired(offer)) throw new NotFoundError();
 
     return {
       reference: offer.reference,

@@ -7,16 +7,22 @@ import { ColdChain, Condition, FoodCategory } from './enums.js';
 export const DriverToken = z.string().regex(/^[A-Za-z0-9_-]{43}$/, 'Not a valid driver link');
 export type DriverToken = z.infer<typeof DriverToken>;
 
+/** a properly minted token has about 30 distinct characters. this refuses a made-up one */
+const MintedDriverToken = DriverToken.refine(
+  (token) => new Set(token).size >= 16,
+  'Not a valid driver link',
+);
+
 export const DispatchRequest = z.object({
   driverName: z.string().trim().min(2).max(120),
   driverPhone: e164Phone,
   scheduledFor: isoDateTime,
   /** optional, and without it the driver text has no link */
-  driverToken: DriverToken.optional(),
+  driverToken: MintedDriverToken.optional(),
 });
 export type DispatchRequest = z.infer<typeof DispatchRequest>;
 
-export const RotateDriverLinkRequest = z.object({ driverToken: DriverToken });
+export const RotateDriverLinkRequest = z.object({ driverToken: MintedDriverToken });
 export type RotateDriverLinkRequest = z.infer<typeof RotateDriverLinkRequest>;
 
 /** one end of the trip, as the driver needs it */
