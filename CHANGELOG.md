@@ -4,7 +4,7 @@ Each release is merged into `main` and tagged, and the deploy workflow then puts
 
 ## Unreleased
 
-Drivers get a read-only page for their collection.
+Drivers get a read-only page for their collection, and administrators can reset a forgotten password.
 
 - **Driver page:** the driver's text ends with a link to `/c/<token>`, a page that needs no sign-in and shows the food, the times, the pickup and drop-off addresses with a link to Maps, and the contact person and number at both ends.
   The page has no actions and no photograph, and it follows the language of the driver's phone.
@@ -16,6 +16,10 @@ Drivers get a read-only page for their collection.
 - **Configuration:** `WEB_ORIGIN` sets the address the link points to.
   The SMS and WhatsApp text ends with the link when it is set.
 - **Privacy notice:** says that a driver now sees the contact person and number at both ends, and that the link is temporary.
+- **Password reset:** an administrator resets a forgotten password from the account list.
+  The person keeps their account and email address, gets a temporary password to change at their next sign-in, and is signed out of every device.
+  The reset lifts any sign-in delay on their email and goes on the audit log.
+  The sign-in screen's help text says FEDSA gives a temporary password.
 
 ## 1.1.0 (2026-10-30)
 
