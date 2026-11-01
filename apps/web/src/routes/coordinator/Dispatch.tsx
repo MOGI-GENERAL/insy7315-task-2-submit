@@ -5,6 +5,7 @@ import {
   type Collection,
   type Organisation,
 } from '@fedsa/contract';
+import { useSession } from '../../auth/context';
 import { isApiError, useData, useLoad } from '../../data';
 import { ConfirmDialog, Empty, errorKey, LoadState, useToast } from '../../components/feedback';
 import { Field, FormError, useForm } from '../../components/forms';
@@ -15,7 +16,7 @@ import { OfferPhoto } from '../../components/OfferPhoto';
 import { PageHead, Section } from '../../components/ui';
 import { useT } from '../../i18n/useT';
 import { formatKg, formatWhen } from '../../lib/format';
-import { driverLink, mintDriverToken } from '../../lib/driverLink';
+import { dispatchedByUs, driverLink, mintDriverToken } from '../../lib/driverLink';
 import { driverText } from '../../lib/driverText';
 import { localInputToIso, toLocalInput } from '../../lib/localTime';
 import { emailLink, whatsAppLink } from '../../lib/share';
@@ -357,10 +358,10 @@ function DispatchCard({ row, onSent }: { row: Row; onSent: () => Promise<void> }
   const toast = useToast();
   const { claim } = row;
   const { offer } = claim;
+  const { user } = useSession();
   const [soon] = useState(() => toLocalInput(new Date(Date.now() + 30 * 60_000)));
   // one link per card. a retry after a failure has to store the link already sent
   const token = useRef<string | null>(null);
-  const posted = useRef(false);
 
   const form = useForm<Values, DispatchRequest>({
     initial: { driverName: '', driverPhone: '', scheduledFor: soon },
@@ -368,11 +369,8 @@ function DispatchCard({ row, onSent }: { row: Row; onSent: () => Promise<void> }
     onSubmit: async (request) => {
       try {
         const driverToken = (token.current ??= mintDriverToken());
-        // a repeat of our own post that got through is not another coordinator's collection
-        const retried = posted.current;
-        posted.current = true;
-        const { created } = await claims.dispatch(claim.id, { ...request, driverToken });
-        if (created || retried) toast.success(t('dispatch.sent'));
+        const result = await claims.dispatch(claim.id, { ...request, driverToken });
+        if (dispatchedByUs(result, request, user.id)) toast.success(t('dispatch.sent'));
         else toast.error(t('dispatch.alreadyArranged'));
       } catch (error) {
         toast.error(t(errorKey(error)));

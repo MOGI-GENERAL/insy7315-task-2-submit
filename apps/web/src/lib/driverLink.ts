@@ -9,5 +9,18 @@ export function mintDriverToken(): string {
 
 export const driverLink = (origin: string, token: string) => `${origin}/c/${token}`;
 
+/** false when another dispatch got there first. the link this coordinator sent is then dead */
+export function dispatchedByUs(
+  result: { created: boolean; collection: { dispatchedByUserId: string; driverPhone: string } },
+  request: { driverPhone: string },
+  userId: string,
+) {
+  const { collection } = result;
+  return (
+    result.created ||
+    (collection.dispatchedByUserId === userId && collection.driverPhone === request.driverPhone)
+  );
+}
+
 export const mapsLink = (address: string) =>
   `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
