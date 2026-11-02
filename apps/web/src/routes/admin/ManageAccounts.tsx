@@ -35,6 +35,29 @@ interface TempPassword {
   tempPassword: string;
 }
 
+function confirmText(change: Change, t: ReturnType<typeof useT>) {
+  switch (change.kind) {
+    case 'reset':
+      return {
+        title: t('acct.confirmReset'),
+        why: t('acct.whyReset'),
+        label: t('acct.resetPassword'),
+      };
+    case 'role':
+      return {
+        title: t('acct.confirmRole'),
+        why: t('acct.whyRole'),
+        label: t(
+          change.role === 'administrator' ? 'acct.makeAdministrator' : 'acct.makeCoordinator',
+        ),
+      };
+    case 'status':
+      return change.status === 'disabled'
+        ? { title: t('acct.confirmDisable'), why: t('acct.whyDisable'), label: t('acct.disable') }
+        : { title: t('acct.confirmEnable'), why: t('acct.whyEnable'), label: t('acct.enable') };
+  }
+}
+
 /** an empty organisation box means none, which only staff accounts may have */
 const createAccount: Validator<CreateUserRequest> = {
   safeParse: (values) => {
@@ -201,33 +224,7 @@ export function ManageAccounts() {
     }
   }
 
-  const confirm = change && {
-    name: change.user.fullName,
-    title:
-      change.kind === 'reset'
-        ? t('acct.confirmReset')
-        : change.kind === 'role'
-          ? t('acct.confirmRole')
-          : change.status === 'disabled'
-            ? t('acct.confirmDisable')
-            : t('acct.confirmEnable'),
-    why:
-      change.kind === 'reset'
-        ? t('acct.whyReset')
-        : change.kind === 'role'
-          ? t('acct.whyRole')
-          : change.status === 'disabled'
-            ? t('acct.whyDisable')
-            : t('acct.whyEnable'),
-    label:
-      change.kind === 'reset'
-        ? t('acct.resetPassword')
-        : change.kind === 'role'
-          ? t(change.role === 'administrator' ? 'acct.makeAdministrator' : 'acct.makeCoordinator')
-          : change.status === 'disabled'
-            ? t('acct.disable')
-            : t('acct.enable'),
-  };
+  const confirm = change && { name: change.user.fullName, ...confirmText(change, t) };
 
   return (
     <>

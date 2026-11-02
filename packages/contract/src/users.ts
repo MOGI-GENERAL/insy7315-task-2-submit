@@ -37,7 +37,7 @@ export const CreateUserResponse = z.object({ user: User, tempPassword: z.string(
 export type CreateUserResponse = z.infer<typeof CreateUserResponse>;
 
 /** a new `tempPassword`, shown once, that must be changed at the next sign-in */
-export const ResetPasswordResponse = z.object({ user: User, tempPassword: z.string() });
+export const ResetPasswordResponse = CreateUserResponse;
 export type ResetPasswordResponse = z.infer<typeof ResetPasswordResponse>;
 
 export const UpdateUserRequest = z
