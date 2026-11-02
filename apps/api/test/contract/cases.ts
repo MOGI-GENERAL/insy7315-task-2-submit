@@ -716,6 +716,8 @@ export const CONTRACT_CASES: Partial<Record<RouteKey, ContractCase>> = {
         phone: '+27829990003',
         languagePreference: 'en',
       });
+      if (created.status !== 201)
+        throw new Error(`creating the account to reset gave ${created.status}`);
       const { user } = (await created.json()) as CreateUserResponse;
       return t.request('zanele', 'POST', `/api/users/${user.id}/password-reset`);
     },
