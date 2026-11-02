@@ -20,7 +20,10 @@ const ACCOUNTS: Record<Role, string> = {
   administrator: 'zanele@example.org',
 };
 
-const SIGNED_OUT = ['/login', '/register', '/privacy'];
+/** the demo driver link, and a link that was never issued */
+const DRIVER_LINKS = [`/c/${'DemoDriverLink'.repeat(3)}0`, `/c/${'Z'.repeat(43)}`];
+
+const SIGNED_OUT = ['/login', '/register', '/privacy', ...DRIVER_LINKS];
 
 const EVERY_ROLE = ['/notifications', '/account/password'];
 

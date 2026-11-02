@@ -19,6 +19,7 @@ const DATA: MessageData = {
     contactPhone: '+27820000001',
     deadline: DEADLINE,
     dropOffAddress: '4 Lansdowne Road, Khayelitsha',
+    link: 'https://web.example.org/c/token',
   },
   verification: { organisationName: 'Siyakhula Shelter' },
   dispute: { reference: 'K4F2', organisationName: 'Siyakhula Shelter' },
@@ -42,6 +43,7 @@ const MUST_SHOW: Record<NotificationKind, string[]> = {
     '+27820000001',
     '17:00',
     '4 Lansdowne Road, Khayelitsha',
+    'https://web.example.org/c/token',
   ],
   verification: ['Siyakhula Shelter'],
   dispute: ['K4F2', 'Siyakhula Shelter'],
@@ -67,10 +69,10 @@ describe.each(CASES)('%s in %s', (kind, language) => {
     for (const value of MUST_SHOW[kind]) expect(text).toContain(value);
   });
 
-  test('the phone text carries the title and body and no link', () => {
+  test('the phone text carries the title and body, and a link only for a driver', () => {
     expect(message.phoneText).toContain(message.title);
     expect(message.phoneText).toContain(message.body);
-    expect(message.phoneText).not.toMatch(/https?:\/\//);
+    if (kind !== 'driver_dispatched') expect(message.phoneText).not.toMatch(/https?:\/\//);
   });
 });
 
@@ -181,4 +183,19 @@ test('the three languages reply with different text', () => {
 test('the reply to an unknown number names no offer and no account', () => {
   expect(UNKNOWN_SENDER_REPLY).not.toMatch(/YES [A-Z0-9]{4}/);
   expect(UNKNOWN_SENDER_REPLY.startsWith('FEDSA: ')).toBe(true);
+});
+
+describe.each(Language.options)('driver_dispatched without a link in %s', (language) => {
+  test('ends at the drop-off address', () => {
+    const data = { ...DATA.driver_dispatched };
+    delete data.link;
+    const message = renderMessage('driver_dispatched', language, data);
+    expect(message.body).not.toContain('http');
+    expect(message.body.endsWith('Khayelitsha.')).toBe(true);
+  });
+
+  test('ends with the link when there is one', () => {
+    const message = renderMessage('driver_dispatched', language, DATA.driver_dispatched);
+    expect(message.body.endsWith('https://web.example.org/c/token')).toBe(true);
+  });
 });

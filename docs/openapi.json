@@ -116,6 +116,7 @@
                 "override_claim",
                 "dispatch_driver",
                 "update_collection",
+                "rotate_driver_link",
                 "resolve_dispute",
                 "update_valuation_rates",
                 "issue_certificate"
@@ -150,6 +151,7 @@
                               "override_claim",
                               "dispatch_driver",
                               "update_collection",
+                              "rotate_driver_link",
                               "resolve_dispute",
                               "update_valuation_rates",
                               "issue_certificate"
@@ -1858,6 +1860,10 @@
                     "pattern": "^\\+[1-9][0-9]{7,14}$",
                     "type": "string"
                   },
+                  "driverToken": {
+                    "pattern": "^[A-Za-z0-9_-]{43}$",
+                    "type": "string"
+                  },
                   "scheduledFor": {
                     "format": "date-time",
                     "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
@@ -2891,6 +2897,227 @@
         "summary": "PATCH /api/collections/:id",
         "tags": [
           "collections"
+        ]
+      }
+    },
+    "/api/collections/{id}/driver-link": {
+      "put": {
+        "description": "Roles: coordinator.",
+        "operationId": "putCollectionsByIdDriverLink",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "driverToken": {
+                    "pattern": "^[A-Za-z0-9_-]{43}$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "driverToken"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No content"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "csrfToken": [],
+            "sessionCookie": []
+          }
+        ],
+        "summary": "PUT /api/collections/:id/driver-link",
+        "tags": [
+          "collections"
+        ]
+      }
+    },
+    "/api/driver-collections/{token}": {
+      "get": {
+        "description": "Public.",
+        "operationId": "getDriverCollectionsByToken",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "category": {
+                      "enum": [
+                        "bakery",
+                        "produce",
+                        "dairy",
+                        "prepared",
+                        "dry",
+                        "other"
+                      ],
+                      "type": "string"
+                    },
+                    "coldChain": {
+                      "enum": [
+                        "ambient",
+                        "refrigerated",
+                        "frozen"
+                      ],
+                      "type": "string"
+                    },
+                    "collectionDeadline": {
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "driverName": {
+                      "type": "string"
+                    },
+                    "dropOff": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "address": {
+                          "type": "string"
+                        },
+                        "contactName": {
+                          "type": "string"
+                        },
+                        "contactPhone": {
+                          "type": "string"
+                        },
+                        "organisationName": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "organisationName",
+                        "address",
+                        "contactName",
+                        "contactPhone"
+                      ],
+                      "type": "object"
+                    },
+                    "pickup": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "address": {
+                          "type": "string"
+                        },
+                        "contactName": {
+                          "type": "string"
+                        },
+                        "contactPhone": {
+                          "type": "string"
+                        },
+                        "organisationName": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "organisationName",
+                        "address",
+                        "contactName",
+                        "contactPhone"
+                      ],
+                      "type": "object"
+                    },
+                    "quantityKg": {
+                      "type": "number"
+                    },
+                    "reference": {
+                      "type": "string"
+                    },
+                    "scheduledFor": {
+                      "anyOf": [
+                        {
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "title": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "reference",
+                    "title",
+                    "description",
+                    "category",
+                    "quantityKg",
+                    "coldChain",
+                    "collectionDeadline",
+                    "scheduledFor",
+                    "driverName",
+                    "pickup",
+                    "dropOff"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [],
+        "summary": "GET /api/driver-collections/:token",
+        "tags": [
+          "driver-collections"
         ]
       }
     },

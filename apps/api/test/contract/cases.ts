@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import type {
   ClaimResponse,
   CollectionResponse,
@@ -86,6 +87,8 @@ async function transportClaim(t: ContractContext) {
   if (claimed.status !== 201) throw new Error(`claiming for dispatch gave ${claimed.status}`);
   return ((await claimed.json()) as ClaimResponse).claim.id;
 }
+
+const newToken = () => randomBytes(32).toString('base64url');
 
 const driver = () => ({
   driverName: 'Themba Mokoena',
@@ -470,6 +473,45 @@ export const CONTRACT_CASES: Partial<Record<RouteKey, ContractCase>> = {
           `/api/collections/${await t.collectionId('Pastries and day-old bread')}`,
           { status: 'completed' },
         ),
+    },
+  },
+
+  'PUT /api/collections/:id/driver-link': {
+    success: async (t) => {
+      const dispatched = await t.request(
+        'nadia',
+        'POST',
+        `/api/claims/${await transportClaim(t)}/collection`,
+        driver(),
+      );
+      const { collection } = (await dispatched.json()) as CollectionResponse;
+      return t.request('nadia', 'PUT', `/api/collections/${collection.id}/driver-link`, {
+        driverToken: newToken(),
+      });
+    },
+    error: {
+      code: 'INVALID_STATE',
+      send: async (t) =>
+        t.request(
+          'nadia',
+          'PUT',
+          `/api/collections/${await t.collectionId('Pastries and day-old bread')}/driver-link`,
+          { driverToken: newToken() },
+        ),
+    },
+  },
+  'GET /api/driver-collections/:token': {
+    success: async (t) => {
+      const driverToken = newToken();
+      await t.request('nadia', 'POST', `/api/claims/${await transportClaim(t)}/collection`, {
+        ...driver(),
+        driverToken,
+      });
+      return t.request('anonymous', 'GET', `/api/driver-collections/${driverToken}`);
+    },
+    error: {
+      code: 'NOT_FOUND',
+      send: (t) => t.request('anonymous', 'GET', `/api/driver-collections/${newToken()}`),
     },
   },
 

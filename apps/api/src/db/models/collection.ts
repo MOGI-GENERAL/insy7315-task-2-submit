@@ -1,6 +1,15 @@
 import { CollectionStatus } from '@fedsa/contract';
 import { Schema, model, type InferSchemaType } from 'mongoose';
-import { E164_PATTERN, date, nullableDate, objectId, oneOf, text, timestamps } from '../rules.js';
+import {
+  E164_PATTERN,
+  SHA256_PATTERN,
+  date,
+  nullableDate,
+  objectId,
+  oneOf,
+  text,
+  timestamps,
+} from '../rules.js';
 
 /**
  * transport for one claim. drivers have no accounts, so the driver is only
@@ -14,12 +23,18 @@ const collectionSchema = new Schema(
     driverPhone: { type: String, required: true, match: new RegExp(E164_PATTERN) },
     dispatchedAt: { type: Date, required: true, default: Date.now },
     scheduledFor: { type: Date, default: null },
+    /** sha-256 of the driver link's token. the token itself is never stored */
+    driverTokenHash: { type: String, default: null, match: new RegExp(SHA256_PATTERN) },
     status: { type: String, enum: CollectionStatus.options, required: true, default: 'dispatched' },
   },
   { collection: 'collections', timestamps: true, autoCreate: false, autoIndex: false },
 );
 
 collectionSchema.index({ claimId: 1 }, { unique: true });
+collectionSchema.index(
+  { driverTokenHash: 1 },
+  { unique: true, partialFilterExpression: { driverTokenHash: { $gt: '' } } },
+);
 
 export const collectionValidator = {
   $jsonSchema: {
@@ -41,6 +56,7 @@ export const collectionValidator = {
       driverPhone: { bsonType: 'string', pattern: E164_PATTERN },
       dispatchedAt: date,
       scheduledFor: nullableDate,
+      driverTokenHash: { bsonType: ['string', 'null'], pattern: SHA256_PATTERN },
       status: oneOf(CollectionStatus.options),
       ...timestamps,
     },

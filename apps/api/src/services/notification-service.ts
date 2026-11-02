@@ -17,6 +17,7 @@ import type {
   Recipient,
   SendingChannel,
 } from '../notifications/notification-channel.js';
+import { hideDriverToken } from '../logger.js';
 import { offerDetails, renderMessage, type MessageData } from '../notifications/templates.js';
 import type { ClaimNotifier } from './claim-notifier.js';
 import { fanOut, sendSafely, type FanOutResult } from './notification-fan-out.js';
@@ -165,7 +166,7 @@ export class NotificationService implements OfferNotifier, ClaimNotifier {
         kind,
         channel: 'sms',
         title: message.title,
-        body: message.phoneText,
+        body: hideDriverToken(message.phoneText),
         href: null,
         deliveryStatus: status,
         providerMessageId: delivery?.providerMessageId ?? null,

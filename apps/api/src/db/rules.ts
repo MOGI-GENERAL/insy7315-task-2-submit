@@ -1,6 +1,9 @@
 /** E.164, the only phone format Twilio accepts */
 export const E164_PATTERN = '^\\+[1-9][0-9]{7,14}$';
 
+/** lowercase hex of a sha-256 digest */
+export const SHA256_PATTERN = '^[0-9a-f]{64}$';
+
 /** plain http would be blocked as mixed content */
 export const HTTPS_PATTERN = '^https://';
 

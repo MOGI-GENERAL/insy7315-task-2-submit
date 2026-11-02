@@ -111,7 +111,7 @@ export const xh: Record<StringKey, string> = {
     'Asisoze sicele iinkcukacha ngabantu abafumana ukutya. Musa ukuzifaka naphi na kusetyenziso.',
   'privacy.sharingTitle': 'Ngubani obonayo',
   'privacy.sharing':
-    'Abasebenzi be-FEDSA. Xa nibanga isibonelelo, umnikeli ubona umbutho wenu nomntu wokuqhagamshelana naye, nani nibona okwabo. Umqhubi othunyelwe ukuthatha ubona kuphela iinkcukacha zokuthatha nezokuhambisa zolo thatho.',
+    'Abasebenzi be-FEDSA. Xa nibanga isibonelelo, umnikeli ubona umbutho wenu nomntu wokuqhagamshelana naye, nani nibona okwabo. Umqhubi othunyelwe ukuthatha ubona kuphela olo thatho: ukutya, amagama needilesi zemibutho yokuthatha neyokuhambisa, nomntu wokuqhagamshelana naye nenombolo yomnikeli nomamkeli. Umqhubi ufumana ikhonkco elingafuni kungena. Liyayeka ukusebenza xa ukuthatha kugqitywa okanye kukhanselwa, xa ibango lingasasebenzi, okanye iiyure ezingama-24 emva kwexesha lokugqibela lokuthatha, kwaye umququzeleli angalutshintsha nanini na.',
   'privacy.keepTitle': 'Sizigcina ixesha elingakanani',
   'privacy.keep':
     'Iinkcukacha zobuqu ziyacinywa xa zingasafuneki kwiingxelo. Iitotali zeengxelo zigcinwa ngaphandle kwamagama.',
@@ -427,6 +427,33 @@ export const xh: Record<StringKey, string> = {
   'dispatch.send': 'Thumela kumqhubi',
   'dispatch.sending': 'Iyathumela',
   'dispatch.sent': 'Iinkcukacha zokuthatha zithunyelwe kumqhubi',
+  'dispatch.alreadyArranged':
+    'Oku kuthatha sele kunomqhubi, ngoko ikhonkco olithumele ngoku aliyi kusebenza. Yabelana ngalo kwakhona ukuthumela elisebenzayo.',
+  'dispatch.rotateFailed':
+    'Ikhonkco elitsha aligcinwanga, ngoko ikhonkco olithumele ngoku aliyi kusebenza. Yabelana ngalo kwakhona ukuthumela elitsha.',
+  'dispatch.rotateClosed':
+    'Oku kuthatha kuvaliwe okanye kudlule ngaphezu kosuku emva kwexesha lokugqibela, ngoko ikhonkco olithumele ngoku aliyi kusebenza.',
+  'dispatch.copiedReplaced':
+    'Umbhalo ukhutshelwe. Ikhonkco elithunyelwe ngaphambili alisasebenzi.',
+
+  'driver.reference': 'Ukuthatha {reference}',
+  'driver.for': 'Umqhubi: {name}',
+  'driver.foodTitle': 'Ukutya',
+  'driver.category': 'Uhlobo',
+  'driver.quantity': 'Isixa',
+  'driver.temperature': 'Ubushushu',
+  'driver.notes': 'Amanqaku',
+  'driver.collectBy': 'Ixesha lokugqibela lokuthatha',
+  'driver.pickupTime': 'Ixesha lokuthatha',
+  'driver.pickupTitle': 'Thatha apha',
+  'driver.dropOffTitle': 'Hambisa apha',
+  'driver.openMaps': 'Vula {address} kwiMaps',
+  'driver.newTab': '(ivula kwithebhu entsha)',
+  'driver.callContact': 'Fowunela {name} kwinombolo {phone}',
+  'driver.contact': 'Unxibelelwano',
+  'driver.goneTitle': 'Ikhonkco alifumaneki',
+  'driver.gone': 'Eli khonkco alisafumaneki. Qhagamshelana nomququzeleli owalithumelayo.',
+  'driver.failed': 'Ayikwazanga ukulayisha. Zama kwakhona.',
 
   'notif.title': 'Izaziso',
   'notif.empty': 'Akukho nto okwangoku.',

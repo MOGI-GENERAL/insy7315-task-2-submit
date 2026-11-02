@@ -23,6 +23,13 @@
     Cross-Origin-Resource-Policy = "same-origin"
 
 [[headers]]
+  for = "/c/*"
+  [headers.values]
+    Referrer-Policy = "no-referrer"
+    X-Robots-Tag = "noindex"
+    Cache-Control = "no-store"
+
+[[headers]]
   for = "/assets/*"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"

@@ -2,6 +2,21 @@
 
 Each release is merged into `main` and tagged, and the deploy workflow then puts it into production.
 
+## Unreleased
+
+Drivers get a read-only page for their collection.
+
+- **Driver page:** the driver's text ends with a link to `/c/<token>`, a page that needs no sign-in and shows the food, the times, the pickup and drop-off addresses with a link to Maps, and the contact person and number at both ends.
+  The page has no actions and no photograph, and it follows the language of the driver's phone.
+- **Link lifetime:** the link stops working when the collection is completed or cancelled, when the claim is no longer active, and 24 hours after the collection deadline.
+  Every dead link gets the same 404.
+  *Share again* replaces the link, so the previous one stops working.
+- **Token handling:** the browser makes a random token, the API stores only its SHA-256 hash, and the token is left out of API request logs, stored notifications and the console channel.
+  The route is limited to 30 requests a minute for each address.
+- **Configuration:** `WEB_ORIGIN` sets the address the link points to.
+  The SMS and WhatsApp text ends with the link when it is set.
+- **Privacy notice:** says that a driver now sees the contact person and number at both ends, and that the link is temporary.
+
 ## 1.1.0 (2026-10-30)
 
 Drivers get their collection details, and the security and accessibility checks are part of the build.
