@@ -63,6 +63,7 @@ export interface User {
   jobTitle: string;
   language: Language;
   active: boolean;
+  mustChangePassword?: boolean;
   /** LOGIN SCREEN BLURB: WHICH CONSTRAINT THIS PERSONA DEMOS */
   personaNote: string;
 }

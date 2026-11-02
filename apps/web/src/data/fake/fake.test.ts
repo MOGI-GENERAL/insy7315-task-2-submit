@@ -233,7 +233,10 @@ describe('fake data layer', () => {
 
       await expect(
         data.claims.rotateDriverLink(collection.id, { driverToken: token('a') }),
-      ).rejects.toMatchObject({ code: 'VALIDATION_FAILED', fields: { driverToken: expect.any(String) } });
+      ).rejects.toMatchObject({
+        code: 'VALIDATION_FAILED',
+        fields: { driverToken: expect.any(String) },
+      });
     });
 
     test('rotating replaces the old link', async () => {
@@ -278,6 +281,24 @@ describe('fake data layer', () => {
         now.mockRestore();
       }
     });
+  });
+
+  test('a reset marks the account until its owner changes the password', async () => {
+    const { data } = setup();
+    await data.auth.login({ email: 'zanele@example.org', password: 'x' });
+    const peter = (await data.users.list({})).items.find((u) => u.email === 'peter@example.org')!;
+
+    const { tempPassword } = await data.users.resetPassword(peter.id);
+    const listed = (await data.users.list({})).items.find((u) => u.id === peter.id)!;
+    expect(listed.mustChangePassword).toBe(true);
+
+    const session = await data.auth.login({ email: peter.email, password: tempPassword });
+    expect(session.user.mustChangePassword).toBe(true);
+    await data.auth.changePassword({
+      currentPassword: tempPassword,
+      newPassword: 'a brand new long password',
+    });
+    expect((await data.auth.me())?.user.mustChangePassword).toBe(false);
   });
 
   test('a method named in failOn rejects with INTERNAL', async () => {

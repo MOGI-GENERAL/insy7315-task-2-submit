@@ -73,7 +73,7 @@ export function toUser(user: User, state: AppState): C.User {
     phone: org?.contactPhone ?? '+27214480000',
     languagePreference: user.language,
     status: user.active ? 'active' : 'disabled',
-    mustChangePassword: false,
+    mustChangePassword: user.mustChangePassword ?? false,
     lastLoginAt: null,
     createdAt: org?.joinedAt ?? '2025-01-01T00:00:00.000Z',
   };
