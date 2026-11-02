@@ -2,7 +2,7 @@
 
 Each release is merged into `main` and tagged, and the deploy workflow then puts it into production.
 
-## Unreleased
+## 1.2.0 (2026-11-02)
 
 Drivers get a read-only page for their collection, and administrators can reset a forgotten password.
 
