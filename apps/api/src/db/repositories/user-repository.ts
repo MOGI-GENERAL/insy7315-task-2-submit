@@ -66,9 +66,10 @@ export class UserRepository {
   }
 
   updatePassword(id: Types.ObjectId | string, passwordHash: string) {
-    return UserModel.updateOne(
-      { _id: id },
-      { $set: { passwordHash, mustChangePassword: false } },
+    return UserModel.findByIdAndUpdate(
+      id,
+      { $set: { passwordHash, mustChangePassword: false }, $inc: { passwordVersion: 1 } },
+      { returnDocument: 'after' },
     ).exec();
   }
 
@@ -81,7 +82,7 @@ export class UserRepository {
   ) {
     return UserModel.findOneAndUpdate(
       { _id: id, status: 'active', passwordHash: from },
-      { $set: { passwordHash, mustChangePassword: true } },
+      { $set: { passwordHash, mustChangePassword: true }, $inc: { passwordVersion: 1 } },
       { returnDocument: 'after', runValidators: true, session },
     ).exec();
   }
