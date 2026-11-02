@@ -316,6 +316,7 @@ describe('password reset', () => {
     const res = await reset(adminClient, user.id);
 
     expect(res.status).toBe(200);
+    expect(res.headers.get('cache-control')).toBe('no-store');
     const text = await res.text();
     expect(text).not.toContain('$2b$');
     expect(text).not.toContain('passwordHash');
