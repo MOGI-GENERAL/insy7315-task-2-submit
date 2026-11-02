@@ -289,6 +289,13 @@ describe('security headers', () => {
     expect(directives).toContain("connect-src 'self'");
     expect(directives).toContain("script-src 'self'");
   });
+
+  test('API responses may not be cached, errors included', async () => {
+    for (const path of ['/api/health', '/api/no-such-route']) {
+      const res = await fetch(`${baseUrl}${path}`);
+      expect(res.headers.get('cache-control'), path).toBe('no-store');
+    }
+  });
 });
 
 describe('logging', () => {

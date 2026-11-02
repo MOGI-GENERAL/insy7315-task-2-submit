@@ -164,6 +164,7 @@ export function createHttpDataLayer(api: ApiClient = createApiClient()): DataLay
       list: (query) => api.get('/api/users', query),
       create: (body) => api.send('POST', '/api/users', { json: body }),
       update: (userId, body) => api.send('PATCH', `/api/users/${id(userId)}`, { json: body }),
+      resetPassword: (userId) => api.send('POST', `/api/users/${id(userId)}/password-reset`),
       auditLog: (query) => api.get('/api/audit-log', query),
     },
   };

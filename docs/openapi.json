@@ -112,6 +112,7 @@
                 "disable_user",
                 "enable_user",
                 "change_role",
+                "reset_password",
                 "cancel_offer",
                 "override_claim",
                 "dispatch_driver",
@@ -147,6 +148,7 @@
                               "disable_user",
                               "enable_user",
                               "change_role",
+                              "reset_password",
                               "cancel_offer",
                               "override_claim",
                               "dispatch_driver",
@@ -10825,6 +10827,151 @@
           }
         ],
         "summary": "PATCH /api/users/:id",
+        "tags": [
+          "users"
+        ]
+      }
+    },
+    "/api/users/{id}/password-reset": {
+      "post": {
+        "description": "Roles: administrator.",
+        "operationId": "postUsersByIdPasswordReset",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "tempPassword": {
+                      "type": "string"
+                    },
+                    "user": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "createdAt": {
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                          "type": "string"
+                        },
+                        "email": {
+                          "type": "string"
+                        },
+                        "fullName": {
+                          "type": "string"
+                        },
+                        "id": {
+                          "pattern": "^[0-9a-f]{24}$",
+                          "type": "string"
+                        },
+                        "languagePreference": {
+                          "enum": [
+                            "en",
+                            "af",
+                            "xh"
+                          ],
+                          "type": "string"
+                        },
+                        "lastLoginAt": {
+                          "anyOf": [
+                            {
+                              "format": "date-time",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "mustChangePassword": {
+                          "type": "boolean"
+                        },
+                        "organisationId": {
+                          "anyOf": [
+                            {
+                              "pattern": "^[0-9a-f]{24}$",
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "phone": {
+                          "type": "string"
+                        },
+                        "role": {
+                          "enum": [
+                            "donor",
+                            "recipient",
+                            "coordinator",
+                            "administrator"
+                          ],
+                          "type": "string"
+                        },
+                        "status": {
+                          "enum": [
+                            "active",
+                            "disabled"
+                          ],
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "organisationId",
+                        "role",
+                        "fullName",
+                        "email",
+                        "phone",
+                        "languagePreference",
+                        "status",
+                        "mustChangePassword",
+                        "lastLoginAt",
+                        "createdAt"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "user",
+                    "tempPassword"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "csrfToken": [],
+            "sessionCookie": []
+          }
+        ],
+        "summary": "POST /api/users/:id/password-reset",
         "tags": [
           "users"
         ]

@@ -96,7 +96,7 @@ All paths start with `/api`.
 | Notifications   | `GET /notifications`, `POST /notifications/:id/read`                                                                                                        |
 | Reports         | `GET /reports/impact`, `/reports/outcomes`, `/reports/export`                                                                                               |
 | Certificates    | `GET` and `PUT /valuation-rates`, `POST` and `GET /tax-certificates`, `GET /tax-certificates/:id/pdf`                                                       |
-| Users           | `GET` and `POST /users`, `PATCH /users/:id`, `GET /audit-log`                                                                                               |
+| Users           | `GET` and `POST /users`, `PATCH /users/:id`, `POST /users/:id/password-reset`, `GET /audit-log`                                                             |
 | Twilio          | `POST /webhooks/twilio/inbound`, `/webhooks/twilio/status`                                                                                                  |
 | Documentation   | `GET /openapi.json`                                                                                                                                         |
 

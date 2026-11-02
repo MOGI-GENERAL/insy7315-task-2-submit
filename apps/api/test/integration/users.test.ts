@@ -1,6 +1,8 @@
+import { createHash } from 'node:crypto';
 import {
   CreateUserResponse,
   ErrorEnvelope,
+  ResetPasswordResponse,
   SessionResponse,
   UserListResponse,
   UserResponse,
@@ -9,9 +11,21 @@ import {
 import bcrypt from 'bcryptjs';
 import mongoose, { Types } from 'mongoose';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-import { AuditLogModel, SESSIONS_COLLECTION, UserModel } from '../../src/db/index.js';
+import {
+  AuditLogModel,
+  AuditLogRepository,
+  LoginThrottleRepository,
+  OrganisationRepository,
+  SESSIONS_COLLECTION,
+  SessionRepository,
+  UserModel,
+  UserRepository,
+} from '../../src/db/index.js';
+import { AuditService } from '../../src/services/audit-service.js';
+import { UserService } from '../../src/services/user-service.js';
 import type { TestClient } from '../test-client.js';
 import {
+  TEST_PASSWORD,
   anonymousClient,
   createOrganisation,
   createUser,
@@ -58,6 +72,10 @@ function newAccount(fields: Partial<CreateUserRequest> = {}): CreateUserRequest 
 
 function patch(client: TestClient, userId: unknown, body: unknown) {
   return client.request('PATCH', `/api/users/${String(userId)}`, body);
+}
+
+function reset(client: TestClient, userId: unknown) {
+  return client.post(`/api/users/${String(userId)}/password-reset`, {});
 }
 
 function sessionCount(userId: Types.ObjectId) {
@@ -289,6 +307,161 @@ describe('role and status changes', () => {
   });
 });
 
+describe('password reset', () => {
+  test('a reset gives a temporary password, ends every session and is audited', async () => {
+    const user = await createUser({ role: 'coordinator' });
+    const first = await signedInClient(baseUrl, user.email);
+    const second = await signedInClient(baseUrl, user.email);
+
+    const res = await reset(adminClient, user.id);
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get('cache-control')).toBe('no-store');
+    const text = await res.text();
+    expect(text).not.toContain('$2b$');
+    expect(text).not.toContain('passwordHash');
+    const { user: view, tempPassword } = ResetPasswordResponse.parse(JSON.parse(text));
+    expect(view.mustChangePassword).toBe(true);
+    expect(tempPassword).toHaveLength(16);
+
+    expect((await first.get('/api/me')).status).toBe(401);
+    expect((await second.get('/api/me')).status).toBe(401);
+    expect(await sessionCount(user._id)).toBe(0);
+    await expect(signedInClient(baseUrl, user.email, TEST_PASSWORD)).rejects.toThrow();
+
+    const rows = await auditRows(user._id);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ userId: admin._id, action: 'reset_password', note: null });
+  });
+
+  test('the temporary password must be replaced before anything else', async () => {
+    const user = await createUser({ role: 'coordinator' });
+    const { tempPassword } = ResetPasswordResponse.parse(
+      await (await reset(adminClient, user.id)).json(),
+    );
+
+    const client = await signedInClient(baseUrl, user.email, tempPassword);
+    const blocked = await client.get('/api/organisations');
+    expect(blocked.status).toBe(403);
+    expect((await errorOf(blocked)).code).toBe('FORBIDDEN');
+
+    const changed = await client.post('/api/me/password', {
+      currentPassword: tempPassword,
+      newPassword: 'a brand new long password',
+    });
+    expect(changed.status).toBe(204);
+    expect((await client.get('/api/organisations')).status).toBe(200);
+    await expect(signedInClient(baseUrl, user.email, tempPassword)).rejects.toThrow();
+  });
+
+  test('a reset lifts the delay left by failed sign-ins', async () => {
+    const user = await createUser({ role: 'coordinator' });
+    const key = createHash('sha256').update(user.email).digest('hex');
+    const throttle = new LoginThrottleRepository();
+    await throttle.recordFailure(key, new Date(Date.now() + 60 * 60 * 1000));
+    await throttle.blockUntil(key, new Date(Date.now() + 15 * 60 * 1000));
+
+    const { tempPassword } = ResetPasswordResponse.parse(
+      await (await reset(adminClient, user.id)).json(),
+    );
+
+    expect(await throttle.isBlocked(key)).toBe(false);
+    await expect(signedInClient(baseUrl, user.email, tempPassword)).resolves.toBeTruthy();
+  });
+
+  test('of two resets at once, one is refused and only the other password works', async () => {
+    const user = await createUser({ role: 'coordinator' });
+    const otherAdmin = await createUser({ role: 'administrator' });
+    const otherClient = await signedInClient(baseUrl, otherAdmin.email);
+
+    const results = await Promise.all([reset(adminClient, user.id), reset(otherClient, user.id)]);
+
+    expect(results.map((res) => res.status).sort()).toEqual([200, 409]);
+    const winner = results.find((res) => res.status === 200)!;
+    const loser = results.find((res) => res.status === 409)!;
+    expect((await errorOf(loser)).code).toBe('INVALID_STATE');
+    const { tempPassword } = ResetPasswordResponse.parse(await winner.json());
+    await expect(signedInClient(baseUrl, user.email, tempPassword)).resolves.toBeTruthy();
+    expect(await auditRows(user._id)).toHaveLength(1);
+  });
+
+  test('a sign-in checked against the old password is refused once a reset lands', async () => {
+    const user = await createUser({ role: 'coordinator' });
+    const users = new UserRepository();
+    const read = users.findByEmail.bind(users);
+    users.findByEmail = async (email) => {
+      const found = await read(email);
+      await UserModel.updateOne(
+        { _id: user._id },
+        { $set: { passwordHash: `$2b$04$${'x'.repeat(53)}` } },
+      );
+      return found;
+    };
+    const service = new UserService(
+      users,
+      new OrganisationRepository(),
+      new SessionRepository(),
+      new AuditService(new AuditLogRepository()),
+      new LoginThrottleRepository(),
+    );
+
+    await expect(service.login({ email: user.email, password: TEST_PASSWORD })).rejects.toThrow(
+      'The email or password is not correct',
+    );
+    expect((await UserModel.findById(user._id).lean())!.lastLoginAt ?? null).toBeNull();
+  });
+
+  test('a failure partway leaves the password, the sessions and the audit log as they were', async () => {
+    const user = await createUser({ role: 'coordinator' });
+    const client = await signedInClient(baseUrl, user.email);
+    const throttle = new LoginThrottleRepository();
+    throttle.clear = () => Promise.reject(new Error('throttle store down'));
+    const service = new UserService(
+      new UserRepository(),
+      new OrganisationRepository(),
+      new SessionRepository(),
+      new AuditService(new AuditLogRepository()),
+      throttle,
+    );
+
+    await expect(service.resetPassword(admin.id, user.id)).rejects.toThrow('throttle store down');
+
+    expect(await UserModel.findById(user._id).lean()).toMatchObject({
+      passwordHash: user.passwordHash,
+      mustChangePassword: false,
+    });
+    expect((await client.get('/api/me')).status).toBe(200);
+    expect(await auditRows(user._id)).toEqual([]);
+  });
+
+  test('a disabled account and your own account are refused, and nothing changes', async () => {
+    const disabled = await createUser({ role: 'coordinator', status: 'disabled' });
+    const before = await UserModel.findById(disabled._id).lean();
+
+    const refused = await reset(adminClient, disabled.id);
+    expect(refused.status).toBe(409);
+    expect((await errorOf(refused)).code).toBe('INVALID_STATE');
+    expect(await UserModel.findById(disabled._id).lean()).toMatchObject({
+      passwordHash: before!.passwordHash,
+      mustChangePassword: before!.mustChangePassword,
+    });
+
+    const own = await reset(adminClient, admin.id);
+    expect(own.status).toBe(409);
+    expect((await errorOf(own)).code).toBe('INVALID_STATE');
+    expect((await adminClient.get('/api/me')).status).toBe(200);
+
+    expect(await auditRows(disabled._id)).toEqual([]);
+    expect(await auditRows(admin._id)).toEqual([]);
+  });
+
+  test('an unknown user is not found', async () => {
+    const res = await reset(adminClient, new Types.ObjectId());
+    expect(res.status).toBe(404);
+    expect((await errorOf(res)).code).toBe('NOT_FOUND');
+  });
+});
+
 describe('self-protection', () => {
   test('an administrator cannot disable themselves or give up the role', async () => {
     const self = await createUser({ role: 'administrator' });
@@ -321,6 +494,7 @@ describe('access', () => {
       ['GET', '/api/users'],
       ['POST', '/api/users', newAccount()],
       ['PATCH', `/api/users/${target.id}`, { status: 'disabled' }],
+      ['POST', `/api/users/${target.id}/password-reset`, {}],
       ['GET', '/api/audit-log'],
     ];
 
@@ -337,7 +511,10 @@ describe('access', () => {
       expect((await anonymous.request(method, path, body)).status, `${method} ${path}`).toBe(401);
     }
 
-    expect((await UserModel.findById(target._id).lean())!.status).toBe('active');
+    expect(await UserModel.findById(target._id).lean()).toMatchObject({
+      status: 'active',
+      mustChangePassword: false,
+    });
     expect(await AuditLogModel.countDocuments({ targetId: target._id })).toBe(0);
   });
 });

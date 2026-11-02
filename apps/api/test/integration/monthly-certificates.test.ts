@@ -1,4 +1,4 @@
-import { ErrorEnvelope, FoodCategory } from '@fedsa/contract';
+import { ErrorEnvelope, FoodCategory, SCHEDULER_EMAIL } from '@fedsa/contract';
 import { Types } from 'mongoose';
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'vitest';
 import {
@@ -19,13 +19,14 @@ import {
   MonthlyCertificateService,
   type MonthlySummary,
 } from '../../src/services/monthly-certificates.js';
-import { SCHEDULER_EMAIL, findOrCreateScheduler } from '../../src/services/scheduler-account.js';
+import { findOrCreateScheduler } from '../../src/services/scheduler-account.js';
 import {
   anonymousClient,
   createOrganisation,
   createUser,
   newNotificationService,
   newReportingService,
+  signedInClient,
   startTestApp,
 } from './test-app.js';
 import { START_TIMEOUT_MS, startTestDb } from './test-db.js';
@@ -287,5 +288,22 @@ describe('the scheduler account', () => {
     });
     expect(active.status).toBe(401);
     expect(ErrorEnvelope.parse(await active.json()).error.code).toBe('UNAUTHENTICATED');
+  });
+
+  test('cannot be reset, and cannot sign in even with its password', async () => {
+    const scheduler = await findOrCreateScheduler(new UserRepository());
+    const admin = await createUser({ role: 'administrator' });
+    const adminClient = await signedInClient(baseUrl, admin.email);
+    await UserModel.updateOne(
+      { email: SCHEDULER_EMAIL },
+      { $set: { status: 'active', passwordHash: admin.passwordHash } },
+    );
+
+    const reset = await adminClient.post(`/api/users/${scheduler.id}/password-reset`, {});
+    expect(reset.status).toBe(409);
+    expect(ErrorEnvelope.parse(await reset.json()).error.code).toBe('INVALID_STATE');
+    expect(await AuditLogModel.countDocuments({ targetId: scheduler._id })).toBe(0);
+
+    await expect(signedInClient(baseUrl, SCHEDULER_EMAIL)).rejects.toThrow('401');
   });
 });

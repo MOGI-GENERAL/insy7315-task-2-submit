@@ -211,7 +211,10 @@ export function createFakeDataLayer(store: Store, options: FakeOptions): DataLay
           }
           return { user: toUser(me(), state()) };
         }),
-      changePassword: () => call('auth', 'changePassword', () => void me()),
+      changePassword: () =>
+        call('auth', 'changePassword', () => {
+          store.dispatch({ type: 'FAKE_CHANGE_PASSWORD', userId: me().id });
+        }),
     },
 
     organisations: {
@@ -468,7 +471,9 @@ export function createFakeDataLayer(store: Store, options: FakeOptions): DataLay
           const claim = state().claims.find((c) => c.id === collection.claimId);
           const offer = offerById(state(), claim?.offerId);
           if (offer && linkExpired(offer)) {
-            throw invalidState('This collection is past its deadline and can no longer get a link.');
+            throw invalidState(
+              'This collection is past its deadline and can no longer get a link.',
+            );
           }
           if (driverTokens.has(body.driverToken)) {
             throw new ApiError('VALIDATION_FAILED', 'Some fields need attention.', {
@@ -763,11 +768,12 @@ export function createFakeDataLayer(store: Store, options: FakeOptions): DataLay
             jobTitle: '',
             language: body.languagePreference,
             active: true,
+            mustChangePassword: true,
             personaNote: '',
           };
           store.dispatch({ type: 'FAKE_ADD_USER', user, actorUserId: me().id });
           return {
-            user: { ...toUser(user, state()), mustChangePassword: true },
+            user: toUser(user, state()),
             tempPassword: 'Demo-Temp-1234',
           };
         }),
@@ -798,6 +804,26 @@ export function createFakeDataLayer(store: Store, options: FakeOptions): DataLay
               state().users.find((u) => u.id === id)!,
               state(),
             ),
+          };
+        }),
+      resetPassword: (id) =>
+        call('users', 'resetPassword', () => {
+          const actor = me();
+          const target = state().users.find((u) => u.id === id);
+          if (!target) throw notFound();
+          if (id === actor.id) {
+            throw invalidState('Change your own password from your account instead.');
+          }
+          if (!target.active) {
+            throw invalidState('Enable the account before resetting its password.');
+          }
+          store.dispatch({ type: 'FAKE_RESET_PASSWORD', actorUserId: actor.id, targetUserId: id });
+          return {
+            user: toUser(
+              state().users.find((u) => u.id === id)!,
+              state(),
+            ),
+            tempPassword: 'Demo-Temp-1234',
           };
         }),
       auditLog: (query) =>

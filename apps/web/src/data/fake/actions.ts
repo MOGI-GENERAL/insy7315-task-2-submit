@@ -18,6 +18,8 @@ export type FakeAction =
       role?: Role;
       active?: boolean;
     }
+  | { type: 'FAKE_RESET_PASSWORD'; targetUserId: string; actorUserId: string }
+  | { type: 'FAKE_CHANGE_PASSWORD'; userId: string }
   | { type: 'FAKE_UPDATE_COLLECTION'; collectionId: string; status: 'completed' | 'cancelled' };
 
 let sequence = 0;
@@ -96,6 +98,36 @@ export function fakeReducer(state: AppState, action: FakeAction): AppState {
           },
           ...state.audit,
         ],
+      };
+
+    case 'FAKE_RESET_PASSWORD': {
+      const target = state.users.find((u) => u.id === action.targetUserId);
+      if (!target) return state;
+      return {
+        ...state,
+        users: state.users.map((u) =>
+          u.id === target.id ? { ...u, mustChangePassword: true } : u,
+        ),
+        audit: [
+          {
+            id: auditId(),
+            actorUserId: action.actorUserId,
+            action: 'Reset password',
+            target: target.name,
+            detail: '',
+            at: new Date().toISOString(),
+          },
+          ...state.audit,
+        ],
+      };
+    }
+
+    case 'FAKE_CHANGE_PASSWORD':
+      return {
+        ...state,
+        users: state.users.map((u) =>
+          u.id === action.userId ? { ...u, mustChangePassword: false } : u,
+        ),
       };
 
     case 'FAKE_UPDATE_USER': {

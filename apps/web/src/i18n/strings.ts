@@ -165,7 +165,7 @@ export const untranslated = {
   'dispatch.shareDone': 'Done',
   'dispatch.emailSubject': 'FEDSA collection {reference}',
   'form.tooShort': 'Use at least {n} characters.',
-  'login.forgot': 'Forgot your password? Phone FEDSA.',
+  'login.forgot': 'Forgot your password? Phone FEDSA for a temporary one.',
   'pending.message': 'The Offers tab shows food as soon as your organisation is verified.',
 
   /* coordinator screens */
@@ -325,6 +325,12 @@ export const untranslated = {
   'acct.disabledDone': 'Account disabled',
   'acct.enabledDone': 'Account enabled',
   'acct.roleDone': 'Role changed',
+  'acct.resetPassword': 'Reset password',
+  'acct.confirmReset': 'Reset the password of {name}?',
+  'acct.whyReset':
+    '{name} is signed out of every device. You get a temporary password to give them, and they must choose their own when they next sign in.',
+  'acct.resetDone': 'Password reset',
+  'acct.resetTitle': 'New temporary password for {name}',
   'acct.newTitle': 'Create an account',
   'acct.newLead':
     'The person gets a temporary password and must choose their own at first sign-in.',
@@ -362,6 +368,7 @@ export const untranslated = {
   'audit.action.disable_user': 'Account disabled',
   'audit.action.enable_user': 'Account enabled',
   'audit.action.change_role': 'Role changed',
+  'audit.action.reset_password': 'Password reset',
   'audit.action.cancel_offer': 'Offer cancelled',
   'audit.action.override_claim': 'Claim overridden',
   'audit.action.dispatch_driver': 'Driver dispatched',

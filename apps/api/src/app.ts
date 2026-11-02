@@ -9,7 +9,7 @@ import { errorHandler, notFound } from './middleware/error-handler.js';
 import { requirePasswordChanged } from './middleware/guards.js';
 import type { RateLimitStoreFactory } from './middleware/rate-limit-store.js';
 import { globalLimit } from './middleware/rate-limits.js';
-import { driverLinkHeaders, securityHeaders } from './middleware/security-headers.js';
+import { driverLinkHeaders, noStore, securityHeaders } from './middleware/security-headers.js';
 import { sessions, type SessionSettings } from './middleware/session.js';
 import type { TwilioWebhookSettings } from './middleware/twilio-signature.js';
 import { auditLogRouter } from './routes/audit-log-router.js';
@@ -78,6 +78,7 @@ export function createApp(deps: AppDeps) {
   app.set('trust proxy', TRUSTED_PROXY_HOPS);
   app.use(pinoHttp({ logger: deps.logger, serializers: { req: redactRequest } }));
   app.use(securityHeaders());
+  app.use('/api', noStore);
   app.use('/api/driver-collections', driverLinkHeaders);
   app.use(clientAddress(deps.proxy ?? null));
   app.use(express.json({ limit: '100kb' }));

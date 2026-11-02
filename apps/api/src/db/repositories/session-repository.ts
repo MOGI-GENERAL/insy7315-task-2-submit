@@ -1,4 +1,4 @@
-import mongoose from 'mongoose';
+import mongoose, { type ClientSession } from 'mongoose';
 
 /** the session store owns this collection and its expiry index, so `bootstrapDb` leaves it alone */
 export const SESSIONS_COLLECTION = 'sessions';
@@ -9,10 +9,12 @@ interface StoredSession {
 }
 
 export class SessionRepository {
-  deleteForUser(userId: string, exceptSessionId?: string) {
+  deleteForUser(userId: string, exceptSessionId?: string, session?: ClientSession) {
     const filter = exceptSessionId
       ? { 'session.userId': userId, _id: { $ne: exceptSessionId } }
       : { 'session.userId': userId };
-    return mongoose.connection.collection<StoredSession>(SESSIONS_COLLECTION).deleteMany(filter);
+    return mongoose.connection
+      .collection<StoredSession>(SESSIONS_COLLECTION)
+      .deleteMany(filter, { session });
   }
 }

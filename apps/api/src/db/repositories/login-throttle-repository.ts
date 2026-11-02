@@ -1,3 +1,4 @@
+import type { ClientSession } from 'mongoose';
 import { LoginThrottleModel } from '../models/login-throttle.js';
 
 export class LoginThrottleRepository {
@@ -24,7 +25,7 @@ export class LoginThrottleRepository {
     await LoginThrottleModel.updateOne({ _id: key }, { $max: { blockedUntil: until } }).exec();
   }
 
-  async clear(key: string) {
-    await LoginThrottleModel.deleteOne({ _id: key }).exec();
+  async clear(key: string, session?: ClientSession) {
+    await LoginThrottleModel.deleteOne({ _id: key }, { session }).exec();
   }
 }

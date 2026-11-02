@@ -73,7 +73,7 @@ export function toUser(user: User, state: AppState): C.User {
     phone: org?.contactPhone ?? '+27214480000',
     languagePreference: user.language,
     status: user.active ? 'active' : 'disabled',
-    mustChangePassword: false,
+    mustChangePassword: user.mustChangePassword ?? false,
     lastLoginAt: null,
     createdAt: org?.joinedAt ?? '2025-01-01T00:00:00.000Z',
   };
@@ -178,6 +178,7 @@ const AUDIT_ACTIONS: [RegExp, C.AuditAction][] = [
   [/^Changed role/, 'change_role'],
   [/^Disabled account/, 'disable_user'],
   [/^Enabled account/, 'enable_user'],
+  [/^Reset password/, 'reset_password'],
   [/^Issued tax certificate/, 'issue_certificate'],
   [/^Resolved dispute/, 'resolve_dispute'],
 ];

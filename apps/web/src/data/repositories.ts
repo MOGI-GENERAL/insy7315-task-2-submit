@@ -46,6 +46,7 @@ import type {
   RegisterRequest,
   ReleaseClaimRequest,
   ReportRangeQuery,
+  ResetPasswordResponse,
   ResolutionRequest,
   RotateDriverLinkRequest,
   SessionResponse,
@@ -150,6 +151,7 @@ export interface UsersRepository {
   list(query: ListUsersQuery): Promise<UserListResponse>;
   create(body: CreateUserRequest): Promise<CreateUserResponse>;
   update(id: string, body: UpdateUserRequest): Promise<UserResponse>;
+  resetPassword(id: string): Promise<ResetPasswordResponse>;
   auditLog(query: AuditLogQuery): Promise<AuditLogResponse>;
 }
 

@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 import {
+  SCHEDULER_EMAIL,
   SUBURBS,
   suburbLocation,
   type ChangePasswordRequest,
@@ -8,6 +9,7 @@ import {
   type ListUsersQuery,
   type LoginRequest,
   type RegisterRequest,
+  type ResetPasswordResponse,
   type Role,
   type SessionResponse,
   type UpdateMeRequest,
@@ -145,8 +147,8 @@ export class UserService {
   }
 
   /**
-   * an unknown email, a wrong password and a disabled account all fail the same
-   * way, and all count towards the delay on that email
+   * an unknown email, a wrong password, a disabled account and the scheduler all
+   * fail the same way, and all count towards the delay on that email
    */
   async login(credentials: LoginRequest): Promise<SessionResponse> {
     const key = throttleKey(credentials.email);
@@ -157,12 +159,12 @@ export class UserService {
     const hash = user ? user.passwordHash : await this.hashForUnknownUser();
     const matches = await bcrypt.compare(credentials.password, hash);
 
-    if (!user || !matches || user.status !== 'active') {
+    if (!user || !matches || user.status !== 'active' || user.email === SCHEDULER_EMAIL) {
       await this.recordLoginFailure(key);
       throw new UnauthenticatedError(LOGIN_FAILED);
     }
 
-    const updated = await this.users.recordLogin(user._id);
+    const updated = await this.users.recordLogin(user._id, user.passwordHash);
     if (!updated) throw new UnauthenticatedError(LOGIN_FAILED);
     await this.throttle.clear(key);
     return this.sessionResponse(updated);
@@ -264,6 +266,46 @@ export class UserService {
       }
       throw err;
     }
+  }
+
+  /** the temporary password appears in this response and nowhere else */
+  async resetPassword(adminId: string, userId: string): Promise<ResetPasswordResponse> {
+    const user = await this.users.findById(userId);
+    if (!user) throw new NotFoundError();
+    if (userId === adminId) {
+      throw new InvalidStateError('Change your own password from your account instead');
+    }
+    if (user.email === SCHEDULER_EMAIL) {
+      throw new InvalidStateError('The scheduler account cannot sign in');
+    }
+    if (user.status !== 'active') {
+      throw new InvalidStateError('Enable the account before resetting its password');
+    }
+
+    const tempPassword = newTemporaryPassword();
+    const passwordHash = await hashPassword(tempPassword);
+
+    const updated = await runInTransaction(async (session) => {
+      const changed = await this.users.resetPassword(
+        user._id,
+        user.passwordHash,
+        passwordHash,
+        session,
+      );
+      // another administrator disabled or reset the account first
+      if (!changed) throw new InvalidStateError();
+      await this.audit.record(
+        adminId,
+        'reset_password',
+        { type: AUDIT_TARGET, id: changed._id },
+        { session },
+      );
+      await this.sessions.deleteForUser(userId, undefined, session);
+      await this.throttle.clear(throttleKey(changed.email), session);
+      return changed;
+    });
+
+    return { user: userView(updated), tempPassword };
   }
 
   /** a role or status change signs the user out of every browser */
