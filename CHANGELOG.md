@@ -25,6 +25,8 @@ Drivers get a read-only page for their collection, and administrators can reset 
 - **Caching:** every API response sends `Cache-Control: no-store`.
 - **Password version:** each account records how many times its password has been set, and each session records the count it signed in with.
   A session from before a password change or reset is signed out on its next request, even one written after the change by a sign-in still in progress.
+- **Push after an access change:** a password reset, a role change, disabling and enabling an account each remove its push subscriptions, so a signed-out phone stops receiving notifications.
+  After the next sign-in, the web app sends the browser's subscription again if notifications are allowed, and a shared browser moves to whoever signed in last.
 
 ## 1.1.0 (2026-10-30)
 
