@@ -8,6 +8,8 @@ declare module 'express-session' {
   interface SessionData {
     /** a hex string, so the store can be queried for every session one user holds */
     userId: string;
+    /** absent in sessions written before it existed, which counts as 0 */
+    passwordVersion: number;
     csrfToken: string;
   }
 }
@@ -63,11 +65,12 @@ export async function createSessionStore() {
 }
 
 /** a new session ID on every sign-in stops a session fixed before it from being reused */
-export async function signIn(req: Request, userId: string) {
+export async function signIn(req: Request, userId: string, passwordVersion: number) {
   await new Promise<void>((resolve, reject) => {
     req.session.regenerate((err) => (err ? reject(err) : resolve()));
   });
   req.session.userId = userId;
+  req.session.passwordVersion = passwordVersion;
 }
 
 export async function signOut(req: Request, res: Response) {

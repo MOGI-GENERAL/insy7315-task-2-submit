@@ -12,15 +12,15 @@ export function authController(users: UserService) {
     },
 
     async register(req: Request, res: Response) {
-      const result = await users.register(req.body);
-      await signIn(req, result.user.id);
-      res.status(201).json(result);
+      const { body, passwordVersion } = await users.register(req.body);
+      await signIn(req, body.user.id, passwordVersion);
+      res.status(201).json(body);
     },
 
     async login(req: Request, res: Response) {
-      const result = await users.login(req.body);
-      await signIn(req, result.user.id);
-      res.json(result);
+      const { body, passwordVersion } = await users.login(req.body);
+      await signIn(req, body.user.id, passwordVersion);
+      res.json(body);
     },
 
     async logout(req: Request, res: Response) {

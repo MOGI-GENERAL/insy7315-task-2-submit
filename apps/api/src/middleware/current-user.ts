@@ -9,13 +9,13 @@ declare module 'express-serve-static-core' {
 }
 
 /**
- * reads the role, status and organisation from the database on every request,
- * so disabling a user or changing their role applies to sessions already open
+ * the user is read on every request. a disable, a role change or a new password
+ * applies to sessions already open
  */
 export function loadCurrentUser(users: UserService) {
   return async (req: Request, _res: Response, next: NextFunction) => {
-    const userId = req.session.userId;
-    if (userId) req.user = (await users.findSessionUser(userId)) ?? undefined;
+    const { userId, passwordVersion = 0 } = req.session;
+    if (userId) req.user = (await users.findSessionUser(userId, passwordVersion)) ?? undefined;
     next();
   };
 }

@@ -84,6 +84,14 @@ function sessionCount(userId: Types.ObjectId) {
     .countDocuments({ 'session.userId': userId.toString() });
 }
 
+/** to put back after a delete, as a sign-in still in flight would */
+function storedSessions(userId: Types.ObjectId) {
+  return mongoose.connection
+    .collection(SESSIONS_COLLECTION)
+    .find({ 'session.userId': userId.toString() })
+    .toArray();
+}
+
 function auditRows(targetId: Types.ObjectId | string) {
   return AuditLogModel.find({ targetId }).sort({ _id: 1 }).lean();
 }
@@ -459,6 +467,48 @@ describe('password reset', () => {
     const res = await reset(adminClient, new Types.ObjectId());
     expect(res.status).toBe(404);
     expect((await errorOf(res)).code).toBe('NOT_FOUND');
+  });
+});
+
+describe('password version', () => {
+  test('a session written back after a reset is still signed out', async () => {
+    const user = await createUser({ role: 'coordinator' });
+    const client = await signedInClient(baseUrl, user.email);
+    const saved = await storedSessions(user._id);
+
+    expect((await reset(adminClient, user.id)).status).toBe(200);
+    await mongoose.connection.collection(SESSIONS_COLLECTION).insertMany(saved);
+
+    expect((await client.get('/api/me')).status).toBe(401);
+  });
+
+  test('after a password change only the session that made it stays signed in', async () => {
+    const user = await createUser({ role: 'coordinator' });
+    const other = await signedInClient(baseUrl, user.email);
+    const saved = await storedSessions(user._id);
+    const own = await signedInClient(baseUrl, user.email);
+
+    const changed = await own.post('/api/me/password', {
+      currentPassword: TEST_PASSWORD,
+      newPassword: 'a brand new long password',
+    });
+    expect(changed.status).toBe(204);
+    await mongoose.connection.collection(SESSIONS_COLLECTION).insertMany(saved);
+
+    expect((await other.get('/api/me')).status).toBe(401);
+    expect((await own.get('/api/me')).status).toBe(200);
+  });
+
+  test('a user and a session from before the version existed still work', async () => {
+    const user = await createUser({ role: 'coordinator' });
+    const client = await signedInClient(baseUrl, user.email);
+
+    await UserModel.collection.updateOne({ _id: user._id }, { $unset: { passwordVersion: '' } });
+    await mongoose.connection
+      .collection(SESSIONS_COLLECTION)
+      .updateMany({ 'session.userId': user.id }, { $unset: { 'session.passwordVersion': '' } });
+
+    expect((await client.get('/api/me')).status).toBe(200);
   });
 });
 
