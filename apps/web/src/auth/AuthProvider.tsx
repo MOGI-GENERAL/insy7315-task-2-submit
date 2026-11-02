@@ -3,11 +3,12 @@ import type { ReactNode } from 'react';
 import type { Language, SessionResponse } from '@fedsa/contract';
 import { useData } from '../data/context';
 import { useLanguageContext } from '../i18n/context';
+import { existingSubscription } from '../lib/push';
 import { AuthContext } from './context';
 import type { AuthContextValue, AuthState } from './context';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const { auth } = useData();
+  const { auth, notifications } = useData();
   const { setLanguage: setLocalLanguage } = useLanguageContext();
   const [state, setState] = useState<AuthState>({ status: 'loading' });
 
@@ -18,6 +19,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return session;
     },
     [setLocalLanguage],
+  );
+
+  // a reset or an access change clears the account's subscriptions on the server
+  const resubscribePush = useCallback(
+    (session: SessionResponse) => {
+      existingSubscription()
+        .then((subscription) => subscription && notifications.subscribePush(subscription))
+        .catch(() => {});
+      return session;
+    },
+    [notifications],
   );
 
   const refresh = useCallback(
@@ -42,8 +54,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       state,
       refresh,
-      login: (body) => auth.login(body).then(signIn),
-      register: (body) => auth.register(body).then(signIn),
+      login: (body) => auth.login(body).then(resubscribePush).then(signIn),
+      register: (body) => auth.register(body).then(resubscribePush).then(signIn),
       async logout() {
         // before the call. screens still on the fake store's user must unmount before it clears
         setState({ status: 'signedOut' });
@@ -56,7 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (signedIn) auth.updateMe({ languagePreference: language }).catch(() => {});
       },
     }),
-    [state, signedIn, refresh, auth, signIn, setLocalLanguage],
+    [state, signedIn, refresh, auth, signIn, resubscribePush, setLocalLanguage],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
