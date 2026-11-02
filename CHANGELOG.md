@@ -23,6 +23,8 @@ Drivers get a read-only page for their collection, and administrators can reset 
   Another administrator's account can be reset, and when two resets of one account cross, the later one is refused.
 - **Scheduler account:** the account that monthly certificates are recorded under cannot be reset and cannot sign in, even if it is made active.
 - **Caching:** every API response sends `Cache-Control: no-store`.
+- **Push after an access change:** a password reset, a role change, disabling and enabling an account each remove its push subscriptions, so a signed-out phone stops receiving notifications.
+  After the next sign-in, the web app sends the browser's subscription again if notifications are allowed, and a shared browser moves to whoever signed in last.
 
 ## 1.1.0 (2026-10-30)
 
