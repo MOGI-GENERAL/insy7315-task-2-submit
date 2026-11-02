@@ -462,6 +462,35 @@ describe('password reset', () => {
   });
 });
 
+describe('push subscriptions', () => {
+  test('a reset, a disable, an enable and a role change each clear them', async () => {
+    const user = await createUser({ role: 'coordinator' });
+    const subscribe = () =>
+      UserModel.updateOne(
+        { _id: user._id },
+        {
+          $set: {
+            pushSubscriptions: [
+              { endpoint: 'https://push.example/1', keys: { p256dh: 'p256dh-key', auth: 'auth' } },
+            ],
+          },
+        },
+      );
+    const changes = [
+      ['reset', () => reset(adminClient, user.id)],
+      ['disable', () => patch(adminClient, user.id, { status: 'disabled' })],
+      ['enable', () => patch(adminClient, user.id, { status: 'active' })],
+      ['role', () => patch(adminClient, user.id, { role: 'administrator' })],
+    ] as const;
+
+    for (const [name, change] of changes) {
+      await subscribe();
+      expect((await change()).status, name).toBe(200);
+      expect((await UserModel.findById(user._id).lean())!.pushSubscriptions, name).toEqual([]);
+    }
+  });
+});
+
 describe('self-protection', () => {
   test('an administrator cannot disable themselves or give up the role', async () => {
     const self = await createUser({ role: 'administrator' });

@@ -22,7 +22,7 @@ export class UserRepository {
     return UserModel.find(query).sort({ fullName: 1, _id: 1 }).exec();
   }
 
-  /** null if the role or status changed since it was read */
+  /** null if the role or status changed since it was read. push stops with the sessions */
   updateAccess(
     id: Types.ObjectId | string,
     from: { role: Role; status: UserStatus },
@@ -31,7 +31,7 @@ export class UserRepository {
   ) {
     return UserModel.findOneAndUpdate(
       { _id: id, role: from.role, status: from.status },
-      { $set: changes },
+      { $set: { ...changes, pushSubscriptions: [] } },
       { returnDocument: 'after', runValidators: true, session },
     ).exec();
   }
@@ -81,7 +81,7 @@ export class UserRepository {
   ) {
     return UserModel.findOneAndUpdate(
       { _id: id, status: 'active', passwordHash: from },
-      { $set: { passwordHash, mustChangePassword: true } },
+      { $set: { passwordHash, mustChangePassword: true, pushSubscriptions: [] } },
       { returnDocument: 'after', runValidators: true, session },
     ).exec();
   }
