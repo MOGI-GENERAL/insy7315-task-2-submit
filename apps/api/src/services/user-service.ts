@@ -268,11 +268,7 @@ export class UserService {
     }
   }
 
-  /**
-   * replaces a forgotten password with a temporary one, shown here once. the
-   * user is signed out everywhere, must choose a new password at the next
-   * sign-in, and any delay from failed sign-ins on their email is lifted
-   */
+  /** the temporary password appears in this response and nowhere else */
   async resetPassword(adminId: string, userId: string): Promise<ResetPasswordResponse> {
     const user = await this.users.findById(userId);
     if (!user) throw new NotFoundError();
@@ -299,11 +295,11 @@ export class UserService {
         { type: AUDIT_TARGET, id: changed._id },
         { session },
       );
+      await this.sessions.deleteForUser(userId, undefined, session);
+      await this.throttle.clear(throttleKey(changed.email), session);
       return changed;
     });
 
-    await this.sessions.deleteForUser(userId);
-    await this.throttle.clear(throttleKey(updated.email));
     return { user: userView(updated), tempPassword };
   }
 

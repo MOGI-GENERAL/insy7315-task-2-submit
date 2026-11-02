@@ -13,10 +13,16 @@ import mongoose, { Types } from 'mongoose';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import {
   AuditLogModel,
+  AuditLogRepository,
   LoginThrottleRepository,
+  OrganisationRepository,
   SESSIONS_COLLECTION,
+  SessionRepository,
   UserModel,
+  UserRepository,
 } from '../../src/db/index.js';
+import { AuditService } from '../../src/services/audit-service.js';
+import { UserService } from '../../src/services/user-service.js';
 import type { TestClient } from '../test-client.js';
 import {
   TEST_PASSWORD,
@@ -360,6 +366,29 @@ describe('password reset', () => {
 
     expect(await throttle.isBlocked(key)).toBe(false);
     await expect(signedInClient(baseUrl, user.email, tempPassword)).resolves.toBeTruthy();
+  });
+
+  test('a failure partway leaves the password, the sessions and the audit log as they were', async () => {
+    const user = await createUser({ role: 'coordinator' });
+    const client = await signedInClient(baseUrl, user.email);
+    const throttle = new LoginThrottleRepository();
+    throttle.clear = () => Promise.reject(new Error('throttle store down'));
+    const service = new UserService(
+      new UserRepository(),
+      new OrganisationRepository(),
+      new SessionRepository(),
+      new AuditService(new AuditLogRepository()),
+      throttle,
+    );
+
+    await expect(service.resetPassword(admin.id, user.id)).rejects.toThrow('throttle store down');
+
+    expect(await UserModel.findById(user._id).lean()).toMatchObject({
+      passwordHash: user.passwordHash,
+      mustChangePassword: false,
+    });
+    expect((await client.get('/api/me')).status).toBe(200);
+    expect(await auditRows(user._id)).toEqual([]);
   });
 
   test('a disabled account and your own account are refused, and nothing changes', async () => {
