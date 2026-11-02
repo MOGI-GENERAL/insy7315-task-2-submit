@@ -3,6 +3,9 @@ import { e164Phone, email, isoDay, objectId, shortText } from './common.js';
 import { AuditEntry, User } from './entities.js';
 import { AuditAction, Language, Role, UserStatus } from './enums.js';
 
+/** a disabled administrator that scheduled actions are audited under. nobody may sign in as it */
+export const SCHEDULER_EMAIL = 'scheduler@fedsa.invalid';
+
 export const ListUsersQuery = z.object({
   role: Role.optional(),
   status: UserStatus.optional(),

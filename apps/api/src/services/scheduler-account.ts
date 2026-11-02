@@ -1,8 +1,7 @@
 import { randomBytes } from 'node:crypto';
+import { SCHEDULER_EMAIL } from '@fedsa/contract';
 import type { UserRepository } from '../db/index.js';
 import { hashPassword } from './user-service.js';
-
-export const SCHEDULER_EMAIL = 'scheduler@fedsa.invalid';
 
 const DUPLICATE_KEY = 11000;
 

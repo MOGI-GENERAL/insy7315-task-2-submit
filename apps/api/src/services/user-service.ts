@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 import {
+  SCHEDULER_EMAIL,
   SUBURBS,
   suburbLocation,
   type ChangePasswordRequest,
@@ -146,8 +147,8 @@ export class UserService {
   }
 
   /**
-   * an unknown email, a wrong password and a disabled account all fail the same
-   * way, and all count towards the delay on that email
+   * an unknown email, a wrong password, a disabled account and the scheduler all
+   * fail the same way, and all count towards the delay on that email
    */
   async login(credentials: LoginRequest): Promise<SessionResponse> {
     const key = throttleKey(credentials.email);
@@ -158,7 +159,7 @@ export class UserService {
     const hash = user ? user.passwordHash : await this.hashForUnknownUser();
     const matches = await bcrypt.compare(credentials.password, hash);
 
-    if (!user || !matches || user.status !== 'active') {
+    if (!user || !matches || user.status !== 'active' || user.email === SCHEDULER_EMAIL) {
       await this.recordLoginFailure(key);
       throw new UnauthenticatedError(LOGIN_FAILED);
     }
@@ -277,6 +278,9 @@ export class UserService {
     if (!user) throw new NotFoundError();
     if (userId === adminId) {
       throw new InvalidStateError('Change your own password from your account instead');
+    }
+    if (user.email === SCHEDULER_EMAIL) {
+      throw new InvalidStateError('The scheduler account cannot sign in');
     }
     if (user.status !== 'active') {
       throw new InvalidStateError('Enable the account before resetting its password');

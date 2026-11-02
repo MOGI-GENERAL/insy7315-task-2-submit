@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { AuditAction, CreateUserRequest, Language, Role } from '@fedsa/contract';
+import { AuditAction, CreateUserRequest, Language, Role, SCHEDULER_EMAIL } from '@fedsa/contract';
 import type { Organisation, Role as RoleName, User } from '@fedsa/contract';
 import { Field, FormError, useForm } from '../../components/forms';
 import type { Validator } from '../../components/forms';
@@ -332,7 +332,7 @@ export function ManageAccounts() {
                             >
                               {u.status === 'active' ? t('acct.disable') : t('acct.enable')}
                             </button>
-                            {u.status === 'active' && (
+                            {u.status === 'active' && u.email !== SCHEDULER_EMAIL && (
                               <button
                                 type="button"
                                 className="btn btn--ghost"
