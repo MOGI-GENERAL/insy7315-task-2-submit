@@ -5,8 +5,11 @@ import type { Dictionary } from './strings';
 export interface LanguageContextValue {
   language: Language;
   dictionary: Dictionary;
-  setLanguage: (language: Language) => void;
+  /** `remember` false applies the language for this visit without storing it */
+  setLanguage: (language: Language, remember?: boolean) => void;
 }
+
+export const LANGUAGE_STORAGE_KEY = 'fedsa.language';
 
 export const LanguageContext = createContext<LanguageContextValue | null>(null);
 

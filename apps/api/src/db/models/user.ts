@@ -34,6 +34,8 @@ const userSchema = new Schema(
     email: { type: String, required: true, trim: true, lowercase: true, maxlength: 254 },
     /** a length floor, so a plaintext password cannot be stored by mistake */
     passwordHash: { type: String, required: true, minlength: 20 },
+    /** goes up with each new password. a session from an older one is signed out */
+    passwordVersion: { type: Number, required: true, default: 0, min: 0 },
     phone: { type: String, required: true, match: new RegExp(E164_PATTERN) },
     languagePreference: { type: String, enum: Language.options, required: true },
     status: { type: String, enum: UserStatus.options, required: true, default: 'active' },
@@ -70,6 +72,7 @@ export const userValidator = {
       fullName: text(1, 120),
       email: text(3, 254),
       passwordHash: { bsonType: 'string', minLength: 20 },
+      passwordVersion: { bsonType: 'number', minimum: 0 },
       phone: { bsonType: 'string', pattern: E164_PATTERN },
       languagePreference: oneOf(Language.options),
       status: oneOf(UserStatus.options),

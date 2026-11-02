@@ -1,6 +1,8 @@
+import { randomBytes } from 'node:crypto';
 import type {
   ClaimResponse,
   CollectionResponse,
+  CreateUserResponse,
   PostOfferResponse,
   RouteKey,
 } from '@fedsa/contract';
@@ -86,6 +88,8 @@ async function transportClaim(t: ContractContext) {
   if (claimed.status !== 201) throw new Error(`claiming for dispatch gave ${claimed.status}`);
   return ((await claimed.json()) as ClaimResponse).claim.id;
 }
+
+const newToken = () => randomBytes(32).toString('base64url');
 
 const driver = () => ({
   driverName: 'Themba Mokoena',
@@ -473,6 +477,45 @@ export const CONTRACT_CASES: Partial<Record<RouteKey, ContractCase>> = {
     },
   },
 
+  'PUT /api/collections/:id/driver-link': {
+    success: async (t) => {
+      const dispatched = await t.request(
+        'nadia',
+        'POST',
+        `/api/claims/${await transportClaim(t)}/collection`,
+        driver(),
+      );
+      const { collection } = (await dispatched.json()) as CollectionResponse;
+      return t.request('nadia', 'PUT', `/api/collections/${collection.id}/driver-link`, {
+        driverToken: newToken(),
+      });
+    },
+    error: {
+      code: 'INVALID_STATE',
+      send: async (t) =>
+        t.request(
+          'nadia',
+          'PUT',
+          `/api/collections/${await t.collectionId('Pastries and day-old bread')}/driver-link`,
+          { driverToken: newToken() },
+        ),
+    },
+  },
+  'GET /api/driver-collections/:token': {
+    success: async (t) => {
+      const driverToken = newToken();
+      await t.request('nadia', 'POST', `/api/claims/${await transportClaim(t)}/collection`, {
+        ...driver(),
+        driverToken,
+      });
+      return t.request('anonymous', 'GET', `/api/driver-collections/${driverToken}`);
+    },
+    error: {
+      code: 'NOT_FOUND',
+      send: (t) => t.request('anonymous', 'GET', `/api/driver-collections/${newToken()}`),
+    },
+  },
+
   'GET /api/notifications': {
     success: (t) => t.request('peter', 'GET', '/api/notifications'),
     error: {
@@ -661,6 +704,27 @@ export const CONTRACT_CASES: Partial<Record<RouteKey, ContractCase>> = {
         t.request('zanele', 'PATCH', `/api/users/${await t.userId('zanele')}`, {
           status: 'disabled',
         }),
+    },
+  },
+  'POST /api/users/:id/password-reset': {
+    // its own new account. resetting a seeded person would end sessions the other cases share
+    success: async (t) => {
+      const created = await t.request('zanele', 'POST', '/api/users', {
+        fullName: 'Ayanda Khumalo',
+        email: 'ayanda@fedsa.example',
+        role: 'coordinator',
+        phone: '+27829990003',
+        languagePreference: 'en',
+      });
+      if (created.status !== 201)
+        throw new Error(`creating the account to reset gave ${created.status}`);
+      const { user } = (await created.json()) as CreateUserResponse;
+      return t.request('zanele', 'POST', `/api/users/${user.id}/password-reset`);
+    },
+    error: {
+      code: 'INVALID_STATE',
+      send: async (t) =>
+        t.request('zanele', 'POST', `/api/users/${await t.userId('zanele')}/password-reset`),
     },
   },
   'GET /api/audit-log': {

@@ -39,6 +39,7 @@ import { OrganisationService } from './services/organisation-service.js';
 import { ReportingService } from './services/reporting-service.js';
 import { UserService } from './services/user-service.js';
 import { WebhookService } from './services/webhook-service.js';
+import { parseWebOrigin } from './web-origin.js';
 
 const logger = createLogger();
 
@@ -56,6 +57,13 @@ async function start() {
   if (!(radiusKm > 0)) {
     logger.fatal('MATCH_RADIUS_KM must be a number of kilometres above zero');
     process.exit(1);
+  }
+
+  const webOrigin = parseWebOrigin(process.env.WEB_ORIGIN);
+  if (!webOrigin) {
+    const set = !!process.env.WEB_ORIGIN?.trim();
+    const log = set ? logger.error.bind(logger) : logger.warn.bind(logger);
+    log(`WEB_ORIGIN is ${set ? 'not a valid origin' : 'not set'}, so driver texts have no link`);
   }
 
   let sessionStore;
@@ -122,6 +130,7 @@ async function start() {
     new AuditService(new AuditLogRepository()),
     notifications,
     logger,
+    webOrigin,
   );
   const services = {
     // Render sets RENDER_GIT_COMMIT on every deploy

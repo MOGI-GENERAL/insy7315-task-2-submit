@@ -22,7 +22,7 @@ export class UserRepository {
     return UserModel.find(query).sort({ fullName: 1, _id: 1 }).exec();
   }
 
-  /** null if the role or status changed since it was read */
+  /** null if the role or status changed since it was read. push stops with the sessions */
   updateAccess(
     id: Types.ObjectId | string,
     from: { role: Role; status: UserStatus },
@@ -31,7 +31,7 @@ export class UserRepository {
   ) {
     return UserModel.findOneAndUpdate(
       { _id: id, role: from.role, status: from.status },
-      { $set: changes },
+      { $set: { ...changes, pushSubscriptions: [] } },
       { returnDocument: 'after', runValidators: true, session },
     ).exec();
   }
@@ -48,9 +48,10 @@ export class UserRepository {
     return new UserModel(data).save({ session });
   }
 
-  recordLogin(id: Types.ObjectId | string) {
-    return UserModel.findByIdAndUpdate(
-      id,
+  /** null if the account was disabled or its password changed after it was checked */
+  recordLogin(id: Types.ObjectId | string, passwordHash: string) {
+    return UserModel.findOneAndUpdate(
+      { _id: id, status: 'active', passwordHash },
       { $set: { lastLoginAt: new Date() } },
       { returnDocument: 'after' },
     ).exec();
@@ -65,9 +66,27 @@ export class UserRepository {
   }
 
   updatePassword(id: Types.ObjectId | string, passwordHash: string) {
-    return UserModel.updateOne(
-      { _id: id },
-      { $set: { passwordHash, mustChangePassword: false } },
+    return UserModel.findByIdAndUpdate(
+      id,
+      { $set: { passwordHash, mustChangePassword: false }, $inc: { passwordVersion: 1 } },
+      { returnDocument: 'after' },
+    ).exec();
+  }
+
+  /** null if the account was disabled or its password changed since it was read */
+  resetPassword(
+    id: Types.ObjectId | string,
+    from: string,
+    passwordHash: string,
+    session?: ClientSession,
+  ) {
+    return UserModel.findOneAndUpdate(
+      { _id: id, status: 'active', passwordHash: from },
+      {
+        $set: { passwordHash, mustChangePassword: true, pushSubscriptions: [] },
+        $inc: { passwordVersion: 1 },
+      },
+      { returnDocument: 'after', runValidators: true, session },
     ).exec();
   }
 

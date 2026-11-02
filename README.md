@@ -90,12 +90,13 @@ All paths start with `/api`.
 | Organisations   | `GET` and `PATCH /organisations/me`, `GET /organisations`, `GET /organisations/:id`, `POST /organisations/:id/verification`, `PUT /organisations/:id/notes` |
 | Offers          | `POST` and `GET /offers`, `GET /offers/:id`, `POST /offers/:id/cancel`                                                                                      |
 | Claims          | `POST /offers/:id/claim`, `GET /claims`, `POST /claims/:id/release`                                                                                         |
-| Dispatch        | `POST /claims/:id/collection`, `PATCH /collections/:id`                                                                                                     |
+| Dispatch        | `POST /claims/:id/collection`, `PATCH /collections/:id`, `PUT /collections/:id/driver-link`                                                                 |
+| Driver page     | `GET /driver-collections/:token`, public                                                                                                                    |
 | Handover        | `POST /offers/:id/handover/donor-confirm`, `/handover/recipient-confirm`, `GET /handovers`, `POST /handovers/:id/resolution`, `GET /handovers/:id/photo`    |
 | Notifications   | `GET /notifications`, `POST /notifications/:id/read`                                                                                                        |
 | Reports         | `GET /reports/impact`, `/reports/outcomes`, `/reports/export`                                                                                               |
 | Certificates    | `GET` and `PUT /valuation-rates`, `POST` and `GET /tax-certificates`, `GET /tax-certificates/:id/pdf`                                                       |
-| Users           | `GET` and `POST /users`, `PATCH /users/:id`, `GET /audit-log`                                                                                               |
+| Users           | `GET` and `POST /users`, `PATCH /users/:id`, `POST /users/:id/password-reset`, `GET /audit-log`                                                             |
 | Twilio          | `POST /webhooks/twilio/inbound`, `/webhooks/twilio/status`                                                                                                  |
 | Documentation   | `GET /openapi.json`                                                                                                                                         |
 
@@ -174,6 +175,10 @@ The isiXhosa text has not yet been reviewed by a first-language speaker.
 - SMS and WhatsApp delivery is built and tested but was not sent live, because the Twilio trial account refused every message.
   Web push and the in-app inbox are the live channels.
   After a driver is dispatched, the app fills in the driver's text for the coordinator to send from their own WhatsApp or email, or to copy.
+  The text ends with a link to a read-only page for that collection, at `/c/<token>`, which needs no sign-in.
+  The browser makes the token and the API stores only its hash.
+  The link stops working when the collection is completed or cancelled, when the claim is no longer active, and 24 hours after the collection deadline, and *Share again* replaces it.
+  Netlify and Render record the link's path in their own access logs.
 - Not built: offline queueing of forms, PDF export of reports, a coordinator override of a claim, and a production WhatsApp sender.
 
 ## Team

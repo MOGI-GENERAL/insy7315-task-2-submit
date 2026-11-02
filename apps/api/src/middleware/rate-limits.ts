@@ -3,6 +3,7 @@ import { ipKeyGenerator, rateLimit, type Store } from 'express-rate-limit';
 import { RateLimitedError } from '../errors.js';
 
 const FIFTEEN_MINUTES = 15 * 60 * 1000;
+const ONE_MINUTE = 60 * 1000;
 const ONE_HOUR = 60 * 60 * 1000;
 
 function refuse(_req: Request, _res: Response, next: NextFunction) {
@@ -50,6 +51,17 @@ export function registerLimit(store?: Store) {
   return rateLimit({
     windowMs: ONE_HOUR,
     limit: 10,
+    keyGenerator: clientIp,
+    handler: refuse,
+    store,
+  });
+}
+
+/** the driver link is public. every guess at a token counts against the address */
+export function driverLinkLimit(store?: Store) {
+  return rateLimit({
+    windowMs: ONE_MINUTE,
+    limit: 30,
     keyGenerator: clientIp,
     handler: refuse,
     store,

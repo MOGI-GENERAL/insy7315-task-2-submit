@@ -41,6 +41,14 @@ export interface FakeOptions {
   failOn: ReadonlySet<string>;
 }
 
+/** a driver link that opens the page on demo data, for the first claim that needs transport */
+export const DEMO_DRIVER_TOKEN = 'DemoDriverLinkDemoDriverLinkDemoDriverLink0';
+
+/** the API's driver link works until a day after the collection deadline */
+const LINK_GRACE_MS = 24 * 60 * 60 * 1000;
+const linkExpired = (offer: Offer) =>
+  Date.now() > Date.parse(offer.collectionDeadline) + LINK_GRACE_MS;
+
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 let sequence = 0;
@@ -91,6 +99,10 @@ function eligibleRecipientIds(
 export function createFakeDataLayer(store: Store, options: FakeOptions): DataLayer {
   const state = () => store.getState();
   const idempotency = new Map<string, string>();
+  /** driver token to claim ID */
+  const driverTokens = new Map<string, string>();
+  const demoClaim = state().claims.find((c) => c.transportNeeded && c.status === 'active');
+  if (demoClaim) driverTokens.set(DEMO_DRIVER_TOKEN, demoClaim.id);
   /** endpoint to user ID */
   const pushEndpoints = new Map<string, string>();
   let rates = (['bakery', 'produce', 'dairy', 'prepared', 'dry', 'other'] as const).map(
@@ -199,7 +211,10 @@ export function createFakeDataLayer(store: Store, options: FakeOptions): DataLay
           }
           return { user: toUser(me(), state()) };
         }),
-      changePassword: () => call('auth', 'changePassword', () => void me()),
+      changePassword: () =>
+        call('auth', 'changePassword', () => {
+          store.dispatch({ type: 'FAKE_CHANGE_PASSWORD', userId: me().id });
+        }),
     },
 
     organisations: {
@@ -414,10 +429,15 @@ export function createFakeDataLayer(store: Store, options: FakeOptions): DataLay
           if (!claim) throw notFound();
           // a repeat gets the first collection back, as the API does
           if (collectionForClaim(state(), id)) {
-            return { collection: toCollection(collectionForClaim(state(), id)!) };
+            return { collection: toCollection(collectionForClaim(state(), id)!), created: false };
           }
           if (claim.status !== 'active' || !claim.transportNeeded) {
             throw invalidState('Only an active claim that needs transport can be dispatched.');
+          }
+          if (body.driverToken && driverTokens.has(body.driverToken)) {
+            throw new ApiError('VALIDATION_FAILED', 'Some fields need attention.', {
+              driverToken: 'Use a new link.',
+            });
           }
           store.dispatch({
             type: 'DISPATCH_DRIVER',
@@ -427,7 +447,8 @@ export function createFakeDataLayer(store: Store, options: FakeOptions): DataLay
             driverPhone: body.driverPhone,
             scheduledFor: body.scheduledFor,
           });
-          return { collection: toCollection(collectionForClaim(state(), id)!) };
+          if (body.driverToken) driverTokens.set(body.driverToken, id);
+          return { collection: toCollection(collectionForClaim(state(), id)!), created: true };
         }),
       updateCollection: (id, body) =>
         call('claims', 'updateCollection', () => {
@@ -438,6 +459,68 @@ export function createFakeDataLayer(store: Store, options: FakeOptions): DataLay
           }
           store.dispatch({ type: 'FAKE_UPDATE_COLLECTION', collectionId: id, status: body.status });
           return { collection: toCollection(state().collections.find((c) => c.id === id)!) };
+        }),
+      rotateDriverLink: (id, body) =>
+        call('claims', 'rotateDriverLink', () => {
+          me();
+          const collection = state().collections.find((c) => c.id === id);
+          if (!collection) throw notFound();
+          if (collection.status !== 'dispatched') {
+            throw invalidState('This collection is already closed.');
+          }
+          const claim = state().claims.find((c) => c.id === collection.claimId);
+          const offer = offerById(state(), claim?.offerId);
+          if (offer && linkExpired(offer)) {
+            throw invalidState(
+              'This collection is past its deadline and can no longer get a link.',
+            );
+          }
+          if (driverTokens.has(body.driverToken)) {
+            throw new ApiError('VALIDATION_FAILED', 'Some fields need attention.', {
+              driverToken: 'Use a new link.',
+            });
+          }
+          for (const [token, claimId] of driverTokens) {
+            if (claimId === collection.claimId) driverTokens.delete(token);
+          }
+          driverTokens.set(body.driverToken, collection.claimId);
+        }),
+    },
+
+    driver: {
+      collection: (token) =>
+        call('driver', 'collection', () => {
+          const s = state();
+          const claim = s.claims.find((c) => c.id === driverTokens.get(token));
+          const offer = offerById(s, claim?.offerId);
+          const collection = claim && collectionForClaim(s, claim.id);
+          const donor = orgById(s, offer?.donorOrganisationId);
+          const recipient = orgById(s, claim?.recipientOrganisationId);
+          if (!claim || !offer || !donor || !recipient) throw notFound();
+          if (collection && collection.status !== 'dispatched') throw notFound();
+          if (claim.status !== 'active' || linkExpired(offer)) throw notFound();
+          const stop = (org: Organisation) => {
+            const { addressLine, suburb } = toOrganisation(org, false);
+            return {
+              organisationName: org.name,
+              address: `${addressLine}, ${suburb}`,
+              contactName: org.contactName,
+              contactPhone: org.contactPhone,
+            };
+          };
+          return {
+            reference: offer.reference,
+            title: offer.title,
+            description: offer.description || null,
+            category: offer.category,
+            quantityKg: offer.offeredQuantityKg,
+            coldChain: offer.coldChain,
+            collectionDeadline: offer.collectionDeadline,
+            scheduledFor: collection?.scheduledFor ?? null,
+            driverName: collection?.driverName ?? 'Themba Mokoena',
+            pickup: stop(donor),
+            dropOff: stop(recipient),
+          };
         }),
     },
 
@@ -685,11 +768,12 @@ export function createFakeDataLayer(store: Store, options: FakeOptions): DataLay
             jobTitle: '',
             language: body.languagePreference,
             active: true,
+            mustChangePassword: true,
             personaNote: '',
           };
           store.dispatch({ type: 'FAKE_ADD_USER', user, actorUserId: me().id });
           return {
-            user: { ...toUser(user, state()), mustChangePassword: true },
+            user: toUser(user, state()),
             tempPassword: 'Demo-Temp-1234',
           };
         }),
@@ -720,6 +804,26 @@ export function createFakeDataLayer(store: Store, options: FakeOptions): DataLay
               state().users.find((u) => u.id === id)!,
               state(),
             ),
+          };
+        }),
+      resetPassword: (id) =>
+        call('users', 'resetPassword', () => {
+          const actor = me();
+          const target = state().users.find((u) => u.id === id);
+          if (!target) throw notFound();
+          if (id === actor.id) {
+            throw invalidState('Change your own password from your account instead.');
+          }
+          if (!target.active) {
+            throw invalidState('Enable the account before resetting its password.');
+          }
+          store.dispatch({ type: 'FAKE_RESET_PASSWORD', actorUserId: actor.id, targetUserId: id });
+          return {
+            user: toUser(
+              state().users.find((u) => u.id === id)!,
+              state(),
+            ),
+            tempPassword: 'Demo-Temp-1234',
           };
         }),
       auditLog: (query) =>

@@ -14,9 +14,8 @@ import { createDataLayer } from './data';
 import { DataProvider } from './data/DataProvider';
 import { LanguageProvider } from './i18n/LanguageProvider';
 import { ToastProvider } from './components/feedback';
-import { AuthProvider } from './auth/AuthProvider';
 import { DemoDataBanner } from './components/DemoDataBanner';
-import { App } from './App';
+import { Root } from './Root';
 
 const data = await createDataLayer();
 
@@ -28,9 +27,7 @@ createRoot(document.getElementById('root')!).render(
         <DemoDataBanner />
         <DataProvider data={data}>
           <ToastProvider>
-            <AuthProvider>
-              <App />
-            </AuthProvider>
+            <Root />
           </ToastProvider>
         </DataProvider>
       </LanguageProvider>

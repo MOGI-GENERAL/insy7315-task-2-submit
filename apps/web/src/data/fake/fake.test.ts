@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import { createStore } from '../../store/store';
 import { isApiError } from '../ApiError';
 import { createFakeDataLayer } from '.';
@@ -152,12 +152,36 @@ describe('fake data layer', () => {
       const first = await data.claims.dispatch(claim.id, request('Themba Mokoena'));
       const repeat = await data.claims.dispatch(claim.id, request('Someone Else'));
 
-      expect(repeat).toEqual(first);
+      expect(first.created).toBe(true);
+      expect(repeat).toEqual({ collection: first.collection, created: false });
       expect(first.collection).toMatchObject({
         status: 'dispatched',
         driverName: 'Themba Mokoena',
         scheduledFor,
       });
+    });
+
+    test('a repeat dispatch keeps the first driver and the first link', async () => {
+      const { data, claim } = await claimWithoutDriver();
+      const first = 'a'.repeat(43);
+      const second = 'b'.repeat(43);
+
+      await data.claims.dispatch(claim.id, { ...request('Themba Mokoena'), driverToken: first });
+      const repeat = await data.claims.dispatch(claim.id, {
+        ...request('Someone Else'),
+        driverPhone: '+27829998888',
+        driverToken: second,
+      });
+
+      expect(repeat.created).toBe(false);
+      expect(repeat.collection).toMatchObject({
+        driverName: 'Themba Mokoena',
+        driverPhone: '+27821112222',
+      });
+      await expect(data.driver.collection(first)).resolves.toMatchObject({
+        driverName: 'Themba Mokoena',
+      });
+      await expect(data.driver.collection(second)).rejects.toMatchObject({ code: 'NOT_FOUND' });
     });
 
     test('a collection can be closed once and then stays closed', async () => {
@@ -170,6 +194,111 @@ describe('fake data layer', () => {
         data.claims.updateCollection(collection.id, { status: 'cancelled' }),
       ).rejects.toMatchObject({ code: 'INVALID_STATE', status: 409 });
     });
+  });
+
+  describe('driver link', () => {
+    const token = (c: string) => c.repeat(43);
+
+    async function dispatched(driverToken: string) {
+      const { data } = setup();
+      await data.auth.login({ email: 'nadia@example.org', password: 'x' });
+      const { items } = await data.claims.list({ status: 'active' });
+      let claim;
+      for (const candidate of items.filter((c) => c.transportNeeded)) {
+        if (!(await data.offers.get(candidate.offerId)).collection) claim = candidate;
+      }
+      const { collection } = await data.claims.dispatch(claim!.id, {
+        driverName: 'Themba Mokoena',
+        driverPhone: '+27821112222',
+        scheduledFor: deadline(),
+        driverToken,
+      });
+      return { data, collection };
+    }
+
+    test('opens the collection it was dispatched with, and nothing else', async () => {
+      const { data } = await dispatched(token('a'));
+
+      const page = await data.driver.collection(token('a'));
+
+      expect(page.driverName).toBe('Themba Mokoena');
+      expect(page.pickup.organisationName).not.toBe('');
+      await expect(data.driver.collection(token('b'))).rejects.toMatchObject({
+        code: 'NOT_FOUND',
+      });
+    });
+
+    test('a reused token is refused', async () => {
+      const { data, collection } = await dispatched(token('a'));
+
+      await expect(
+        data.claims.rotateDriverLink(collection.id, { driverToken: token('a') }),
+      ).rejects.toMatchObject({
+        code: 'VALIDATION_FAILED',
+        fields: { driverToken: expect.any(String) },
+      });
+    });
+
+    test('rotating replaces the old link', async () => {
+      const { data, collection } = await dispatched(token('a'));
+
+      await data.claims.rotateDriverLink(collection.id, { driverToken: token('b') });
+
+      await expect(data.driver.collection(token('a'))).rejects.toMatchObject({
+        code: 'NOT_FOUND',
+      });
+      await expect(data.driver.collection(token('b'))).resolves.toMatchObject({
+        driverName: 'Themba Mokoena',
+      });
+    });
+
+    test('a closed collection has a dead link and cannot be rotated', async () => {
+      const { data, collection } = await dispatched(token('a'));
+      await data.claims.updateCollection(collection.id, { status: 'completed' });
+
+      await expect(data.driver.collection(token('a'))).rejects.toMatchObject({
+        code: 'NOT_FOUND',
+      });
+      await expect(
+        data.claims.rotateDriverLink(collection.id, { driverToken: token('b') }),
+      ).rejects.toMatchObject({ code: 'INVALID_STATE', status: 409 });
+    });
+
+    test('more than a day past the deadline the link is dead and cannot be rotated', async () => {
+      const { data, collection } = await dispatched(token('a'));
+      const { collectionDeadline } = await data.driver.collection(token('a'));
+      const now = vi.spyOn(Date, 'now');
+      try {
+        now.mockReturnValue(Date.parse(collectionDeadline) + 25 * 3_600_000);
+
+        await expect(data.driver.collection(token('a'))).rejects.toMatchObject({
+          code: 'NOT_FOUND',
+        });
+        await expect(
+          data.claims.rotateDriverLink(collection.id, { driverToken: token('b') }),
+        ).rejects.toMatchObject({ code: 'INVALID_STATE', status: 409 });
+      } finally {
+        now.mockRestore();
+      }
+    });
+  });
+
+  test('a reset marks the account until its owner changes the password', async () => {
+    const { data } = setup();
+    await data.auth.login({ email: 'zanele@example.org', password: 'x' });
+    const peter = (await data.users.list({})).items.find((u) => u.email === 'peter@example.org')!;
+
+    const { tempPassword } = await data.users.resetPassword(peter.id);
+    const listed = (await data.users.list({})).items.find((u) => u.id === peter.id)!;
+    expect(listed.mustChangePassword).toBe(true);
+
+    const session = await data.auth.login({ email: peter.email, password: tempPassword });
+    expect(session.user.mustChangePassword).toBe(true);
+    await data.auth.changePassword({
+      currentPassword: tempPassword,
+      newPassword: 'a brand new long password',
+    });
+    expect((await data.auth.me())?.user.mustChangePassword).toBe(false);
   });
 
   test('a method named in failOn rejects with INTERNAL', async () => {

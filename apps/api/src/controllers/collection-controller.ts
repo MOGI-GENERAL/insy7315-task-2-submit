@@ -9,6 +9,15 @@ export function collectionController(collections: CollectionService) {
       res.status(result.created ? 201 : 200).json(result.response);
     },
 
+    async rotateDriverLink(req: Request, res: Response) {
+      await collections.rotateDriverLink(req.user!, String(req.params.id), req.body);
+      res.status(204).end();
+    },
+
+    async driverView(req: Request, res: Response) {
+      res.json(await collections.driverView(String(req.params.token)));
+    },
+
     async update(req: Request, res: Response) {
       res.json(await collections.update(req.user!, String(req.params.id), req.body));
     },

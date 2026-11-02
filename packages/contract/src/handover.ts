@@ -1,14 +1,54 @@
 import { z } from 'zod';
 import { e164Phone, isoDateTime, longText, quantityKgField } from './common.js';
 import { Collection, Handover, Offer, OrganisationSummary } from './entities.js';
-import { Condition } from './enums.js';
+import { ColdChain, Condition, FoodCategory } from './enums.js';
+
+/** 32 random bytes, base64url without padding. the browser makes it, the API stores only a hash */
+export const DriverToken = z.string().regex(/^[A-Za-z0-9_-]{43}$/, 'Not a valid driver link');
+export type DriverToken = z.infer<typeof DriverToken>;
+
+/** a properly minted token has about 30 distinct characters. this refuses a made-up one */
+const MintedDriverToken = DriverToken.refine(
+  (token) => new Set(token).size >= 16,
+  'Not a valid driver link',
+);
 
 export const DispatchRequest = z.object({
   driverName: z.string().trim().min(2).max(120),
   driverPhone: e164Phone,
   scheduledFor: isoDateTime,
+  /** optional, and without it the driver text has no link */
+  driverToken: MintedDriverToken.optional(),
 });
 export type DispatchRequest = z.infer<typeof DispatchRequest>;
+
+export const RotateDriverLinkRequest = z.object({ driverToken: MintedDriverToken });
+export type RotateDriverLinkRequest = z.infer<typeof RotateDriverLinkRequest>;
+
+/** one end of the trip, as the driver needs it */
+export const DriverStop = z.object({
+  organisationName: z.string(),
+  address: z.string(),
+  contactName: z.string(),
+  contactPhone: z.string(),
+});
+export type DriverStop = z.infer<typeof DriverStop>;
+
+/** what the driver link shows. a dead link answers 404 and has no status */
+export const DriverCollectionResponse = z.object({
+  reference: z.string(),
+  title: z.string(),
+  description: z.string().nullable(),
+  category: FoodCategory,
+  quantityKg: z.number(),
+  coldChain: ColdChain,
+  collectionDeadline: isoDateTime,
+  scheduledFor: isoDateTime.nullable(),
+  driverName: z.string(),
+  pickup: DriverStop,
+  dropOff: DriverStop,
+});
+export type DriverCollectionResponse = z.infer<typeof DriverCollectionResponse>;
 
 export const UpdateCollectionRequest = z.object({ status: z.enum(['completed', 'cancelled']) });
 export type UpdateCollectionRequest = z.infer<typeof UpdateCollectionRequest>;

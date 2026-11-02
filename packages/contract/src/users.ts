@@ -3,6 +3,9 @@ import { e164Phone, email, isoDay, objectId, shortText } from './common.js';
 import { AuditEntry, User } from './entities.js';
 import { AuditAction, Language, Role, UserStatus } from './enums.js';
 
+/** a disabled administrator that scheduled actions are audited under. nobody may sign in as it */
+export const SCHEDULER_EMAIL = 'scheduler@fedsa.invalid';
+
 export const ListUsersQuery = z.object({
   role: Role.optional(),
   status: UserStatus.optional(),
@@ -32,6 +35,10 @@ export type CreateUserRequest = z.infer<typeof CreateUserRequest>;
 /** `tempPassword` is shown once and must be changed at first login */
 export const CreateUserResponse = z.object({ user: User, tempPassword: z.string() });
 export type CreateUserResponse = z.infer<typeof CreateUserResponse>;
+
+/** a new `tempPassword`, shown once, that must be changed at the next sign-in */
+export const ResetPasswordResponse = CreateUserResponse;
+export type ResetPasswordResponse = z.infer<typeof ResetPasswordResponse>;
 
 export const UpdateUserRequest = z
   .object({ role: Role.optional(), status: UserStatus.optional() })

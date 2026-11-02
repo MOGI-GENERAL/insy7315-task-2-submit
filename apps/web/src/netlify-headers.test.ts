@@ -13,3 +13,15 @@ test.each([
   const line = siteHeaders.match(new RegExp(`^\\s*${name} = "(.*)"$`, 'm'));
   expect(line?.[1]).toMatch(value);
 });
+
+const driverHeaders =
+  config.split('[[headers]]').find((block) => block.includes('for = "/c/*"')) ?? '';
+
+test.each([
+  ['Referrer-Policy', /^no-referrer$/],
+  ['X-Robots-Tag', /^noindex$/],
+  ['Cache-Control', /^no-store$/],
+])('Netlify sends %s on the driver page', (name, value) => {
+  const line = driverHeaders.match(new RegExp(`^\\s*${name} = "(.*)"$`, 'm'));
+  expect(line?.[1]).toMatch(value);
+});

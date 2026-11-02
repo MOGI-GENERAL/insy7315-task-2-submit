@@ -51,6 +51,17 @@ export async function subscribeBrowser(key: string): Promise<PushSubscriptionReq
       userVisibleOnly: true,
       applicationServerKey: keyBytes(key),
     }));
+  return toRequest(subscription);
+}
+
+/** this browser's subscription without asking anything. null when it has none */
+export async function existingSubscription(): Promise<PushSubscriptionRequest | null> {
+  if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return null;
+  const subscription = await currentSubscription();
+  return subscription ? toRequest(subscription) : null;
+}
+
+function toRequest(subscription: PushSubscription): PushSubscriptionRequest {
   const { keys } = subscription.toJSON();
   return {
     endpoint: subscription.endpoint,

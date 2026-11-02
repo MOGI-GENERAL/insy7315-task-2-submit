@@ -24,6 +24,8 @@ export interface MessageData {
     contactPhone: string;
     deadline: string;
     dropOffAddress: string;
+    /** absent when the dispatch had no driver link */
+    link?: string;
   };
   verification: { organisationName: string };
   dispute: { reference: string; organisationName: string };
@@ -77,7 +79,7 @@ const TEMPLATES: Record<Language, Templates> = {
     }),
     driver_dispatched: (d, f) => ({
       title: `Collection ${d.reference}`,
-      body: `Collect from ${d.pickupAddress} (${d.contactName}, ${d.contactPhone}) by ${f.time(d.deadline)}. Deliver to ${d.dropOffAddress}.`,
+      body: `Collect from ${d.pickupAddress} (${d.contactName}, ${d.contactPhone}) by ${f.time(d.deadline)}. Deliver to ${d.dropOffAddress}.${d.link ? ` Details: ${d.link}` : ''}`,
     }),
     verification: (d) => ({
       title: 'Verification update',
@@ -118,7 +120,7 @@ const TEMPLATES: Record<Language, Templates> = {
     }),
     driver_dispatched: (d, f) => ({
       title: `Afhaling ${d.reference}`,
-      body: `Haal af by ${d.pickupAddress} (${d.contactName}, ${d.contactPhone}) teen ${f.time(d.deadline)}. Lewer af by ${d.dropOffAddress}.`,
+      body: `Haal af by ${d.pickupAddress} (${d.contactName}, ${d.contactPhone}) teen ${f.time(d.deadline)}. Lewer af by ${d.dropOffAddress}.${d.link ? ` Besonderhede: ${d.link}` : ''}`,
     }),
     verification: (d) => ({
       title: 'Verifikasie-opdatering',
@@ -159,7 +161,7 @@ const TEMPLATES: Record<Language, Templates> = {
     }),
     driver_dispatched: (d, f) => ({
       title: `Ukuthatha ${d.reference}`,
-      body: `Dilesi yokuthatha: ${d.pickupAddress} (${d.contactName}, ${d.contactPhone}). Ixesha lokugqibela: ${f.time(d.deadline)}. Dilesi yokuhambisa: ${d.dropOffAddress}.`,
+      body: `Dilesi yokuthatha: ${d.pickupAddress} (${d.contactName}, ${d.contactPhone}). Ixesha lokugqibela: ${f.time(d.deadline)}. Dilesi yokuhambisa: ${d.dropOffAddress}.${d.link ? ` Iinkcukacha: ${d.link}` : ''}`,
     }),
     verification: (d) => ({
       title: 'Uhlaziyo lokuqinisekiswa',

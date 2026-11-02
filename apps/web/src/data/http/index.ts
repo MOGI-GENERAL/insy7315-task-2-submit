@@ -100,10 +100,23 @@ export function createHttpDataLayer(api: ApiClient = createApiClient()): DataLay
       list: (query) => api.get('/api/claims', query),
       release: (claimId, body) =>
         api.send('POST', `/api/claims/${id(claimId)}/release`, { json: body }),
-      dispatch: (claimId, body) =>
-        api.send('POST', `/api/claims/${id(claimId)}/collection`, { json: body }),
+      async dispatch(claimId, body) {
+        let status = 0;
+        const response = await api.send<C.CollectionResponse>(
+          'POST',
+          `/api/claims/${id(claimId)}/collection`,
+          { json: body, onStatus: (s) => (status = s) },
+        );
+        return { ...response, created: status === 201 };
+      },
       updateCollection: (collectionId, body) =>
         api.send('PATCH', `/api/collections/${id(collectionId)}`, { json: body }),
+      rotateDriverLink: (collectionId, body) =>
+        api.send('PUT', `/api/collections/${id(collectionId)}/driver-link`, { json: body }),
+    },
+
+    driver: {
+      collection: (token) => api.getAnonymous(`/api/driver-collections/${id(token)}`),
     },
 
     handovers: {
@@ -151,6 +164,7 @@ export function createHttpDataLayer(api: ApiClient = createApiClient()): DataLay
       list: (query) => api.get('/api/users', query),
       create: (body) => api.send('POST', '/api/users', { json: body }),
       update: (userId, body) => api.send('PATCH', `/api/users/${id(userId)}`, { json: body }),
+      resetPassword: (userId) => api.send('POST', `/api/users/${id(userId)}/password-reset`),
       auditLog: (query) => api.get('/api/audit-log', query),
     },
   };

@@ -1,6 +1,7 @@
 import express, { type Router } from 'express';
 import type { Logger } from 'pino';
 import { pinoHttp } from 'pino-http';
+import { redactRequest } from './logger.js';
 import { clientAddress, type ProxySettings } from './middleware/client-address.js';
 import { csrfProtection } from './middleware/csrf.js';
 import { loadCurrentUser } from './middleware/current-user.js';
@@ -8,7 +9,7 @@ import { errorHandler, notFound } from './middleware/error-handler.js';
 import { requirePasswordChanged } from './middleware/guards.js';
 import type { RateLimitStoreFactory } from './middleware/rate-limit-store.js';
 import { globalLimit } from './middleware/rate-limits.js';
-import { securityHeaders } from './middleware/security-headers.js';
+import { driverLinkHeaders, noStore, securityHeaders } from './middleware/security-headers.js';
 import { sessions, type SessionSettings } from './middleware/session.js';
 import type { TwilioWebhookSettings } from './middleware/twilio-signature.js';
 import { auditLogRouter } from './routes/audit-log-router.js';
@@ -75,8 +76,10 @@ export function createApp(deps: AppDeps) {
   const app = express();
 
   app.set('trust proxy', TRUSTED_PROXY_HOPS);
-  app.use(pinoHttp({ logger: deps.logger }));
+  app.use(pinoHttp({ logger: deps.logger, serializers: { req: redactRequest } }));
   app.use(securityHeaders());
+  app.use('/api', noStore);
+  app.use('/api/driver-collections', driverLinkHeaders);
   app.use(clientAddress(deps.proxy ?? null));
   app.use(express.json({ limit: '100kb' }));
 
@@ -93,7 +96,7 @@ export function createApp(deps: AppDeps) {
   app.use('/api', organisationRouter(deps.services.organisations));
   app.use('/api', offerRouter(deps.services.offers));
   app.use('/api', claimRouter(deps.services.claims));
-  app.use('/api', collectionRouter(deps.services.collections));
+  app.use('/api', collectionRouter(deps.services.collections, deps.rateLimitStores));
   app.use('/api', handoverRouter(deps.services.handovers));
   app.use('/api', notificationRouter(deps.services.notifications));
   app.use('/api', reportRouter(deps.services.reports));

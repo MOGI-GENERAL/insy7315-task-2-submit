@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import {
   ErrorEnvelope,
   ROUTES,
@@ -16,6 +17,7 @@ import {
   OfferModel,
   TaxCertificateModel,
 } from '../../src/db/index.js';
+import { hashDriverToken } from '../../src/services/collection-service.js';
 import {
   TEST_PASSWORD,
   anonymousClient,
@@ -66,6 +68,7 @@ interface World {
   recipientOrganisationId: string;
   pendingOrganisationId: string;
   collectionId: string;
+  driverToken: string;
   /** donor confirmed, recipient has not */
   awaitingReceiptOfferId: string;
   /** received as a problem and not yet resolved, with a donor photo */
@@ -94,6 +97,7 @@ const STRICT = process.env.DENIAL_MATRIX_STRICT === '1';
 
 const ANY_ID = '0123456789abcdef01234567';
 const HOUR = 60 * 60 * 1000;
+const newToken = () => randomBytes(32).toString('base64url');
 const inHours = (hours: number) => new Date(Date.now() + hours * HOUR).toISOString();
 
 const TODAY = new Date().toISOString().slice(0, 10);
@@ -191,6 +195,13 @@ const MATRIX = {
     path: `/api/collections/${w.collectionId}`,
     body: { status: 'completed' },
   }),
+  'PUT /api/collections/:id/driver-link': (w) => ({
+    path: `/api/collections/${w.collectionId}/driver-link`,
+    body: { driverToken: newToken() },
+  }),
+  'GET /api/driver-collections/:token': (w) => ({
+    path: `/api/driver-collections/${w.driverToken}`,
+  }),
   'POST /api/offers/:id/handover/donor-confirm': (w) => {
     const form = new FormData();
     form.append('collectedQuantityKg', '10');
@@ -251,6 +262,9 @@ const MATRIX = {
   'PATCH /api/users/:id': (w) => ({
     path: `/api/users/${w.users.otherRecipient.id}`,
     body: { status: 'disabled' },
+  }),
+  'POST /api/users/:id/password-reset': (w) => ({
+    path: `/api/users/${w.users.otherRecipient.id}/password-reset`,
   }),
   'GET /api/audit-log': () => ({ path: '/api/audit-log' }),
 } satisfies Record<MatrixKey, Row>;
@@ -378,8 +392,10 @@ async function createWorld(): Promise<World> {
     transportNeeded: true,
     status: 'active',
   });
+  const driverToken = newToken();
   const collection = await CollectionModel.create({
     claimId: claim._id,
+    driverTokenHash: hashDriverToken(driverToken),
     dispatchedByUserId: users.coordinator.id,
     driverName: 'Sipho Dube',
     driverPhone: '+27821110000',
@@ -422,6 +438,7 @@ async function createWorld(): Promise<World> {
     donorOrganisationId: donorOrg._id.toString(),
     recipientOrganisationId: recipientOrg._id.toString(),
     collectionId: collection._id.toString(),
+    driverToken,
     awaitingReceiptOfferId: awaitingReceipt.offerId.toString(),
     handoverId: received.handoverId.toString(),
     certificateId: certificate._id.toString(),

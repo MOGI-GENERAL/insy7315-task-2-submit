@@ -33,12 +33,14 @@ import {
   DispatchRequest,
   DonorConfirmFields,
   DonorConfirmResponse,
+  DriverCollectionResponse,
   HandoverListResponse,
   HandoverResponse,
   ListHandoversQuery,
   RecipientConfirmRequest,
   RecipientConfirmResponse,
   ResolutionRequest,
+  RotateDriverLinkRequest,
   UpdateCollectionRequest,
 } from './handover.js';
 import { NotificationListResponse, TwilioInboundBody, TwilioStatusBody } from './notifications.js';
@@ -76,6 +78,7 @@ import {
   CreateUserRequest,
   CreateUserResponse,
   ListUsersQuery,
+  ResetPasswordResponse,
   UpdateUserRequest,
   UserListResponse,
 } from './users.js';
@@ -308,6 +311,20 @@ export const ROUTES = [
     response: CollectionResponse,
   },
   {
+    method: 'PUT',
+    path: '/api/collections/:id/driver-link',
+    access: [C],
+    body: RotateDriverLinkRequest,
+    status: 204,
+  },
+  {
+    method: 'GET',
+    path: '/api/driver-collections/:token',
+    access: 'public',
+    status: 200,
+    response: DriverCollectionResponse,
+  },
+  {
     method: 'POST',
     path: '/api/offers/:id/handover/donor-confirm',
     access: [D],
@@ -452,6 +469,13 @@ export const ROUTES = [
     body: UpdateUserRequest,
     status: 200,
     response: UserResponse,
+  },
+  {
+    method: 'POST',
+    path: '/api/users/:id/password-reset',
+    access: [A],
+    status: 200,
+    response: ResetPasswordResponse,
   },
   {
     method: 'GET',

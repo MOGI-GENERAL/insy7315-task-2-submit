@@ -2,6 +2,32 @@
 
 Each release is merged into `main` and tagged, and the deploy workflow then puts it into production.
 
+## 1.2.0 (2026-11-02)
+
+Drivers get a read-only page for their collection, and administrators can reset a forgotten password.
+
+- **Driver page:** the driver's text ends with a link to `/c/<token>`, a page that needs no sign-in and shows the food, the times, the pickup and drop-off addresses with a link to Maps, and the contact person and number at both ends.
+  The page has no actions and no photograph, and it follows the language of the driver's phone.
+- **Link lifetime:** the link stops working when the collection is completed or cancelled, when the claim is no longer active, and 24 hours after the collection deadline.
+  Every dead link gets the same 404.
+  *Share again* replaces the link, so the previous one stops working.
+- **Token handling:** the browser makes a random token, the API stores only its SHA-256 hash, and the token is left out of API request logs, stored notifications and the console channel.
+  The route is limited to 30 requests a minute for each address.
+- **Configuration:** `WEB_ORIGIN` sets the address the link points to.
+  The SMS and WhatsApp text ends with the link when it is set.
+- **Privacy notice:** says that a driver now sees the contact person and number at both ends, and that the link is temporary.
+- **Password reset:** an administrator resets a forgotten password from the account list.
+  The person keeps their account and email address, gets a temporary password to change at their next sign-in, and is signed out of every device.
+  The reset lifts any sign-in delay on their email and goes on the audit log.
+  The sign-in screen's help text says FEDSA gives a temporary password.
+  Another administrator's account can be reset, and when two resets of one account cross, the later one is refused.
+- **Scheduler account:** the account that monthly certificates are recorded under cannot be reset and cannot sign in, even if it is made active.
+- **Caching:** every API response sends `Cache-Control: no-store`.
+- **Password version:** each account records how many times its password has been set, and each session records the count it signed in with.
+  A session from before a password change or reset is signed out on its next request, even one written after the change by a sign-in still in progress.
+- **Push after an access change:** a password reset, a role change, disabling and enabling an account each remove its push subscriptions, so a signed-out phone stops receiving notifications.
+  After the next sign-in, the web app sends the browser's subscription again if notifications are allowed, and a shared browser moves to whoever signed in last.
+
 ## 1.1.0 (2026-10-30)
 
 Drivers get their collection details, and the security and accessibility checks are part of the build.

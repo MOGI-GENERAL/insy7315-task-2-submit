@@ -1,4 +1,5 @@
 import type { Logger } from 'pino';
+import { hideDriverToken } from '../logger.js';
 import {
   addressesFor,
   type Delivery,
@@ -26,7 +27,10 @@ export class ConsoleChannel implements NotificationChannel {
     return addressesFor(this.name, recipient).map((to) => {
       // the address is left out of the log, because a phone number is personal information
       this.logger.info(
-        { channel: this.name, text: this.name === 'push' ? message.body : message.phoneText },
+        {
+          channel: this.name,
+          text: hideDriverToken(this.name === 'push' ? message.body : message.phoneText),
+        },
         'notification logged, not sent',
       );
       return { to, status: 'sent', providerMessageId: null, gone: false };

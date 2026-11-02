@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 import {
+  SCHEDULER_EMAIL,
   SUBURBS,
   suburbLocation,
   type ChangePasswordRequest,
@@ -8,6 +9,7 @@ import {
   type ListUsersQuery,
   type LoginRequest,
   type RegisterRequest,
+  type ResetPasswordResponse,
   type Role,
   type SessionResponse,
   type UpdateMeRequest,
@@ -90,6 +92,12 @@ export interface SessionUser {
   mustChangePassword: boolean;
 }
 
+/** the response body, and the password version the new session records */
+export interface SignedIn {
+  body: SessionResponse;
+  passwordVersion: number;
+}
+
 export class UserService {
   private readonly users: UserRepository;
   private readonly organisations: OrganisationRepository;
@@ -112,7 +120,7 @@ export class UserService {
     this.throttle = throttle;
   }
 
-  async register(input: RegisterRequest): Promise<SessionResponse> {
+  async register(input: RegisterRequest): Promise<SignedIn> {
     const passwordHash = await hashPassword(input.user.password);
 
     try {
@@ -134,7 +142,10 @@ export class UserService {
           },
           session,
         );
-        return { user: userView(user), organisation: organisationView(organisation) };
+        return {
+          body: { user: userView(user), organisation: organisationView(organisation) },
+          passwordVersion: user.passwordVersion,
+        };
       });
     } catch (err) {
       if (err instanceof mongo.MongoServerError && err.code === DUPLICATE_KEY) {
@@ -145,10 +156,10 @@ export class UserService {
   }
 
   /**
-   * an unknown email, a wrong password and a disabled account all fail the same
-   * way, and all count towards the delay on that email
+   * an unknown email, a wrong password, a disabled account and the scheduler all
+   * fail the same way, and all count towards the delay on that email
    */
-  async login(credentials: LoginRequest): Promise<SessionResponse> {
+  async login(credentials: LoginRequest): Promise<SignedIn> {
     const key = throttleKey(credentials.email);
     if (await this.throttle.isBlocked(key)) throw new RateLimitedError();
 
@@ -157,15 +168,15 @@ export class UserService {
     const hash = user ? user.passwordHash : await this.hashForUnknownUser();
     const matches = await bcrypt.compare(credentials.password, hash);
 
-    if (!user || !matches || user.status !== 'active') {
+    if (!user || !matches || user.status !== 'active' || user.email === SCHEDULER_EMAIL) {
       await this.recordLoginFailure(key);
       throw new UnauthenticatedError(LOGIN_FAILED);
     }
 
-    const updated = await this.users.recordLogin(user._id);
+    const updated = await this.users.recordLogin(user._id, user.passwordHash);
     if (!updated) throw new UnauthenticatedError(LOGIN_FAILED);
     await this.throttle.clear(key);
-    return this.sessionResponse(updated);
+    return { body: await this.sessionResponse(updated), passwordVersion: updated.passwordVersion };
   }
 
   private async recordLoginFailure(key: string) {
@@ -184,10 +195,10 @@ export class UserService {
     return this.sessionResponse(user);
   }
 
-  /** null for a user who no longer exists or has been disabled */
-  async findSessionUser(userId: string): Promise<SessionUser | null> {
+  /** null for a user who no longer exists, has been disabled, or has a newer password than the session */
+  async findSessionUser(userId: string, passwordVersion: number): Promise<SessionUser | null> {
     const user = await this.users.findById(userId);
-    if (!user || user.status !== 'active') return null;
+    if (!user || user.status !== 'active' || user.passwordVersion !== passwordVersion) return null;
     return {
       id: user._id.toString(),
       role: user.role,
@@ -202,8 +213,15 @@ export class UserService {
     return { user: userView(user) };
   }
 
-  /** signs the user out everywhere except the session that made the change */
-  async changePassword(userId: string, input: ChangePasswordRequest, currentSessionId: string) {
+  /**
+   * signs the user out everywhere except the session that made the change, which
+   * has to record the returned password version to stay signed in
+   */
+  async changePassword(
+    userId: string,
+    input: ChangePasswordRequest,
+    currentSessionId: string,
+  ): Promise<number> {
     const user = await this.users.findById(userId);
     if (!user) throw new UnauthenticatedError();
 
@@ -212,8 +230,10 @@ export class UserService {
     }
 
     const passwordHash = await hashPassword(input.newPassword);
-    await this.users.updatePassword(user._id, passwordHash);
+    const updated = await this.users.updatePassword(user._id, passwordHash);
+    if (!updated) throw new UnauthenticatedError();
     await this.sessions.deleteForUser(userId, currentSessionId);
+    return updated.passwordVersion;
   }
 
   async listUsers(query: ListUsersQuery): Promise<UserListResponse> {
@@ -264,6 +284,46 @@ export class UserService {
       }
       throw err;
     }
+  }
+
+  /** the temporary password appears in this response and nowhere else */
+  async resetPassword(adminId: string, userId: string): Promise<ResetPasswordResponse> {
+    const user = await this.users.findById(userId);
+    if (!user) throw new NotFoundError();
+    if (userId === adminId) {
+      throw new InvalidStateError('Change your own password from your account instead');
+    }
+    if (user.email === SCHEDULER_EMAIL) {
+      throw new InvalidStateError('The scheduler account cannot sign in');
+    }
+    if (user.status !== 'active') {
+      throw new InvalidStateError('Enable the account before resetting its password');
+    }
+
+    const tempPassword = newTemporaryPassword();
+    const passwordHash = await hashPassword(tempPassword);
+
+    const updated = await runInTransaction(async (session) => {
+      const changed = await this.users.resetPassword(
+        user._id,
+        user.passwordHash,
+        passwordHash,
+        session,
+      );
+      // another administrator disabled or reset the account first
+      if (!changed) throw new InvalidStateError();
+      await this.audit.record(
+        adminId,
+        'reset_password',
+        { type: AUDIT_TARGET, id: changed._id },
+        { session },
+      );
+      await this.sessions.deleteForUser(userId, undefined, session);
+      await this.throttle.clear(throttleKey(changed.email), session);
+      return changed;
+    });
+
+    return { user: userView(updated), tempPassword };
   }
 
   /** a role or status change signs the user out of every browser */

@@ -26,5 +26,11 @@ export function userRouter(users: UserService) {
     validate({ params: idParams, body: UpdateUserRequest }),
     controller.update,
   );
+  router.post(
+    '/users/:id/password-reset',
+    requireRole('administrator'),
+    validate({ params: idParams }),
+    controller.resetPassword,
+  );
   return router;
 }

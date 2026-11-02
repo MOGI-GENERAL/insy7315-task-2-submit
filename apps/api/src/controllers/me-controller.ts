@@ -13,7 +13,11 @@ export function meController(users: UserService) {
     },
 
     async changePassword(req: Request, res: Response) {
-      await users.changePassword(req.user!.id, req.body, req.sessionID);
+      req.session.passwordVersion = await users.changePassword(
+        req.user!.id,
+        req.body,
+        req.sessionID,
+      );
       res.status(204).end();
     },
   };

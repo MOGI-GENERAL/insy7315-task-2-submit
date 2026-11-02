@@ -22,6 +22,7 @@ interface Call {
   method: string;
   headers: Record<string, string>;
   body: unknown;
+  init: RequestInit;
 }
 
 const json = (status: number, body: unknown) =>
@@ -41,6 +42,7 @@ function fakeServer(replies: Response[]) {
       method: init.method ?? 'GET',
       headers: (init.headers ?? {}) as Record<string, string>,
       body: init.body,
+      init,
     });
     if (url === '/api/auth/csrf') return json(200, { csrfToken: `token-${++tokens}` });
     const next = replies.shift();
@@ -178,5 +180,48 @@ describe('HTTP repositories', () => {
     await data.offers.get('../users');
 
     expect(server.calls.at(-1)!.url).toBe('/api/offers/..%2Fusers');
+  });
+
+  test('the driver page is read with no cookies, no referrer and no CSRF token', async () => {
+    const server = fakeServer([json(200, { reference: 'K4F2' })]);
+    const data = createHttpDataLayer(createApiClient(server.fetchFn));
+
+    await data.driver.collection('a/b');
+
+    expect(server.calls).toHaveLength(1);
+    expect(server.calls[0]!.url).toBe('/api/driver-collections/a%2Fb');
+    expect(server.calls[0]!.init).toMatchObject({
+      credentials: 'omit',
+      referrerPolicy: 'no-referrer',
+    });
+  });
+
+  test('a dispatch is created on 201 and a repeat on 200', async () => {
+    const server = fakeServer([json(201, { collection: { id: 'c' } }), json(200, { collection: {} })]);
+    const data = createHttpDataLayer(createApiClient(server.fetchFn));
+    const body = { driverName: 'Themba', driverPhone: '+27821112222', scheduledFor: 'x' };
+
+    expect((await data.claims.dispatch('clm-1', body)).created).toBe(true);
+    expect((await data.claims.dispatch('clm-1', body)).created).toBe(false);
+  });
+
+  test('a dead driver link is NOT_FOUND', async () => {
+    const server = fakeServer([envelope(404, 'NOT_FOUND')]);
+    const data = createHttpDataLayer(createApiClient(server.fetchFn));
+
+    const error = await data.driver.collection('x').catch((e) => e);
+
+    expect(isApiError(error, 'NOT_FOUND')).toBe(true);
+  });
+
+  test('replacing a driver link is a PUT with the new token', async () => {
+    const server = fakeServer([new Response(null, { status: 204 })]);
+    const data = createHttpDataLayer(createApiClient(server.fetchFn));
+
+    await data.claims.rotateDriverLink('col-1', { driverToken: 'T'.repeat(43) });
+
+    const call = server.calls.find((c) => c.url === '/api/collections/col-1/driver-link')!;
+    expect(call.method).toBe('PUT');
+    expect(JSON.parse(call.body as string)).toEqual({ driverToken: 'T'.repeat(43) });
   });
 });

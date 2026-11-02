@@ -52,6 +52,7 @@ The cron service needs the same database, photo, notification and Twilio setting
 | `NOTIFY_MIRROR` | optional | optional | optional | `false` stops copying offer notifications to WhatsApp or SMS. On when empty |
 | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` | ✓ | ✓ | optional | The webhooks refuse every request without the auth token |
 | `TWILIO_SMS_FROM`, `TWILIO_WHATSAPP_FROM` | ✓ | ✓ | optional | E.164, for example a Twilio trial number |
+| `WEB_ORIGIN` | ✓ | ✓ | optional | The Netlify origin, with no trailing slash. The driver text links to `<WEB_ORIGIN>/c/<token>`, and carries no link without it |
 | `PUBLIC_API_URL` | ✓ | ✓ | – | The Render origin, with no trailing slash. Twilio signs webhook requests against it and sends delivery reports to it |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | ✓ | ✓ | optional | A separate key pair per environment |
 | `MATCH_RADIUS_KM` | optional | optional | optional | Defaults to 15 |

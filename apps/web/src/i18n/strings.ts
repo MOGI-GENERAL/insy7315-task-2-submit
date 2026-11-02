@@ -165,7 +165,7 @@ export const untranslated = {
   'dispatch.shareDone': 'Done',
   'dispatch.emailSubject': 'FEDSA collection {reference}',
   'form.tooShort': 'Use at least {n} characters.',
-  'login.forgot': 'Forgot your password? Phone FEDSA.',
+  'login.forgot': 'Forgot your password? Phone FEDSA for a temporary one.',
   'pending.message': 'The Offers tab shows food as soon as your organisation is verified.',
 
   /* coordinator screens */
@@ -325,6 +325,12 @@ export const untranslated = {
   'acct.disabledDone': 'Account disabled',
   'acct.enabledDone': 'Account enabled',
   'acct.roleDone': 'Role changed',
+  'acct.resetPassword': 'Reset password',
+  'acct.confirmReset': 'Reset the password of {name}?',
+  'acct.whyReset':
+    '{name} is signed out of every device. You get a temporary password to give them, and they must choose their own when they next sign in.',
+  'acct.resetDone': 'Password reset',
+  'acct.resetTitle': 'New temporary password for {name}',
   'acct.newTitle': 'Create an account',
   'acct.newLead':
     'The person gets a temporary password and must choose their own at first sign-in.',
@@ -362,10 +368,12 @@ export const untranslated = {
   'audit.action.disable_user': 'Account disabled',
   'audit.action.enable_user': 'Account enabled',
   'audit.action.change_role': 'Role changed',
+  'audit.action.reset_password': 'Password reset',
   'audit.action.cancel_offer': 'Offer cancelled',
   'audit.action.override_claim': 'Claim overridden',
   'audit.action.dispatch_driver': 'Driver dispatched',
   'audit.action.update_collection': 'Collection updated',
+  'audit.action.rotate_driver_link': 'Driver link replaced',
   'audit.action.resolve_dispute': 'Dispute resolved',
   'audit.action.update_valuation_rates': 'Valuation rates updated',
   'audit.action.issue_certificate': 'Certificate issued',
@@ -543,7 +551,7 @@ export const en = {
     'We never ask for details about the people who receive the food. Do not enter them anywhere in the app.',
   'privacy.sharingTitle': 'Who sees it',
   'privacy.sharing':
-    'FEDSA staff. When you claim an offer, the donor sees your organisation and contact person, and you see theirs. A driver sent to collect sees only that collection’s pickup and drop-off details.',
+    'FEDSA staff. When you claim an offer, the donor sees your organisation and contact person, and you see theirs. A driver sent to collect sees only that collection: the food, the names and addresses of the pickup and drop-off organisations, and the donor’s and recipient’s contact person and number. The driver gets a link that needs no sign-in. It stops working once the collection is completed or cancelled, the claim is no longer active, or 24 hours after the collection deadline, and a coordinator can replace it at any time.',
   'privacy.keepTitle': 'How long we keep it',
   'privacy.keep':
     'Personal details are deleted once they are no longer needed for reporting. Report totals are kept without names.',
@@ -872,6 +880,33 @@ export const en = {
   'dispatch.send': 'Send to driver',
   'dispatch.sending': 'Sending',
   'dispatch.sent': 'Collection details sent to the driver',
+  'dispatch.alreadyArranged':
+    'This collection already had a driver, so the link you just sent will not work. Share it again to send a working one.',
+  'dispatch.rotateFailed':
+    'The new link was not saved, so the link you just sent will not work. Share it again to send a new one.',
+  'dispatch.rotateClosed':
+    'This collection is closed or more than a day past its deadline, so the link you just sent will not work.',
+  'dispatch.copiedReplaced': 'Text copied. The link sent before no longer works.',
+
+  /* DRIVER PAGE */
+  'driver.reference': 'Collection {reference}',
+  'driver.for': 'For {name}',
+  'driver.foodTitle': 'The food',
+  'driver.category': 'Type',
+  'driver.quantity': 'Amount',
+  'driver.temperature': 'Temperature',
+  'driver.notes': 'Notes',
+  'driver.collectBy': 'Collect by',
+  'driver.pickupTime': 'Pickup time',
+  'driver.pickupTitle': 'Pick up from',
+  'driver.dropOffTitle': 'Deliver to',
+  'driver.openMaps': 'Open {address} in Maps',
+  'driver.newTab': '(opens in a new tab)',
+  'driver.callContact': 'Call {name} on {phone}',
+  'driver.contact': 'Contact',
+  'driver.goneTitle': 'Link not available',
+  'driver.gone': 'This link is no longer available. Contact the coordinator who sent it.',
+  'driver.failed': 'Could not load. Try again.',
 
   /* NOTIFICATIONS */
   'notif.title': 'Notifications',
