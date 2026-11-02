@@ -20,6 +20,9 @@ Drivers get a read-only page for their collection, and administrators can reset 
   The person keeps their account and email address, gets a temporary password to change at their next sign-in, and is signed out of every device.
   The reset lifts any sign-in delay on their email and goes on the audit log.
   The sign-in screen's help text says FEDSA gives a temporary password.
+  Another administrator's account can be reset, and when two resets of one account cross, the later one is refused.
+- **Scheduler account:** the account that monthly certificates are recorded under cannot be reset and cannot sign in, even if it is made active.
+- **Caching:** every API response sends `Cache-Control: no-store`.
 
 ## 1.1.0 (2026-10-30)
 
