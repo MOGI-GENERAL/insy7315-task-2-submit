@@ -164,7 +164,7 @@ export class UserService {
       throw new UnauthenticatedError(LOGIN_FAILED);
     }
 
-    const updated = await this.users.recordLogin(user._id);
+    const updated = await this.users.recordLogin(user._id, user.passwordHash);
     if (!updated) throw new UnauthenticatedError(LOGIN_FAILED);
     await this.throttle.clear(key);
     return this.sessionResponse(updated);

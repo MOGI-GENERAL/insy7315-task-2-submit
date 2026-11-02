@@ -48,9 +48,10 @@ export class UserRepository {
     return new UserModel(data).save({ session });
   }
 
-  recordLogin(id: Types.ObjectId | string) {
-    return UserModel.findByIdAndUpdate(
-      id,
+  /** null if the account was disabled or its password changed after it was checked */
+  recordLogin(id: Types.ObjectId | string, passwordHash: string) {
+    return UserModel.findOneAndUpdate(
+      { _id: id, status: 'active', passwordHash },
       { $set: { lastLoginAt: new Date() } },
       { returnDocument: 'after' },
     ).exec();

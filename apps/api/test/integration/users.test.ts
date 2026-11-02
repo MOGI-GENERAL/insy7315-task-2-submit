@@ -384,6 +384,32 @@ describe('password reset', () => {
     expect(await auditRows(user._id)).toHaveLength(1);
   });
 
+  test('a sign-in checked against the old password is refused once a reset lands', async () => {
+    const user = await createUser({ role: 'coordinator' });
+    const users = new UserRepository();
+    const read = users.findByEmail.bind(users);
+    users.findByEmail = async (email) => {
+      const found = await read(email);
+      await UserModel.updateOne(
+        { _id: user._id },
+        { $set: { passwordHash: `$2b$04$${'x'.repeat(53)}` } },
+      );
+      return found;
+    };
+    const service = new UserService(
+      users,
+      new OrganisationRepository(),
+      new SessionRepository(),
+      new AuditService(new AuditLogRepository()),
+      new LoginThrottleRepository(),
+    );
+
+    await expect(service.login({ email: user.email, password: TEST_PASSWORD })).rejects.toThrow(
+      'The email or password is not correct',
+    );
+    expect((await UserModel.findById(user._id).lean())!.lastLoginAt ?? null).toBeNull();
+  });
+
   test('a failure partway leaves the password, the sessions and the audit log as they were', async () => {
     const user = await createUser({ role: 'coordinator' });
     const client = await signedInClient(baseUrl, user.email);
