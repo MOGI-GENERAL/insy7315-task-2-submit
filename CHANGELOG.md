@@ -23,6 +23,8 @@ Drivers get a read-only page for their collection, and administrators can reset 
   Another administrator's account can be reset, and when two resets of one account cross, the later one is refused.
 - **Scheduler account:** the account that monthly certificates are recorded under cannot be reset and cannot sign in, even if it is made active.
 - **Caching:** every API response sends `Cache-Control: no-store`.
+- **Password version:** each account records how many times its password has been set, and each session records the count it signed in with.
+  A session from before a password change or reset is signed out on its next request, even one written after the change by a sign-in still in progress.
 
 ## 1.1.0 (2026-10-30)
 
