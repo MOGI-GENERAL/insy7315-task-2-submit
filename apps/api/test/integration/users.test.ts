@@ -368,6 +368,22 @@ describe('password reset', () => {
     await expect(signedInClient(baseUrl, user.email, tempPassword)).resolves.toBeTruthy();
   });
 
+  test('of two resets at once, one is refused and only the other password works', async () => {
+    const user = await createUser({ role: 'coordinator' });
+    const otherAdmin = await createUser({ role: 'administrator' });
+    const otherClient = await signedInClient(baseUrl, otherAdmin.email);
+
+    const results = await Promise.all([reset(adminClient, user.id), reset(otherClient, user.id)]);
+
+    expect(results.map((res) => res.status).sort()).toEqual([200, 409]);
+    const winner = results.find((res) => res.status === 200)!;
+    const loser = results.find((res) => res.status === 409)!;
+    expect((await errorOf(loser)).code).toBe('INVALID_STATE');
+    const { tempPassword } = ResetPasswordResponse.parse(await winner.json());
+    await expect(signedInClient(baseUrl, user.email, tempPassword)).resolves.toBeTruthy();
+    expect(await auditRows(user._id)).toHaveLength(1);
+  });
+
   test('a failure partway leaves the password, the sessions and the audit log as they were', async () => {
     const user = await createUser({ role: 'coordinator' });
     const client = await signedInClient(baseUrl, user.email);

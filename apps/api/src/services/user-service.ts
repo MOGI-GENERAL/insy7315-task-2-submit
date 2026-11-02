@@ -286,9 +286,14 @@ export class UserService {
     const passwordHash = await hashPassword(tempPassword);
 
     const updated = await runInTransaction(async (session) => {
-      const changed = await this.users.resetPassword(user._id, passwordHash, session);
-      // another administrator disabled the account first
-      if (!changed) throw new InvalidStateError('Enable the account before resetting its password');
+      const changed = await this.users.resetPassword(
+        user._id,
+        user.passwordHash,
+        passwordHash,
+        session,
+      );
+      // another administrator disabled or reset the account first
+      if (!changed) throw new InvalidStateError();
       await this.audit.record(
         adminId,
         'reset_password',

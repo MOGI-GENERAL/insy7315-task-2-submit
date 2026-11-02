@@ -71,10 +71,15 @@ export class UserRepository {
     ).exec();
   }
 
-  /** null if the account was disabled since it was read */
-  resetPassword(id: Types.ObjectId | string, passwordHash: string, session?: ClientSession) {
+  /** null if the account was disabled or its password changed since it was read */
+  resetPassword(
+    id: Types.ObjectId | string,
+    from: string,
+    passwordHash: string,
+    session?: ClientSession,
+  ) {
     return UserModel.findOneAndUpdate(
-      { _id: id, status: 'active' },
+      { _id: id, status: 'active', passwordHash: from },
       { $set: { passwordHash, mustChangePassword: true } },
       { returnDocument: 'after', runValidators: true, session },
     ).exec();
