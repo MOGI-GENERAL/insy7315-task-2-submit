@@ -10,8 +10,8 @@
   },
   "dependencies": {
     "@fedsa/api": "*",
-    "mongoose": "^9.10.3",
-    "pino": "^10.3.1"
+    "mongoose": "^9.12.1",
+    "pino": "^10.4.0"
   },
   "devDependencies": {
     "@types/node": "^22.20.4"
